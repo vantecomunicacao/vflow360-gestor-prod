@@ -29,6 +29,8 @@ const Integrations = () => {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loadingWa, setLoadingWa] = useState(false);
   const [ghlConnected, setGhlConnected] = useState(false);
+  const [ghlLocationName, setGhlLocationName] = useState("");
+  const [loadingGhl, setLoadingGhl] = useState(false);
   const [ghlApiKey, setGhlApiKey] = useState("");
   const [ghlLocationId, setGhlLocationId] = useState("");
   const [customFields, setCustomFields] = useState<CustomFieldMapping[]>([
