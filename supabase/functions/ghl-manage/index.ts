@@ -193,7 +193,8 @@ serve(async (req) => {
       }
 
       case "custom_fields": {
-        const data = await callGhl("/locations/" + (await getGhlCredentials()).locationId + "/customFields");
+        const creds = await getGhlCredentials();
+        const data = await callGhl("/locations/" + creds.locationId + "/customFields", "GET", undefined, true);
         return new Response(JSON.stringify({ success: true, data }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
