@@ -89,12 +89,31 @@ const Integrations = () => {
     return result.data;
   }, []);
 
+  const GHL_STANDARD_FIELDS: GhlCustomField[] = [
+    { id: "std_firstName", name: "Nome", fieldKey: "firstName", dataType: "text", selected: false, description: "" },
+    { id: "std_lastName", name: "Sobrenome", fieldKey: "lastName", dataType: "text", selected: false, description: "" },
+    { id: "std_name", name: "Nome completo", fieldKey: "name", dataType: "text", selected: false, description: "" },
+    { id: "std_email", name: "Email", fieldKey: "email", dataType: "text", selected: false, description: "" },
+    { id: "std_phone", name: "Telefone", fieldKey: "phone", dataType: "text", selected: false, description: "" },
+    { id: "std_address1", name: "Endereço", fieldKey: "address1", dataType: "text", selected: false, description: "" },
+    { id: "std_city", name: "Cidade", fieldKey: "city", dataType: "text", selected: false, description: "" },
+    { id: "std_state", name: "Estado", fieldKey: "state", dataType: "text", selected: false, description: "" },
+    { id: "std_country", name: "País", fieldKey: "country", dataType: "text", selected: false, description: "" },
+    { id: "std_postalCode", name: "CEP", fieldKey: "postalCode", dataType: "text", selected: false, description: "" },
+    { id: "std_website", name: "Website", fieldKey: "website", dataType: "text", selected: false, description: "" },
+    { id: "std_companyName", name: "Empresa", fieldKey: "companyName", dataType: "text", selected: false, description: "" },
+    { id: "std_source", name: "Origem", fieldKey: "source", dataType: "text", selected: false, description: "" },
+    { id: "std_tags", name: "Tags", fieldKey: "tags", dataType: "array", selected: false, description: "" },
+    { id: "std_dnd", name: "Não perturbe (DND)", fieldKey: "dnd", dataType: "boolean", selected: false, description: "" },
+    { id: "std_dateOfBirth", name: "Data de nascimento", fieldKey: "dateOfBirth", dataType: "date", selected: false, description: "" },
+  ];
+
   const fetchGhlFieldsAndStages = useCallback(async () => {
     setLoadingFields(true);
     setLoadingStages(true);
     try {
       const fieldsData = await callGhl("custom_fields");
-      const fields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => ({
+      const customFields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => ({
         id: f.id,
         name: f.name || f.fieldKey || f.id,
         fieldKey: f.fieldKey || f.key || f.id,
@@ -102,9 +121,10 @@ const Integrations = () => {
         selected: false,
         description: "",
       }));
-      setGhlFields(fields);
+      setGhlFields([...GHL_STANDARD_FIELDS, ...customFields]);
     } catch (error) {
       console.error("Error fetching GHL fields:", error);
+      setGhlFields([...GHL_STANDARD_FIELDS]);
     } finally {
       setLoadingFields(false);
     }
@@ -428,7 +448,7 @@ const Integrations = () => {
             {/* Custom Fields from GHL */}
             <div className="space-y-4">
               <div>
-                <h4 className="font-semibold text-foreground text-sm">Campos Personalizados do GHL</h4>
+                <h4 className="font-semibold text-foreground text-sm">Campos do GHL</h4>
                 <p className="text-xs text-muted-foreground">Selecione os campos que a IA deve considerar e descreva o que cada um representa</p>
               </div>
 
@@ -437,10 +457,12 @@ const Integrations = () => {
                   <Loader2 className="w-4 h-4 animate-spin" /> Carregando campos do GHL...
                 </div>
               ) : ghlFields.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">Nenhum campo personalizado encontrado no GHL.</p>
+                <p className="text-sm text-muted-foreground py-4">Nenhum campo encontrado no GHL.</p>
               ) : (
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                  {ghlFields.map((field) => (
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {/* Standard fields */}
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-1">Campos padrão</p>
+                  {ghlFields.filter(f => f.id.startsWith("std_")).map((field) => (
                     <div key={field.id} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
                       <Checkbox
                         id={`field-${field.id}`}
@@ -467,6 +489,41 @@ const Integrations = () => {
                       </div>
                     </div>
                   ))}
+
+                  {/* Custom fields */}
+                  {ghlFields.filter(f => !f.id.startsWith("std_")).length > 0 && (
+                    <>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-3">Campos personalizados</p>
+                      {ghlFields.filter(f => !f.id.startsWith("std_")).map((field) => (
+                        <div key={field.id} className="flex items-start gap-3 p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors">
+                          <Checkbox
+                            id={`field-${field.id}`}
+                            checked={field.selected}
+                            onCheckedChange={() => toggleField(field.id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label htmlFor={`field-${field.id}`} className="text-sm font-medium text-foreground cursor-pointer">
+                                {field.name}
+                              </label>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">personalizado</Badge>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{field.dataType}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground font-mono">{field.fieldKey}</p>
+                            {field.selected && (
+                              <Input
+                                placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
+                                value={field.description}
+                                onChange={(e) => updateFieldDescription(field.id, e.target.value)}
+                                className="text-sm"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
             </div>
