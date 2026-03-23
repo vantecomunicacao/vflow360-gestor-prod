@@ -47,11 +47,10 @@ serve(async (req) => {
     };
 
     // Helper to call GHL API
-    const callGhl = async (endpoint: string, method = "GET", body?: unknown) => {
+    const callGhl = async (endpoint: string, method = "GET", body?: unknown, skipLocationId = false) => {
       const creds = await getGhlCredentials();
       const url = new URL(endpoint, GHL_BASE_URL);
-      // Add locationId as query param for endpoints that need it
-      if (!url.searchParams.has("locationId")) {
+      if (!skipLocationId && !url.searchParams.has("locationId")) {
         url.searchParams.set("locationId", creds.locationId!);
       }
 
@@ -194,7 +193,8 @@ serve(async (req) => {
       }
 
       case "custom_fields": {
-        const data = await callGhl("/locations/" + (await getGhlCredentials()).locationId + "/customFields");
+        const creds = await getGhlCredentials();
+        const data = await callGhl("/locations/" + creds.locationId + "/customFields", "GET", undefined, true);
         return new Response(JSON.stringify({ success: true, data }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
