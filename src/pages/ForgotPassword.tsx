@@ -6,16 +6,27 @@ import { Label } from "@/components/ui/label";
 import { Bot, Mail, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
-    toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada." });
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } else {
+      setSent(true);
+      toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada." });
+    }
   };
 
   return (
@@ -41,7 +52,9 @@ const ForgotPassword = () => {
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
-            <Button type="submit" className="w-full">Enviar link de recuperação</Button>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Enviando..." : "Enviar link de recuperação"}
+            </Button>
           </form>
         )}
 
