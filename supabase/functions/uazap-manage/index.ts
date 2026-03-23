@@ -30,7 +30,7 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     
     // Create a client with the user's token to verify identity
-    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!, {
+    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
