@@ -187,10 +187,14 @@ const Integrations = () => {
     const interval = setInterval(async () => {
       try {
         const data = await callUazap("status");
-        if (data?.status === "connected") {
+        if (data?.status === "connected" || data?.instance?.status === "connected") {
           setWhatsappStatus("connected");
           setQrCode(null);
           toast({ title: "WhatsApp conectado com sucesso!" });
+        } else {
+          // Update QR code if available from status
+          const newQr = data?.instance?.qrcode || data?.qrcode;
+          if (newQr) setQrCode(newQr);
         }
       } catch { /* ignore */ }
     }, 5000);
