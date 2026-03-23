@@ -116,8 +116,11 @@ serve(async (req) => {
         if (!config.token) throw new Error("Instance token not found");
 
         const response = await fetch(`${BASE_URL}/instance/qrcode`, {
-          method: "GET",
-          headers: { token: config.token },
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            token: config.token,
+          },
         });
         const data = await response.json();
         if (!response.ok) {
