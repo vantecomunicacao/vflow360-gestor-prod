@@ -302,7 +302,9 @@ const Integrations = () => {
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Go High Level</h3>
-              <p className="text-sm text-muted-foreground">Integração com CRM</p>
+              <p className="text-sm text-muted-foreground">
+                {ghlConnected && ghlLocationName ? `Conectado: ${ghlLocationName}` : "Integração com CRM"}
+              </p>
             </div>
           </div>
           <Badge variant="outline" className={ghlConnected ? "text-success border-success/30" : "text-destructive border-destructive/30"}>
@@ -312,16 +314,40 @@ const Integrations = () => {
 
         {!ghlConnected ? (
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Insira seu Private Integration Token e Location ID do Go High Level. Encontre em: Settings → Integrations → API Keys.
+            </p>
             <div className="space-y-2">
-              <Label>API Key</Label>
-              <Input placeholder="Sua API Key do GHL" value={ghlApiKey} onChange={(e) => setGhlApiKey(e.target.value)} />
+              <Label>API Key (Private Integration Token)</Label>
+              <Input placeholder="pit-xxxxxxxx..." value={ghlApiKey} onChange={(e) => setGhlApiKey(e.target.value)} type="password" />
             </div>
             <div className="space-y-2">
               <Label>Location ID</Label>
               <Input placeholder="Seu Location ID" value={ghlLocationId} onChange={(e) => setGhlLocationId(e.target.value)} />
             </div>
-            <Button onClick={() => { setGhlConnected(true); toast({ title: "GHL conectado!" }); }}>
-              <Link2 className="w-4 h-4 mr-1" /> Conectar
+            <Button
+              onClick={async () => {
+                if (!ghlApiKey || !ghlLocationId) {
+                  toast({ title: "Erro", description: "Preencha a API Key e o Location ID.", variant: "destructive" });
+                  return;
+                }
+                setLoadingGhl(true);
+                try {
+                  const data = await callGhl("connect", { apiKey: ghlApiKey, locationId: ghlLocationId });
+                  setGhlConnected(true);
+                  setGhlLocationName(data.locationName || "");
+                  setGhlApiKey("");
+                  setGhlLocationId("");
+                  toast({ title: "GHL conectado!", description: `Location: ${data.locationName || ghlLocationId}` });
+                } catch (error) {
+                  toast({ title: "Erro ao conectar", description: error instanceof Error ? error.message : "Verifique suas credenciais", variant: "destructive" });
+                } finally {
+                  setLoadingGhl(false);
+                }
+              }}
+              disabled={loadingGhl}
+            >
+              {loadingGhl ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Conectando...</> : <><Link2 className="w-4 h-4 mr-1" /> Conectar</>}
             </Button>
           </div>
         ) : (
