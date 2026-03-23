@@ -66,10 +66,13 @@ serve(async (req) => {
         options.body = JSON.stringify(body);
       }
 
+      console.log(`GHL API call: ${method} ${url.toString()}`);
       const response = await fetch(url.toString(), options);
-      const data = await response.json();
+      const responseText = await response.text();
+      console.log(`GHL API response [${response.status}]: ${responseText.substring(0, 500)}`);
+      const data = JSON.parse(responseText);
       if (!response.ok) {
-        throw new Error(`GHL API error [${response.status}]: ${JSON.stringify(data)}`);
+        throw new Error(`GHL API error [${response.status}]: ${responseText}`);
       }
       return data;
     };
