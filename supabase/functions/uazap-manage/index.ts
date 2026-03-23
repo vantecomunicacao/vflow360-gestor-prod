@@ -49,7 +49,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
             admintoken: UAZAP_ADMIN_TOKEN,
           },
-          body: JSON.stringify({ instanceName: name }),
+          body: JSON.stringify({ name, instanceName: name }),
         });
         const data = await response.json();
         if (!response.ok) {
