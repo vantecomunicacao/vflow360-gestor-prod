@@ -30,17 +30,56 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
-    const { action, apiKey, locationId } = await req.json();
+    const payload = await req.json().catch(() => ({} as Record<string, unknown>));
+    const action = typeof payload.action === "string" ? payload.action : "";
+    const apiKey = typeof payload.apiKey === "string" ? payload.apiKey.trim() : "";
+    const locationId = typeof payload.locationId === "string" ? payload.locationId.trim() : "";
+
+    const clearGhlConnection = async () => {
+      await supabase.from("integrations").upsert(
+        {
+          user_id: user.id,
+          type: "ghl",
+          status: "disconnected",
+          config: {},
+        },
+        { onConflict: "user_id,type" }
+      );
+    };
+
+    const validateGhlCredentials = async (candidateApiKey: string, candidateLocationId: string) => {
+      const testUrl = new URL(`/locations/${candidateLocationId}`, GHL_BASE_URL);
+      const testResponse = await fetch(testUrl.toString(), {
+        headers: {
+          Authorization: `Bearer ${candidateApiKey}`,
+          "Content-Type": "application/json",
+          Version: "2021-07-28",
+        },
+      });
+
+      if (!testResponse.ok) {
+        const errData = await testResponse.json().catch(() => ({}));
+        throw new Error(
+          testResponse.status === 401
+            ? "API Key inválida. Verifique suas credenciais."
+            : `Erro ao conectar ao GHL [${testResponse.status}]: ${JSON.stringify(errData)}`
+        );
+      }
+
+      return await testResponse.json();
+    };
 
     // Helper to get stored GHL credentials
     const getGhlCredentials = async () => {
       const { data: integration } = await supabase
         .from("integrations")
-        .select("config")
+        .select("config, status")
         .eq("user_id", user.id)
         .eq("type", "ghl")
         .single();
-      if (!integration) throw new Error("GHL not connected. Please add your credentials first.");
+      if (!integration || integration.status !== "connected") {
+        throw new Error("GHL not connected. Please add your credentials first.");
+      }
       const config = integration.config as { apiKey?: string; locationId?: string };
       if (!config.apiKey || !config.locationId) throw new Error("GHL credentials incomplete");
       return config;
@@ -70,10 +109,21 @@ serve(async (req) => {
       const response = await fetch(url.toString(), options);
       const responseText = await response.text();
       console.log(`GHL API response [${response.status}]: ${responseText.substring(0, 500)}`);
-      const data = JSON.parse(responseText);
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          await clearGhlConnection();
+          throw new Error("Credenciais GHL inválidas ou expiradas. Reconecte sua conta.");
+        }
         throw new Error(`GHL API error [${response.status}]: ${responseText}`);
       }
+
+      let data: unknown = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        data = responseText;
+      }
+
       return data;
     };
 
@@ -82,26 +132,13 @@ serve(async (req) => {
         // Save credentials and test connection
         if (!apiKey || !locationId) throw new Error("API Key and Location ID are required");
 
-        // Test the connection by fetching location info
-        const testUrl = new URL("/locations/" + locationId, GHL_BASE_URL);
-        const testResponse = await fetch(testUrl.toString(), {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            Version: "2021-07-28",
-          },
-        });
-
-        if (!testResponse.ok) {
-          const errData = await testResponse.json().catch(() => ({}));
-          throw new Error(
-            testResponse.status === 401
-              ? "API Key inválida. Verifique suas credenciais."
-              : `Erro ao conectar ao GHL [${testResponse.status}]: ${JSON.stringify(errData)}`
-          );
+        let locationData;
+        try {
+          locationData = await validateGhlCredentials(apiKey, locationId);
+        } catch (validationError) {
+          await clearGhlConnection();
+          throw validationError;
         }
-
-        const locationData = await testResponse.json();
 
         // Save credentials
         await supabase.from("integrations").upsert(
@@ -153,7 +190,26 @@ serve(async (req) => {
           );
         }
 
-        const config = integration.config as { locationName?: string };
+        const config = integration.config as { apiKey?: string; locationId?: string; locationName?: string };
+
+        if (integration.status !== "connected" || !config.apiKey || !config.locationId) {
+          await clearGhlConnection();
+          return new Response(
+            JSON.stringify({ success: true, data: { status: "disconnected", locationName: "" } }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        try {
+          await validateGhlCredentials(config.apiKey, config.locationId);
+        } catch {
+          await clearGhlConnection();
+          return new Response(
+            JSON.stringify({ success: true, data: { status: "disconnected", locationName: "" } }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -174,7 +230,7 @@ serve(async (req) => {
       }
 
       case "search_contacts": {
-        const { query } = await req.json().catch(() => ({ query: "" }));
+        const query = typeof payload.query === "string" ? payload.query : "";
         const data = await callGhl(`/contacts/search?query=${encodeURIComponent(query || "")}`);
         return new Response(JSON.stringify({ success: true, data }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -204,7 +260,9 @@ serve(async (req) => {
       }
 
       case "save_mappings": {
-        const { selectedFields, selectedStages, aiPrompt: prompt } = await req.json().catch(() => ({ selectedFields: [], selectedStages: [], aiPrompt: "" }));
+        const selectedFields = Array.isArray(payload.selectedFields) ? payload.selectedFields : [];
+        const selectedStages = Array.isArray(payload.selectedStages) ? payload.selectedStages : [];
+        const prompt = typeof payload.aiPrompt === "string" ? payload.aiPrompt : "";
         
         // Get current config to preserve apiKey/locationId
         const { data: currentIntegration } = await supabase
