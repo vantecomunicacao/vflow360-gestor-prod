@@ -49,6 +49,13 @@ const Integrations = () => {
   );
   const { toast } = useToast();
 
+  const resetGhlState = useCallback(() => {
+    setGhlConnected(false);
+    setGhlLocationName("");
+    setGhlFields([]);
+    setGhlStages([]);
+  }, []);
+
   const callUazap = useCallback(async (action: string, extra?: Record<string, unknown>) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");
@@ -111,6 +118,8 @@ const Integrations = () => {
   const fetchGhlFieldsAndStages = useCallback(async () => {
     setLoadingFields(true);
     setLoadingStages(true);
+    setGhlFields([]);
+    setGhlStages([]);
     
     // Load saved mappings first
     let savedFields: any[] = [];
@@ -173,6 +182,7 @@ const Integrations = () => {
       setGhlStages(stages);
     } catch (error) {
       console.error("Error fetching GHL pipelines:", error);
+      setGhlStages([]);
     } finally {
       setLoadingStages(false);
     }
@@ -192,11 +202,13 @@ const Integrations = () => {
         if (data?.status === "connected") {
           setGhlConnected(true);
           setGhlLocationName(data.locationName || "");
+        } else {
+          resetGhlState();
         }
       } catch { /* silent */ }
     };
     checkStatus();
-  }, [callUazap, callGhl]);
+  }, [callUazap, callGhl, resetGhlState]);
 
   // Fetch fields/stages when GHL connects
   useEffect(() => {
@@ -445,6 +457,7 @@ const Integrations = () => {
                   setGhlLocationId("");
                   toast({ title: "GHL conectado!", description: `Location: ${data.locationName || ghlLocationId}` });
                 } catch (error) {
+                  resetGhlState();
                   toast({ title: "Erro ao conectar", description: error instanceof Error ? error.message : "Verifique suas credenciais", variant: "destructive" });
                 } finally {
                   setLoadingGhl(false);
@@ -465,10 +478,7 @@ const Integrations = () => {
                 setLoadingGhl(true);
                 try {
                   await callGhl("disconnect");
-                  setGhlConnected(false);
-                  setGhlLocationName("");
-                  setGhlFields([]);
-                  setGhlStages([]);
+                  resetGhlState();
                   toast({ title: "GHL desconectado" });
                 } catch (error) {
                   toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao desconectar", variant: "destructive" });
