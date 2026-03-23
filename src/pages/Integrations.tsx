@@ -1,24 +1,31 @@
-import { MessageSquare, Link2, QrCode, CheckCircle, XCircle, RefreshCw, Settings, Plus, Trash2, Sparkles, Loader2, Wifi, WifiOff } from "lucide-react";
+import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Settings, Sparkles, Loader2, Wifi, WifiOff, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { motion, AnimatePresence } from "framer-motion";
+import { Checkbox } from "@/components/ui/checkbox";
+import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-interface CustomFieldMapping {
+interface GhlCustomField {
   id: string;
-  ghlFieldName: string;
+  name: string;
+  fieldKey: string;
+  dataType: string;
+  selected: boolean;
   description: string;
 }
 
-interface PipelineStageMapping {
+interface GhlPipelineStage {
   id: string;
-  stageName: string;
+  name: string;
+  pipelineId: string;
+  pipelineName: string;
+  selected: boolean;
   description: string;
 }
 
@@ -33,12 +40,10 @@ const Integrations = () => {
   const [loadingGhl, setLoadingGhl] = useState(false);
   const [ghlApiKey, setGhlApiKey] = useState("");
   const [ghlLocationId, setGhlLocationId] = useState("");
-  const [customFields, setCustomFields] = useState<CustomFieldMapping[]>([
-    { id: "1", ghlFieldName: "", description: "" },
-  ]);
-  const [pipelineStages, setPipelineStages] = useState<PipelineStageMapping[]>([
-    { id: "1", stageName: "", description: "" },
-  ]);
+  const [ghlFields, setGhlFields] = useState<GhlCustomField[]>([]);
+  const [ghlStages, setGhlStages] = useState<GhlPipelineStage[]>([]);
+  const [loadingFields, setLoadingFields] = useState(false);
+  const [loadingStages, setLoadingStages] = useState(false);
   const [aiPrompt, setAiPrompt] = useState(
     "Você é um assistente de CRM. Ao analisar conversas, leve em conta os campos personalizados e etapas do funil mapeados abaixo para gerar sugestões precisas."
   );
@@ -47,7 +52,6 @@ const Integrations = () => {
   const callUazap = useCallback(async (action: string, extra?: Record<string, unknown>) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");
-
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/uazap-manage`,
       {
@@ -68,7 +72,6 @@ const Integrations = () => {
   const callGhl = useCallback(async (action: string, extra?: Record<string, unknown>) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");
-
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ghl-manage`,
       {
@@ -86,7 +89,52 @@ const Integrations = () => {
     return result.data;
   }, []);
 
-  // Check WhatsApp + GHL status on mount
+  const fetchGhlFieldsAndStages = useCallback(async () => {
+    setLoadingFields(true);
+    setLoadingStages(true);
+    try {
+      const fieldsData = await callGhl("custom_fields");
+      const fields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => ({
+        id: f.id,
+        name: f.name || f.fieldKey || f.id,
+        fieldKey: f.fieldKey || f.key || f.id,
+        dataType: f.dataType || f.type || "text",
+        selected: false,
+        description: "",
+      }));
+      setGhlFields(fields);
+    } catch (error) {
+      console.error("Error fetching GHL fields:", error);
+    } finally {
+      setLoadingFields(false);
+    }
+
+    try {
+      const pipelinesData = await callGhl("pipelines");
+      const stages: GhlPipelineStage[] = [];
+      const pipelines = pipelinesData?.pipelines || pipelinesData || [];
+      for (const pipeline of pipelines) {
+        const pStages = pipeline.stages || [];
+        for (const stage of pStages) {
+          stages.push({
+            id: stage.id,
+            name: stage.name,
+            pipelineId: pipeline.id,
+            pipelineName: pipeline.name,
+            selected: false,
+            description: "",
+          });
+        }
+      }
+      setGhlStages(stages);
+    } catch (error) {
+      console.error("Error fetching GHL pipelines:", error);
+    } finally {
+      setLoadingStages(false);
+    }
+  }, [callGhl]);
+
+  // Check status on mount
   useEffect(() => {
     const checkStatus = async () => {
       try {
@@ -106,7 +154,14 @@ const Integrations = () => {
     checkStatus();
   }, [callUazap, callGhl]);
 
-  // Poll for status while connecting
+  // Fetch fields/stages when GHL connects
+  useEffect(() => {
+    if (ghlConnected) {
+      fetchGhlFieldsAndStages();
+    }
+  }, [ghlConnected, fetchGhlFieldsAndStages]);
+
+  // Poll for WA status while connecting
   useEffect(() => {
     if (whatsappStatus !== "connecting") return;
     const interval = setInterval(async () => {
@@ -125,17 +180,13 @@ const Integrations = () => {
   const handleCreateAndConnect = async () => {
     setLoadingWa(true);
     try {
-      // Create instance
       await callUazap("create");
       toast({ title: "Instância criada!", description: "Gerando QR Code..." });
-
-      // Get QR code
       const connectData = await callUazap("connect");
       if (connectData?.qrcode || connectData?.base64 || connectData?.pairingCode) {
         setQrCode(connectData.qrcode || connectData.base64 || null);
         setWhatsappStatus("connecting");
       } else {
-        // Try qrcode endpoint
         const qrData = await callUazap("qrcode");
         setQrCode(qrData?.qrcode || qrData?.base64 || null);
         setWhatsappStatus("connecting");
@@ -180,15 +231,27 @@ const Integrations = () => {
     }
   };
 
-  const addCustomField = () => setCustomFields(prev => [...prev, { id: crypto.randomUUID(), ghlFieldName: "", description: "" }]);
-  const removeCustomField = (id: string) => setCustomFields(prev => prev.filter(f => f.id !== id));
-  const updateCustomField = (id: string, key: keyof CustomFieldMapping, value: string) => setCustomFields(prev => prev.map(f => f.id === id ? { ...f, [key]: value } : f));
-  const addPipelineStage = () => setPipelineStages(prev => [...prev, { id: crypto.randomUUID(), stageName: "", description: "" }]);
-  const removePipelineStage = (id: string) => setPipelineStages(prev => prev.filter(s => s.id !== id));
-  const updatePipelineStage = (id: string, key: keyof PipelineStageMapping, value: string) => setPipelineStages(prev => prev.map(s => s.id === id ? { ...s, [key]: value } : s));
+  const toggleField = (id: string) => {
+    setGhlFields(prev => prev.map(f => f.id === id ? { ...f, selected: !f.selected } : f));
+  };
+
+  const updateFieldDescription = (id: string, description: string) => {
+    setGhlFields(prev => prev.map(f => f.id === id ? { ...f, description } : f));
+  };
+
+  const toggleStage = (id: string) => {
+    setGhlStages(prev => prev.map(s => s.id === id ? { ...s, selected: !s.selected } : s));
+  };
+
+  const updateStageDescription = (id: string, description: string) => {
+    setGhlStages(prev => prev.map(s => s.id === id ? { ...s, description } : s));
+  };
 
   const handleSaveMappings = () => {
-    toast({ title: "Mapeamento salvo!", description: "A IA usará essas informações para gerar sugestões mais precisas." });
+    const selectedFields = ghlFields.filter(f => f.selected);
+    const selectedStages = ghlStages.filter(s => s.selected);
+    console.log("Saving mappings:", { selectedFields, selectedStages, aiPrompt });
+    toast({ title: "Mapeamento salvo!", description: `${selectedFields.length} campos e ${selectedStages.length} etapas selecionados.` });
   };
 
   const getWhatsAppBadge = () => {
@@ -229,9 +292,7 @@ const Integrations = () => {
         {whatsappStatus === "not_created" && (
           <div className="bg-muted rounded-lg p-6 flex flex-col items-center gap-4">
             <Wifi className="w-12 h-12 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground text-center">
-              Conecte seu WhatsApp para começar a receber e analisar mensagens automaticamente.
-            </p>
+            <p className="text-sm text-muted-foreground text-center">Conecte seu WhatsApp para começar a receber e analisar mensagens automaticamente.</p>
             <Button onClick={handleCreateAndConnect} disabled={loadingWa}>
               {loadingWa ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Criando...</> : <><MessageSquare className="w-4 h-4 mr-2" /> Conectar WhatsApp</>}
             </Button>
@@ -243,18 +304,11 @@ const Integrations = () => {
             {qrCode ? (
               <>
                 <div className="w-64 h-64 bg-background rounded-lg flex items-center justify-center overflow-hidden border border-border">
-                  <img
-                    src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
-                    alt="QR Code WhatsApp"
-                    className="w-full h-full object-contain"
-                  />
+                  <img src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR Code WhatsApp" className="w-full h-full object-contain" />
                 </div>
-                <p className="text-sm text-muted-foreground text-center">
-                  Escaneie o QR Code com seu WhatsApp para conectar
-                </p>
+                <p className="text-sm text-muted-foreground text-center">Escaneie o QR Code com seu WhatsApp para conectar</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Aguardando conexão...
+                  <Loader2 className="w-3 h-3 animate-spin" /> Aguardando conexão...
                 </div>
               </>
             ) : (
@@ -272,9 +326,7 @@ const Integrations = () => {
         {whatsappStatus === "disconnected" && (
           <div className="bg-muted rounded-lg p-6 flex flex-col items-center gap-4">
             <WifiOff className="w-12 h-12 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground text-center">
-              Sua instância está desconectada. Reconecte para continuar recebendo mensagens.
-            </p>
+            <p className="text-sm text-muted-foreground text-center">Sua instância está desconectada. Reconecte para continuar recebendo mensagens.</p>
             <Button onClick={handleReconnect} disabled={loadingWa}>
               {loadingWa ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reconectando...</> : <><RefreshCw className="w-4 h-4 mr-2" /> Reconectar</>}
             </Button>
@@ -283,12 +335,8 @@ const Integrations = () => {
 
         {whatsappStatus === "connected" && (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleReconnect} disabled={loadingWa}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Reconectar
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDisconnect} disabled={loadingWa}>
-              Desconectar
-            </Button>
+            <Button variant="outline" size="sm" onClick={handleReconnect} disabled={loadingWa}><RefreshCw className="w-4 h-4 mr-1" /> Reconectar</Button>
+            <Button variant="outline" size="sm" onClick={handleDisconnect} disabled={loadingWa}>Desconectar</Button>
           </div>
         )}
       </motion.div>
@@ -353,8 +401,8 @@ const Integrations = () => {
         ) : (
           <div className="space-y-6">
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Settings className="w-4 h-4 mr-1" /> Configurações
+              <Button variant="outline" size="sm" onClick={fetchGhlFieldsAndStages} disabled={loadingFields || loadingStages}>
+                <Download className="w-4 h-4 mr-1" /> {loadingFields || loadingStages ? "Carregando..." : "Recarregar dados"}
               </Button>
               <Button variant="outline" size="sm" disabled={loadingGhl} onClick={async () => {
                 setLoadingGhl(true);
@@ -362,6 +410,8 @@ const Integrations = () => {
                   await callGhl("disconnect");
                   setGhlConnected(false);
                   setGhlLocationName("");
+                  setGhlFields([]);
+                  setGhlStages([]);
                   toast({ title: "GHL desconectado" });
                 } catch (error) {
                   toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao desconectar", variant: "destructive" });
@@ -375,58 +425,97 @@ const Integrations = () => {
 
             <Separator />
 
-            {/* Custom Fields */}
+            {/* Custom Fields from GHL */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-semibold text-foreground text-sm">Campos Personalizados</h4>
-                  <p className="text-xs text-muted-foreground">Mapeie os campos do GHL para que a IA entenda cada um</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={addCustomField}>
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar
-                </Button>
+              <div>
+                <h4 className="font-semibold text-foreground text-sm">Campos Personalizados do GHL</h4>
+                <p className="text-xs text-muted-foreground">Selecione os campos que a IA deve considerar e descreva o que cada um representa</p>
               </div>
-              <AnimatePresence>
-                {customFields.map((field) => (
-                  <motion.div key={field.id} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="flex items-start gap-3">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <Input placeholder="Nome do campo no GHL" value={field.ghlFieldName} onChange={(e) => updateCustomField(field.id, "ghlFieldName", e.target.value)} />
-                      <Input placeholder="Descrição para a IA" value={field.description} onChange={(e) => updateCustomField(field.id, "description", e.target.value)} />
+
+              {loadingFields ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando campos do GHL...
+                </div>
+              ) : ghlFields.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">Nenhum campo personalizado encontrado no GHL.</p>
+              ) : (
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                  {ghlFields.map((field) => (
+                    <div key={field.id} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
+                      <Checkbox
+                        id={`field-${field.id}`}
+                        checked={field.selected}
+                        onCheckedChange={() => toggleField(field.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label htmlFor={`field-${field.id}`} className="text-sm font-medium text-foreground cursor-pointer">
+                            {field.name}
+                          </label>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{field.dataType}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground font-mono">{field.fieldKey}</p>
+                        {field.selected && (
+                          <Input
+                            placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
+                            value={field.description}
+                            onChange={(e) => updateFieldDescription(field.id, e.target.value)}
+                            className="text-sm"
+                          />
+                        )}
+                      </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeCustomField(field.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Separator />
 
-            {/* Pipeline Stages */}
+            {/* Pipeline Stages from GHL */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-semibold text-foreground text-sm">Etapas do Funil</h4>
-                  <p className="text-xs text-muted-foreground">Descreva cada etapa para que a IA saiba quando mover o lead</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={addPipelineStage}>
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar
-                </Button>
+              <div>
+                <h4 className="font-semibold text-foreground text-sm">Etapas do Funil</h4>
+                <p className="text-xs text-muted-foreground">Selecione as etapas que a IA deve usar e descreva quando mover o lead para cada uma</p>
               </div>
-              <AnimatePresence>
-                {pipelineStages.map((stage) => (
-                  <motion.div key={stage.id} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="flex items-start gap-3">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <Input placeholder="Nome da etapa" value={stage.stageName} onChange={(e) => updatePipelineStage(stage.id, "stageName", e.target.value)} />
-                      <Input placeholder="Descrição para a IA" value={stage.description} onChange={(e) => updatePipelineStage(stage.id, "description", e.target.value)} />
+
+              {loadingStages ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando etapas do GHL...
+                </div>
+              ) : ghlStages.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">Nenhum funil encontrado no GHL.</p>
+              ) : (
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                  {ghlStages.map((stage) => (
+                    <div key={stage.id} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
+                      <Checkbox
+                        id={`stage-${stage.id}`}
+                        checked={stage.selected}
+                        onCheckedChange={() => toggleStage(stage.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label htmlFor={`stage-${stage.id}`} className="text-sm font-medium text-foreground cursor-pointer">
+                            {stage.name}
+                          </label>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{stage.pipelineName}</Badge>
+                        </div>
+                        {stage.selected && (
+                          <Input
+                            placeholder="Quando mover o lead para esta etapa? (ex: 'Quando confirmar interesse em agendar')"
+                            value={stage.description}
+                            onChange={(e) => updateStageDescription(stage.id, e.target.value)}
+                            className="text-sm"
+                          />
+                        )}
+                      </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removePipelineStage(stage.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Separator />
