@@ -29,6 +29,8 @@ const Integrations = () => {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loadingWa, setLoadingWa] = useState(false);
   const [ghlConnected, setGhlConnected] = useState(false);
+  const [ghlLocationName, setGhlLocationName] = useState("");
+  const [loadingGhl, setLoadingGhl] = useState(false);
   const [ghlApiKey, setGhlApiKey] = useState("");
   const [ghlLocationId, setGhlLocationId] = useState("");
   const [customFields, setCustomFields] = useState<CustomFieldMapping[]>([
@@ -63,19 +65,46 @@ const Integrations = () => {
     return result.data;
   }, []);
 
-  // Check WhatsApp status on mount
+  const callGhl = useCallback(async (action: string, extra?: Record<string, unknown>) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not authenticated");
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ghl-manage`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ action, ...extra }),
+      }
+    );
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error || "Unknown error");
+    return result.data;
+  }, []);
+
+  // Check WhatsApp + GHL status on mount
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const data = await callUazap("status");
         const status = data?.status || "not_created";
         setWhatsappStatus(status === "connected" ? "connected" : status === "connecting" ? "connecting" : status === "not_created" ? "not_created" : "disconnected");
-      } catch {
-        // silent - user may not have instance
-      }
+      } catch { /* silent */ }
+
+      try {
+        const data = await callGhl("status");
+        if (data?.status === "connected") {
+          setGhlConnected(true);
+          setGhlLocationName(data.locationName || "");
+        }
+      } catch { /* silent */ }
     };
     checkStatus();
-  }, [callUazap]);
+  }, [callUazap, callGhl]);
 
   // Poll for status while connecting
   useEffect(() => {
@@ -273,7 +302,9 @@ const Integrations = () => {
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Go High Level</h3>
-              <p className="text-sm text-muted-foreground">Integração com CRM</p>
+              <p className="text-sm text-muted-foreground">
+                {ghlConnected && ghlLocationName ? `Conectado: ${ghlLocationName}` : "Integração com CRM"}
+              </p>
             </div>
           </div>
           <Badge variant="outline" className={ghlConnected ? "text-success border-success/30" : "text-destructive border-destructive/30"}>
@@ -283,16 +314,40 @@ const Integrations = () => {
 
         {!ghlConnected ? (
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Insira seu Private Integration Token e Location ID do Go High Level. Encontre em: Settings → Integrations → API Keys.
+            </p>
             <div className="space-y-2">
-              <Label>API Key</Label>
-              <Input placeholder="Sua API Key do GHL" value={ghlApiKey} onChange={(e) => setGhlApiKey(e.target.value)} />
+              <Label>API Key (Private Integration Token)</Label>
+              <Input placeholder="pit-xxxxxxxx..." value={ghlApiKey} onChange={(e) => setGhlApiKey(e.target.value)} type="password" />
             </div>
             <div className="space-y-2">
               <Label>Location ID</Label>
               <Input placeholder="Seu Location ID" value={ghlLocationId} onChange={(e) => setGhlLocationId(e.target.value)} />
             </div>
-            <Button onClick={() => { setGhlConnected(true); toast({ title: "GHL conectado!" }); }}>
-              <Link2 className="w-4 h-4 mr-1" /> Conectar
+            <Button
+              onClick={async () => {
+                if (!ghlApiKey || !ghlLocationId) {
+                  toast({ title: "Erro", description: "Preencha a API Key e o Location ID.", variant: "destructive" });
+                  return;
+                }
+                setLoadingGhl(true);
+                try {
+                  const data = await callGhl("connect", { apiKey: ghlApiKey, locationId: ghlLocationId });
+                  setGhlConnected(true);
+                  setGhlLocationName(data.locationName || "");
+                  setGhlApiKey("");
+                  setGhlLocationId("");
+                  toast({ title: "GHL conectado!", description: `Location: ${data.locationName || ghlLocationId}` });
+                } catch (error) {
+                  toast({ title: "Erro ao conectar", description: error instanceof Error ? error.message : "Verifique suas credenciais", variant: "destructive" });
+                } finally {
+                  setLoadingGhl(false);
+                }
+              }}
+              disabled={loadingGhl}
+            >
+              {loadingGhl ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Conectando...</> : <><Link2 className="w-4 h-4 mr-1" /> Conectar</>}
             </Button>
           </div>
         ) : (
@@ -301,7 +356,19 @@ const Integrations = () => {
               <Button variant="outline" size="sm">
                 <Settings className="w-4 h-4 mr-1" /> Configurações
               </Button>
-              <Button variant="outline" size="sm" onClick={() => { setGhlConnected(false); toast({ title: "GHL desconectado" }); }}>
+              <Button variant="outline" size="sm" disabled={loadingGhl} onClick={async () => {
+                setLoadingGhl(true);
+                try {
+                  await callGhl("disconnect");
+                  setGhlConnected(false);
+                  setGhlLocationName("");
+                  toast({ title: "GHL desconectado" });
+                } catch (error) {
+                  toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao desconectar", variant: "destructive" });
+                } finally {
+                  setLoadingGhl(false);
+                }
+              }}>
                 Desconectar
               </Button>
             </div>
