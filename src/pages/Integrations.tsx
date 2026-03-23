@@ -111,6 +111,19 @@ const Integrations = () => {
   const fetchGhlFieldsAndStages = useCallback(async () => {
     setLoadingFields(true);
     setLoadingStages(true);
+    
+    // Load saved mappings first
+    let savedFields: any[] = [];
+    let savedStages: any[] = [];
+    let savedPrompt = "";
+    try {
+      const mappingsData = await callGhl("get_mappings");
+      savedFields = mappingsData?.selectedFields || [];
+      savedStages = mappingsData?.selectedStages || [];
+      savedPrompt = mappingsData?.aiPrompt || "";
+      if (savedPrompt) setAiPrompt(savedPrompt);
+    } catch { /* ignore */ }
+
     try {
       const fieldsData = await callGhl("custom_fields");
       const customFields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => ({
@@ -121,10 +134,20 @@ const Integrations = () => {
         selected: false,
         description: "",
       }));
-      setGhlFields([...GHL_STANDARD_FIELDS, ...customFields]);
+      
+      // Merge with saved selections
+      const allFields = [...GHL_STANDARD_FIELDS, ...customFields].map(f => {
+        const saved = savedFields.find((sf: any) => sf.id === f.id);
+        return saved ? { ...f, selected: true, description: saved.description || "" } : f;
+      });
+      setGhlFields(allFields);
     } catch (error) {
       console.error("Error fetching GHL fields:", error);
-      setGhlFields([...GHL_STANDARD_FIELDS]);
+      const allFields = GHL_STANDARD_FIELDS.map(f => {
+        const saved = savedFields.find((sf: any) => sf.id === f.id);
+        return saved ? { ...f, selected: true, description: saved.description || "" } : f;
+      });
+      setGhlFields(allFields);
     } finally {
       setLoadingFields(false);
     }
@@ -136,13 +159,14 @@ const Integrations = () => {
       for (const pipeline of pipelines) {
         const pStages = pipeline.stages || [];
         for (const stage of pStages) {
+          const saved = savedStages.find((ss: any) => ss.id === stage.id);
           stages.push({
             id: stage.id,
             name: stage.name,
             pipelineId: pipeline.id,
             pipelineName: pipeline.name,
-            selected: false,
-            description: "",
+            selected: saved ? true : false,
+            description: saved?.description || "",
           });
         }
       }
@@ -276,11 +300,15 @@ const Integrations = () => {
     setGhlStages(prev => prev.map(s => s.id === id ? { ...s, description } : s));
   };
 
-  const handleSaveMappings = () => {
-    const selectedFields = ghlFields.filter(f => f.selected);
-    const selectedStages = ghlStages.filter(s => s.selected);
-    console.log("Saving mappings:", { selectedFields, selectedStages, aiPrompt });
-    toast({ title: "Mapeamento salvo!", description: `${selectedFields.length} campos e ${selectedStages.length} etapas selecionados.` });
+  const handleSaveMappings = async () => {
+    const selectedFields = ghlFields.filter(f => f.selected).map(f => ({ id: f.id, fieldKey: f.fieldKey, name: f.name, dataType: f.dataType, description: f.description }));
+    const selectedStages = ghlStages.filter(s => s.selected).map(s => ({ id: s.id, name: s.name, pipelineId: s.pipelineId, pipelineName: s.pipelineName, description: s.description }));
+    try {
+      await callGhl("save_mappings", { selectedFields, selectedStages, aiPrompt });
+      toast({ title: "Mapeamento salvo!", description: `${selectedFields.length} campos e ${selectedStages.length} etapas selecionados.` });
+    } catch (error) {
+      toast({ title: "Erro ao salvar", description: error instanceof Error ? error.message : "Erro desconhecido", variant: "destructive" });
+    }
   };
 
   const getWhatsAppBadge = () => {

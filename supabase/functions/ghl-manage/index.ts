@@ -200,6 +200,65 @@ serve(async (req) => {
         });
       }
 
+      case "save_mappings": {
+        const { selectedFields, selectedStages, aiPrompt: prompt } = await req.json().catch(() => ({ selectedFields: [], selectedStages: [], aiPrompt: "" }));
+        
+        // Get current config to preserve apiKey/locationId
+        const { data: currentIntegration } = await supabase
+          .from("integrations")
+          .select("config")
+          .eq("user_id", user.id)
+          .eq("type", "ghl")
+          .single();
+        
+        if (!currentIntegration) throw new Error("GHL not connected");
+        const currentConfig = currentIntegration.config as Record<string, unknown>;
+        
+        await supabase
+          .from("integrations")
+          .update({
+            config: {
+              ...currentConfig,
+              selectedFields,
+              selectedStages,
+              aiPrompt: prompt,
+            },
+          })
+          .eq("user_id", user.id)
+          .eq("type", "ghl");
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "get_mappings": {
+        const { data: integration } = await supabase
+          .from("integrations")
+          .select("config")
+          .eq("user_id", user.id)
+          .eq("type", "ghl")
+          .single();
+        
+        if (!integration) {
+          return new Response(JSON.stringify({ success: true, data: { selectedFields: [], selectedStages: [], aiPrompt: "" } }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        const config = integration.config as Record<string, unknown>;
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            selectedFields: config.selectedFields || [],
+            selectedStages: config.selectedStages || [],
+            aiPrompt: config.aiPrompt || "",
+          },
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
