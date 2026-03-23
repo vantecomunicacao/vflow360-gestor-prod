@@ -41,7 +41,23 @@ serve(async (req) => {
 
     switch (action) {
       case "create": {
-        // Create a new instance for this user
+        // Check if user already has an instance
+        const { data: existingIntegration } = await supabase
+          .from("integrations")
+          .select("config, status")
+          .eq("user_id", user.id)
+          .eq("type", "whatsapp")
+          .single();
+
+        if (existingIntegration) {
+          const existingConfig = existingIntegration.config as { token?: string; instanceName?: string };
+          if (existingConfig?.token) {
+            return new Response(JSON.stringify({ success: true, data: { message: "Instance already exists", instanceName: existingConfig.instanceName } }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+
         const name = instanceName || `copiloto-${user.id.slice(0, 8)}`;
         const response = await fetch(`${BASE_URL}/instance/create`, {
           method: "POST",
@@ -56,7 +72,6 @@ serve(async (req) => {
           throw new Error(`Uazap create failed [${response.status}]: ${JSON.stringify(data)}`);
         }
 
-        // Save instance token in integrations table
         await supabase.from("integrations").upsert(
           {
             user_id: user.id,
