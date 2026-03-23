@@ -356,7 +356,19 @@ const Integrations = () => {
               <Button variant="outline" size="sm">
                 <Settings className="w-4 h-4 mr-1" /> Configurações
               </Button>
-              <Button variant="outline" size="sm" onClick={() => { setGhlConnected(false); toast({ title: "GHL desconectado" }); }}>
+              <Button variant="outline" size="sm" disabled={loadingGhl} onClick={async () => {
+                setLoadingGhl(true);
+                try {
+                  await callGhl("disconnect");
+                  setGhlConnected(false);
+                  setGhlLocationName("");
+                  toast({ title: "GHL desconectado" });
+                } catch (error) {
+                  toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao desconectar", variant: "destructive" });
+                } finally {
+                  setLoadingGhl(false);
+                }
+              }}>
                 Desconectar
               </Button>
             </div>
