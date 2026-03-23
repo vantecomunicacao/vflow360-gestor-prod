@@ -300,11 +300,15 @@ const Integrations = () => {
     setGhlStages(prev => prev.map(s => s.id === id ? { ...s, description } : s));
   };
 
-  const handleSaveMappings = () => {
-    const selectedFields = ghlFields.filter(f => f.selected);
-    const selectedStages = ghlStages.filter(s => s.selected);
-    console.log("Saving mappings:", { selectedFields, selectedStages, aiPrompt });
-    toast({ title: "Mapeamento salvo!", description: `${selectedFields.length} campos e ${selectedStages.length} etapas selecionados.` });
+  const handleSaveMappings = async () => {
+    const selectedFields = ghlFields.filter(f => f.selected).map(f => ({ id: f.id, fieldKey: f.fieldKey, name: f.name, dataType: f.dataType, description: f.description }));
+    const selectedStages = ghlStages.filter(s => s.selected).map(s => ({ id: s.id, name: s.name, pipelineId: s.pipelineId, pipelineName: s.pipelineName, description: s.description }));
+    try {
+      await callGhl("save_mappings", { selectedFields, selectedStages, aiPrompt });
+      toast({ title: "Mapeamento salvo!", description: `${selectedFields.length} campos e ${selectedStages.length} etapas selecionados.` });
+    } catch (error) {
+      toast({ title: "Erro ao salvar", description: error instanceof Error ? error.message : "Erro desconhecido", variant: "destructive" });
+    }
   };
 
   const getWhatsAppBadge = () => {
