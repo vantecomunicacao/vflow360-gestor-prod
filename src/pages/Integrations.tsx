@@ -187,10 +187,14 @@ const Integrations = () => {
     const interval = setInterval(async () => {
       try {
         const data = await callUazap("status");
-        if (data?.status === "connected") {
+        if (data?.status === "connected" || data?.instance?.status === "connected") {
           setWhatsappStatus("connected");
           setQrCode(null);
           toast({ title: "WhatsApp conectado com sucesso!" });
+        } else {
+          // Update QR code if available from status
+          const newQr = data?.instance?.qrcode || data?.qrcode;
+          if (newQr) setQrCode(newQr);
         }
       } catch { /* ignore */ }
     }, 5000);
@@ -203,12 +207,15 @@ const Integrations = () => {
       await callUazap("create");
       toast({ title: "Instância criada!", description: "Gerando QR Code..." });
       const connectData = await callUazap("connect");
-      if (connectData?.qrcode || connectData?.base64 || connectData?.pairingCode) {
-        setQrCode(connectData.qrcode || connectData.base64 || null);
+      const qr = connectData?.qrcode || connectData?.instance?.qrcode || connectData?.base64 || null;
+      if (qr) {
+        setQrCode(qr);
         setWhatsappStatus("connecting");
       } else {
-        const qrData = await callUazap("qrcode");
-        setQrCode(qrData?.qrcode || qrData?.base64 || null);
+        // Fallback: use status endpoint which returns qrcode when connecting
+        const statusData = await callUazap("status");
+        const statusQr = statusData?.instance?.qrcode || statusData?.qrcode || null;
+        setQrCode(statusQr);
         setWhatsappStatus("connecting");
       }
     } catch (error) {
@@ -222,12 +229,14 @@ const Integrations = () => {
     setLoadingWa(true);
     try {
       const connectData = await callUazap("connect");
-      if (connectData?.qrcode || connectData?.base64) {
-        setQrCode(connectData.qrcode || connectData.base64);
+      const qr = connectData?.qrcode || connectData?.instance?.qrcode || connectData?.base64 || null;
+      if (qr) {
+        setQrCode(qr);
         setWhatsappStatus("connecting");
       } else {
-        const qrData = await callUazap("qrcode");
-        setQrCode(qrData?.qrcode || qrData?.base64 || null);
+        const statusData = await callUazap("status");
+        const statusQr = statusData?.instance?.qrcode || statusData?.qrcode || null;
+        setQrCode(statusQr);
         setWhatsappStatus("connecting");
       }
     } catch (error) {

@@ -118,33 +118,8 @@ serve(async (req) => {
         });
       }
 
-      case "qrcode": {
-        const { data: integration } = await supabase
-          .from("integrations")
-          .select("config")
-          .eq("user_id", user.id)
-          .eq("type", "whatsapp")
-          .single();
-
-        if (!integration) throw new Error("No WhatsApp instance found.");
-        const config = integration.config as { token?: string };
-        if (!config.token) throw new Error("Instance token not found");
-
-        const response = await fetch(`${BASE_URL}/instance/qrcode`, {
-          method: "GET",
-          headers: { 
-            token: config.token,
-          },
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(`Uazap qrcode failed [${response.status}]: ${JSON.stringify(data)}`);
-        }
-
-        return new Response(JSON.stringify({ success: true, data }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      case "qrcode":
+      // Fallback: use status endpoint to get QR code
 
       case "status": {
         const { data: integration } = await supabase
