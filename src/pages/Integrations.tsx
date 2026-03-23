@@ -65,19 +65,46 @@ const Integrations = () => {
     return result.data;
   }, []);
 
-  // Check WhatsApp status on mount
+  const callGhl = useCallback(async (action: string, extra?: Record<string, unknown>) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not authenticated");
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ghl-manage`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ action, ...extra }),
+      }
+    );
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error || "Unknown error");
+    return result.data;
+  }, []);
+
+  // Check WhatsApp + GHL status on mount
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const data = await callUazap("status");
         const status = data?.status || "not_created";
         setWhatsappStatus(status === "connected" ? "connected" : status === "connecting" ? "connecting" : status === "not_created" ? "not_created" : "disconnected");
-      } catch {
-        // silent - user may not have instance
-      }
+      } catch { /* silent */ }
+
+      try {
+        const data = await callGhl("status");
+        if (data?.status === "connected") {
+          setGhlConnected(true);
+          setGhlLocationName(data.locationName || "");
+        }
+      } catch { /* silent */ }
     };
     checkStatus();
-  }, [callUazap]);
+  }, [callUazap, callGhl]);
 
   // Poll for status while connecting
   useEffect(() => {
