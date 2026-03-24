@@ -18,14 +18,17 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const payload = await req.json();
-    console.log("Webhook received:", JSON.stringify(payload).slice(0, 500));
+    // Log full payload for debugging (truncated to 2000 chars)
+    console.log("Webhook payload:", JSON.stringify(payload).slice(0, 2000));
 
-    // Uazap sends different event types
-    const event = payload.event || payload.type;
-    const instanceToken = payload.token || payload.instanceToken;
+    // Uazap v2 sends EventType (capitalized) and also event/type in older formats
+    const event = payload.EventType || payload.event || payload.type;
+    
+    // Uazap v2 sends instance token in different places
+    const instanceToken = payload.token || payload.instanceToken || payload.instance?.token;
 
     if (!instanceToken) {
-      console.log("No instance token in webhook payload");
+      console.log("No instance token in webhook payload, skipping");
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -43,17 +46,18 @@ serve(async (req) => {
     });
 
     if (!integration) {
-      console.log("No matching integration found for token");
+      console.log("No matching integration found for token:", instanceToken);
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const userId = integration.user_id;
+    console.log("Found user:", userId, "Event:", event);
 
     // Handle connection status changes
-    if (event === "status" || event === "connection.update") {
-      const status = payload.data?.status || payload.status;
+    if (event === "status" || event === "connection.update" || event === "status_instance") {
+      const status = payload.data?.status || payload.status || payload.instance?.status;
       if (status) {
         await supabase
           .from("integrations")
@@ -66,25 +70,45 @@ serve(async (req) => {
       });
     }
 
-    // Handle incoming messages
-    if (event === "messages.upsert" || event === "message" || event === "messages") {
-      const message = payload.data?.message || payload.message || payload.data;
+    // Handle incoming messages - Uazap v2 uses EventType: "messages"
+    if (event === "messages" || event === "messages.upsert" || event === "message") {
+      // Uazap v2 format: payload.message is the message object directly
+      // Also supports: payload.data.message (older format)
+      const message = payload.message || payload.data?.message || payload.data;
       if (!message) {
+        console.log("No message object found in payload");
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const remoteJid = message.key?.remoteJid || message.from || message.chatId || "";
-      const isFromMe = message.key?.fromMe || false;
+      // Uazap v2: message.key.remoteJid, message.key.fromMe
+      // Also: message.from, message.chatId
+      const remoteJid = message.key?.remoteJid || message.from || message.chatId || message.remoteJid || "";
+      const isFromMe = message.key?.fromMe ?? message.fromMe ?? false;
+
+      // Extract text content from various formats
       const content =
         message.message?.conversation ||
         message.message?.extendedTextMessage?.text ||
+        message.message?.imageMessage?.caption ||
+        message.message?.videoMessage?.caption ||
+        message.message?.documentMessage?.caption ||
         message.body ||
         message.text ||
+        message.content ||
         "";
 
-      if (!content || !remoteJid) {
+      // Skip if group message (ends with @g.us) or no content/jid
+      if (!remoteJid || remoteJid.endsWith("@g.us")) {
+        console.log("Skipping: group message or no remoteJid", remoteJid);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!content) {
+        console.log("Skipping: no text content in message");
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -92,7 +116,10 @@ serve(async (req) => {
 
       // Extract phone number from JID
       const phone = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
-      const contactName = message.pushName || message.notifyName || phone;
+      const contactName = message.pushName || message.notifyName || message.senderName || 
+                          payload.chat?.name || payload.chat?.pushName || phone;
+
+      console.log("Processing message:", { phone, contactName, isFromMe, contentPreview: content.slice(0, 50) });
 
       // Find or create conversation
       let { data: conversation } = await supabase
@@ -123,7 +150,7 @@ serve(async (req) => {
             last_message: content,
             last_message_at: new Date().toISOString(),
             contact_name: contactName,
-            unread_count: isFromMe ? conversation.unread_count : conversation.unread_count + 1,
+            unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
           })
           .eq("id", conversation.id);
       }
@@ -154,6 +181,8 @@ serve(async (req) => {
             console.error("Error triggering AI analysis:", e);
           }
         }
+
+        console.log("Message saved successfully for conversation:", conversation.id);
       }
 
       return new Response(JSON.stringify({ ok: true }), {
@@ -162,13 +191,14 @@ serve(async (req) => {
     }
 
     // Default: acknowledge
+    console.log("Unhandled event type:", event);
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Webhook error:", error);
     return new Response(JSON.stringify({ ok: true }), {
-      status: 200, // Always return 200 to webhooks
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
