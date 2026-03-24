@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_config: {
+        Row: {
+          action_type: string
+          auto_approve: boolean
+          created_at: string
+          enabled: boolean
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          auto_approve?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          auto_approve?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           contact_name: string | null
