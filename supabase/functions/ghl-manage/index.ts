@@ -320,6 +320,212 @@ serve(async (req) => {
         });
       }
 
+      case "execute_suggestion": {
+        const suggestionId = payload.suggestionId as string;
+        if (!suggestionId) throw new Error("suggestionId is required");
+
+        // Fetch the suggestion
+        const { data: suggestion, error: sugErr } = await supabase
+          .from("suggestions")
+          .select("*")
+          .eq("id", suggestionId)
+          .eq("user_id", user.id)
+          .single();
+        if (sugErr || !suggestion) throw new Error("Sugestão não encontrada");
+
+        const actionData = suggestion.action_data as Record<string, any>;
+        const contactPhone = actionData?.contact_phone;
+        if (!contactPhone) throw new Error("Sugestão sem telefone de contato associado.");
+
+        // 1. Search contact in GHL by phone
+        const cleanPhone = contactPhone.replace(/\D/g, "");
+        let searchQuery = cleanPhone;
+        if (searchQuery.startsWith("55") && searchQuery.length > 10) {
+          searchQuery = "+" + searchQuery;
+        }
+        
+        const searchResult = await callGhl(`/contacts/search?query=${encodeURIComponent(searchQuery)}`) as any;
+        const contacts = searchResult?.contacts || [];
+        
+        if (contacts.length === 0) {
+          // Try without country code
+          const shortPhone = cleanPhone.startsWith("55") ? cleanPhone.slice(2) : cleanPhone;
+          const retryResult = await callGhl(`/contacts/search?query=${encodeURIComponent(shortPhone)}`) as any;
+          const retryContacts = retryResult?.contacts || [];
+          if (retryContacts.length === 0) {
+            // Update suggestion status to failed
+            await supabase.from("suggestions").update({ 
+              status: "approved",
+              action_data: { ...actionData, execution_error: "Contato não encontrado no CRM" }
+            }).eq("id", suggestionId);
+            
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: `Contato com telefone ${contactPhone} não foi encontrado no CRM (GoHighLevel). Verifique se o contato está cadastrado.` 
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          contacts.push(...retryContacts);
+        }
+
+        const contact = contacts[0];
+        const contactId = contact.id;
+        console.log(`Found GHL contact: ${contactId} (${contact.name || contact.firstName})`);
+
+        // 2. Search for latest opportunity for this contact
+        const creds = await getGhlCredentials();
+        const oppsResult = await callGhl(`/opportunities/search?contact_id=${contactId}`) as any;
+        const opportunities = oppsResult?.opportunities || [];
+        
+        let opportunity: any = null;
+        let opportunityCreated = false;
+
+        if (opportunities.length > 0) {
+          // Sort by date desc and pick the latest
+          opportunity = opportunities.sort((a: any, b: any) => 
+            new Date(b.createdAt || b.dateAdded || 0).getTime() - new Date(a.createdAt || a.dateAdded || 0).getTime()
+          )[0];
+          console.log(`Found existing opportunity: ${opportunity.id}`);
+        } else {
+          // Create a new opportunity - need a pipeline and stage
+          const pipelinesResult = await callGhl("/opportunities/pipelines") as any;
+          const pipelines = pipelinesResult?.pipelines || [];
+          if (pipelines.length === 0) throw new Error("Nenhum funil encontrado no CRM para criar oportunidade.");
+          
+          const pipeline = pipelines[0];
+          const firstStage = pipeline.stages?.[0];
+          if (!firstStage) throw new Error("Nenhuma etapa encontrada no funil para criar oportunidade.");
+
+          const newOpp = await callGhl("/opportunities/", "POST", {
+            pipelineId: pipeline.id,
+            pipelineStageId: firstStage.id,
+            locationId: creds.locationId,
+            contactId: contactId,
+            name: `Oportunidade - ${contact.name || contact.firstName || contactPhone}`,
+            status: "open",
+          }, true) as any;
+          
+          opportunity = newOpp?.opportunity || newOpp;
+          opportunityCreated = true;
+          console.log(`Created new opportunity: ${opportunity?.id}`);
+        }
+
+        if (!opportunity?.id) throw new Error("Falha ao obter oportunidade.");
+
+        // 3. Execute the action based on suggestion type
+        let executionResult = "";
+        const suggestionType = suggestion.type;
+
+        switch (suggestionType) {
+          case "mover_funil": {
+            const targetStageName = actionData?.value;
+            if (!targetStageName) throw new Error("Etapa de destino não especificada na sugestão.");
+            
+            // Find the stage
+            const pipelinesData = await callGhl("/opportunities/pipelines") as any;
+            let targetStage: any = null;
+            let targetPipelineId = "";
+            for (const p of (pipelinesData?.pipelines || [])) {
+              const found = p.stages?.find((s: any) => 
+                s.name.toLowerCase() === targetStageName.toLowerCase()
+              );
+              if (found) { targetStage = found; targetPipelineId = p.id; break; }
+            }
+            if (!targetStage) throw new Error(`Etapa "${targetStageName}" não encontrada nos funis do CRM.`);
+            
+            await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+              pipelineId: targetPipelineId,
+              pipelineStageId: targetStage.id,
+            }, true);
+            executionResult = `Lead movido para a etapa "${targetStageName}"`;
+            break;
+          }
+
+          case "campo_personalizado": {
+            const fieldKey = actionData?.field;
+            const fieldValue = actionData?.value;
+            if (!fieldKey || !fieldValue) throw new Error("Campo ou valor não especificado na sugestão.");
+            
+            await callGhl(`/contacts/${contactId}`, "PUT", {
+              customFields: [{ key: fieldKey, value: fieldValue }],
+            }, true);
+            executionResult = `Campo "${fieldKey}" atualizado para "${fieldValue}"`;
+            break;
+          }
+
+          case "adicionar_nota": {
+            const noteBody = actionData?.value || suggestion.description || suggestion.title;
+            await callGhl(`/contacts/${contactId}/notes`, "POST", {
+              body: noteBody,
+            }, true);
+            executionResult = `Nota adicionada ao contato`;
+            break;
+          }
+
+          case "valor_negociacao": {
+            const monetaryValue = parseFloat((actionData?.value || "0").replace(/[^\d.,]/g, "").replace(",", "."));
+            await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+              monetaryValue: monetaryValue,
+            }, true);
+            executionResult = `Valor da negociação atualizado para R$ ${monetaryValue.toFixed(2)}`;
+            break;
+          }
+
+          case "ganho_perdido": {
+            const status = (actionData?.value || "").toLowerCase().includes("ganh") ? "won" : "lost";
+            await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+              status: status,
+            }, true);
+            executionResult = `Oportunidade marcada como ${status === "won" ? "ganha" : "perdida"}`;
+            break;
+          }
+
+          case "agendar_lembrete": {
+            // Add as a note with reminder tag since GHL tasks API may vary
+            const reminderText = actionData?.value || suggestion.title;
+            await callGhl(`/contacts/${contactId}/notes`, "POST", {
+              body: `⏰ LEMBRETE: ${reminderText}`,
+            }, true);
+            executionResult = `Lembrete adicionado como nota no contato`;
+            break;
+          }
+
+          default:
+            executionResult = `Tipo de ação "${suggestionType}" não suportado para execução automática.`;
+        }
+
+        // 4. Update suggestion with execution result
+        await supabase.from("suggestions").update({
+          status: "approved",
+          action_data: { 
+            ...actionData, 
+            executed: true, 
+            execution_result: executionResult,
+            ghl_contact_id: contactId,
+            ghl_opportunity_id: opportunity.id,
+            opportunity_created: opportunityCreated,
+          },
+        }).eq("id", suggestionId);
+
+        const resultMessage = opportunityCreated 
+          ? `${executionResult}. Nova oportunidade criada para o contato.`
+          : executionResult;
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          data: { 
+            message: resultMessage,
+            opportunityCreated,
+            contactId,
+            opportunityId: opportunity.id,
+          } 
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
