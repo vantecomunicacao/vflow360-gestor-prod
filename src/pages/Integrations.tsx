@@ -193,8 +193,15 @@ const Integrations = () => {
     const checkStatus = async () => {
       try {
         const data = await callUazap("status");
-        const status = data?.status || "not_created";
-        setWhatsappStatus(status === "connected" ? "connected" : status === "connecting" ? "connecting" : status === "not_created" ? "not_created" : "disconnected");
+        // data.status can be an object like {connected: true} or a string
+        const isConnected = data?.status?.connected === true || data?.instance?.status === "connected" || data?.status === "connected";
+        if (isConnected) {
+          setWhatsappStatus("connected");
+        } else if (data?.status === "not_created" || (!data?.instance && !data?.status)) {
+          setWhatsappStatus("not_created");
+        } else {
+          setWhatsappStatus("disconnected");
+        }
       } catch { /* silent */ }
 
       try {
