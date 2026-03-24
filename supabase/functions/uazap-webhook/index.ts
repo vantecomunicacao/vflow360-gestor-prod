@@ -18,42 +18,34 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const payload = await req.json();
-    // Log full payload for debugging (truncated to 2000 chars)
-    console.log("Webhook payload:", JSON.stringify(payload).slice(0, 2000));
+    console.log("Webhook event:", payload.EventType || payload.event, "instance:", payload.instanceName);
 
-    // Uazap v2 sends EventType (capitalized) and also event/type in older formats
     const event = payload.EventType || payload.event || payload.type;
-    
-    // Uazap v2 sends instance token in different places
-    const instanceToken = payload.token || payload.instanceToken || payload.instance?.token;
 
-    if (!instanceToken) {
-      console.log("No instance token in webhook payload, skipping");
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Find the user by instanceName or token
+    const instanceName = payload.instanceName;
+    const instanceToken = payload.token || payload.instanceToken;
 
-    // Find which user owns this instance
     const { data: integrations } = await supabase
       .from("integrations")
       .select("user_id, config")
       .eq("type", "whatsapp");
 
     const integration = integrations?.find((i) => {
-      const config = i.config as { token?: string };
-      return config.token === instanceToken;
+      const config = i.config as { token?: string; instanceName?: string };
+      if (instanceName && config.instanceName === instanceName) return true;
+      if (instanceToken && config.token === instanceToken) return true;
+      return false;
     });
 
     if (!integration) {
-      console.log("No matching integration found for token:", instanceToken);
+      console.log("No matching integration for instance:", instanceName || instanceToken);
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const userId = integration.user_id;
-    console.log("Found user:", userId, "Event:", event);
 
     // Handle connection status changes
     if (event === "status" || event === "connection.update" || event === "status_instance") {
@@ -70,56 +62,59 @@ serve(async (req) => {
       });
     }
 
-    // Handle incoming messages - Uazap v2 uses EventType: "messages"
+    // Handle incoming messages
     if (event === "messages" || event === "messages.upsert" || event === "message") {
-      // Uazap v2 format: payload.message is the message object directly
-      // Also supports: payload.data.message (older format)
-      const message = payload.message || payload.data?.message || payload.data;
-      if (!message) {
-        console.log("No message object found in payload");
+      const message = payload.message;
+      const chat = payload.chat;
+
+      if (!message && !chat) {
+        console.log("No message/chat in payload");
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Uazap v2: message.key.remoteJid, message.key.fromMe
-      // Also: message.from, message.chatId
-      const remoteJid = message.key?.remoteJid || message.from || message.chatId || message.remoteJid || "";
-      const isFromMe = message.key?.fromMe ?? message.fromMe ?? false;
+      // Uazap v2: chatid is in message.chatid or chat.wa_chatid
+      const chatId = message?.chatid || chat?.wa_chatid || message?.key?.remoteJid || "";
 
-      // Extract text content from various formats
-      const content =
-        message.message?.conversation ||
-        message.message?.extendedTextMessage?.text ||
-        message.message?.imageMessage?.caption ||
-        message.message?.videoMessage?.caption ||
-        message.message?.documentMessage?.caption ||
-        message.body ||
-        message.text ||
-        message.content ||
-        "";
-
-      // Skip if group message (ends with @g.us) or no content/jid
-      if (!remoteJid || remoteJid.endsWith("@g.us")) {
-        console.log("Skipping: group message or no remoteJid", remoteJid);
+      // Skip group messages
+      if (!chatId || chatId.endsWith("@g.us") || chat?.wa_isGroup) {
+        console.log("Skipping: group or no chatId");
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      const isFromMe = message?.fromMe ?? message?.key?.fromMe ?? false;
+
+      // Extract text - content can be string or object {text: "..."}
+      let content = "";
+      const rawContent = message?.content;
+      if (typeof rawContent === "string") {
+        content = rawContent;
+      } else if (rawContent && typeof rawContent === "object") {
+        content = rawContent.text || rawContent.conversation || "";
+      }
+      // Fallback to other fields
+      if (!content) {
+        content = message?.body || message?.text || 
+                  message?.message?.conversation || 
+                  message?.message?.extendedTextMessage?.text || 
+                  chat?.wa_lastMessageTextVote || "";
       }
 
       if (!content) {
-        console.log("Skipping: no text content in message");
+        console.log("Skipping: no text content");
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Extract phone number from JID
-      const phone = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
-      const contactName = message.pushName || message.notifyName || message.senderName || 
-                          payload.chat?.name || payload.chat?.pushName || phone;
+      // Extract phone from chatId
+      const phone = chatId.replace("@s.whatsapp.net", "").replace("@g.us", "");
+      const contactName = chat?.name || chat?.wa_name || message?.pushName || phone;
 
-      console.log("Processing message:", { phone, contactName, isFromMe, contentPreview: content.slice(0, 50) });
+      console.log("Processing:", { phone, contactName, isFromMe, content: content.slice(0, 80) });
 
       // Find or create conversation
       let { data: conversation } = await supabase
@@ -164,25 +159,17 @@ serve(async (req) => {
 
         // Trigger AI analysis for inbound messages (fire-and-forget)
         if (!isFromMe) {
-          try {
-            const aiUrl = `${SUPABASE_URL}/functions/v1/ai-analyze`;
-            fetch(aiUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-              },
-              body: JSON.stringify({
-                conversation_id: conversation.id,
-                user_id: userId,
-              }),
-            }).catch((e) => console.error("AI analyze trigger failed:", e));
-          } catch (e) {
-            console.error("Error triggering AI analysis:", e);
-          }
+          fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
+          }).catch((e) => console.error("AI analyze trigger failed:", e));
         }
 
-        console.log("Message saved successfully for conversation:", conversation.id);
+        console.log("Message saved:", conversation.id);
       }
 
       return new Response(JSON.stringify({ ok: true }), {
@@ -190,8 +177,7 @@ serve(async (req) => {
       });
     }
 
-    // Default: acknowledge
-    console.log("Unhandled event type:", event);
+    console.log("Unhandled event:", event);
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
