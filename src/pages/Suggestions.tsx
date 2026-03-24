@@ -311,10 +311,14 @@ const Suggestions = () => {
 
                     {suggestion.status === "pending" && (
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleAction(suggestion.id, "approved")}>
-                          <Check className="w-4 h-4 mr-1" /> Aprovar
+                        <Button size="sm" onClick={() => handleAction(suggestion.id, "approved")} disabled={executingId === suggestion.id}>
+                          {executingId === suggestion.id ? (
+                            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Executando...</>
+                          ) : (
+                            <><Check className="w-4 h-4 mr-1" /> Aprovar e Executar</>
+                          )}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleAction(suggestion.id, "rejected")}>
+                        <Button size="sm" variant="outline" onClick={() => handleAction(suggestion.id, "rejected")} disabled={!!executingId}>
                           <X className="w-4 h-4 mr-1" /> Rejeitar
                         </Button>
                       </div>
