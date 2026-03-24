@@ -128,22 +128,48 @@ const Suggestions = () => {
     }
   };
 
+  const [executingId, setExecutingId] = useState<string | null>(null);
+
   const handleAction = async (id: string, action: "approved" | "rejected") => {
-    try {
-      const { error } = await supabase
-        .from("suggestions")
-        .update({ status: action })
-        .eq("id", id);
+    if (action === "approved") {
+      // Execute the suggestion in GHL
+      setExecutingId(id);
+      try {
+        const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", {
+          body: { action: "execute_suggestion", suggestionId: id },
+        });
 
-      if (error) throw error;
+        if (fnError || !result?.success) {
+          const errorMsg = result?.error || fnError?.message || "Erro ao executar a sugestão no CRM.";
+          toast({ title: "Erro ao executar", description: errorMsg, variant: "destructive" });
+          // Still update locally to show the error state
+          setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: "approved" as SuggestionStatus } : s));
+          return;
+        }
 
-      setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: action } : s));
-      toast({
-        title: action === "approved" ? "Sugestão aprovada!" : "Sugestão rejeitada",
-        description: action === "approved" ? "A ação será executada no GHL." : "A sugestão foi descartada.",
-      });
-    } catch (error) {
-      toast({ title: "Erro", description: "Não foi possível atualizar a sugestão.", variant: "destructive" });
+        setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: "approved" as SuggestionStatus } : s));
+        toast({
+          title: "✅ Sugestão executada!",
+          description: result.data?.message || "Ação aplicada com sucesso no CRM.",
+        });
+      } catch (error) {
+        toast({ title: "Erro", description: "Falha ao conectar com o CRM.", variant: "destructive" });
+      } finally {
+        setExecutingId(null);
+      }
+    } else {
+      // Reject
+      try {
+        const { error } = await supabase
+          .from("suggestions")
+          .update({ status: action })
+          .eq("id", id);
+        if (error) throw error;
+        setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: action } : s));
+        toast({ title: "Sugestão rejeitada", description: "A sugestão foi descartada." });
+      } catch {
+        toast({ title: "Erro", description: "Não foi possível atualizar a sugestão.", variant: "destructive" });
+      }
     }
   };
 
@@ -285,10 +311,14 @@ const Suggestions = () => {
 
                     {suggestion.status === "pending" && (
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleAction(suggestion.id, "approved")}>
-                          <Check className="w-4 h-4 mr-1" /> Aprovar
+                        <Button size="sm" onClick={() => handleAction(suggestion.id, "approved")} disabled={executingId === suggestion.id}>
+                          {executingId === suggestion.id ? (
+                            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Executando...</>
+                          ) : (
+                            <><Check className="w-4 h-4 mr-1" /> Aprovar e Executar</>
+                          )}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleAction(suggestion.id, "rejected")}>
+                        <Button size="sm" variant="outline" onClick={() => handleAction(suggestion.id, "rejected")} disabled={!!executingId}>
                           <X className="w-4 h-4 mr-1" /> Rejeitar
                         </Button>
                       </div>
