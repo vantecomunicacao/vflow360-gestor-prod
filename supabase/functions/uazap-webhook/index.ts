@@ -134,6 +134,26 @@ serve(async (req) => {
           direction: isFromMe ? "outbound" : "inbound",
           content,
         });
+
+        // Trigger AI analysis for inbound messages (fire-and-forget)
+        if (!isFromMe) {
+          try {
+            const aiUrl = `${SUPABASE_URL}/functions/v1/ai-analyze`;
+            fetch(aiUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              },
+              body: JSON.stringify({
+                conversation_id: conversation.id,
+                user_id: userId,
+              }),
+            }).catch((e) => console.error("AI analyze trigger failed:", e));
+          } catch (e) {
+            console.error("Error triggering AI analysis:", e);
+          }
+        }
       }
 
       return new Response(JSON.stringify({ ok: true }), {
