@@ -1,49 +1,143 @@
-import { useState } from "react";
-import { MessageSquare, Search, Link2, Phone } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
-const contacts = [
-  {
-    id: "1", name: "João Silva", phone: "+55 11 99999-1234", lastMessage: "Quero comprar por R$1500", time: "2 min",
-    linked: true, messages: [
-      { from: "lead", text: "Oi, vi o anúncio de vocês", time: "10:30" },
-      { from: "user", text: "Olá João! Tudo bem? Como posso ajudar?", time: "10:32" },
-      { from: "lead", text: "Quero comprar por R$1500", time: "10:35" },
-    ],
-  },
-  {
-    id: "2", name: "Maria Santos", phone: "+55 21 98888-5678", lastMessage: "Pode me enviar a proposta?", time: "15 min",
-    linked: false, messages: [
-      { from: "lead", text: "Boa tarde!", time: "14:00" },
-      { from: "user", text: "Boa tarde Maria! Em que posso ajudar?", time: "14:02" },
-      { from: "lead", text: "Pode me enviar a proposta?", time: "14:05" },
-    ],
-  },
-  {
-    id: "3", name: "Carlos Lima", phone: "+55 31 97777-9012", lastMessage: "Já fechei com vocês!", time: "1h",
-    linked: true, messages: [
-      { from: "lead", text: "Pessoal, já fechei com vocês!", time: "09:00" },
-      { from: "user", text: "Que ótimo Carlos! Parabéns!", time: "09:05" },
-    ],
-  },
-  {
-    id: "4", name: "Ana Oliveira", phone: "+55 41 96666-3456", lastMessage: "Pode me ligar amanhã às 10h?", time: "2h",
-    linked: false, messages: [
-      { from: "lead", text: "Pode me ligar amanhã às 10h?", time: "08:20" },
-    ],
-  },
-];
+interface Message {
+  id: string;
+  content: string;
+  direction: string;
+  created_at: string;
+}
+
+interface Conversation {
+  id: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+}
 
 const Conversations = () => {
-  const [selected, setSelected] = useState(contacts[0]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selected, setSelected] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const { toast } = useToast();
 
-  const filtered = contacts.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone.includes(search)
+  const fetchConversations = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .order("last_message_at", { ascending: false });
+
+      if (error) throw error;
+      setConversations(data || []);
+      if (!selected && data && data.length > 0) {
+        setSelected(data[0]);
+      }
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchMessages = useCallback(async (conversationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  useEffect(() => {
+    if (selected) {
+      fetchMessages(selected.id);
+    }
+  }, [selected, fetchMessages]);
+
+  const handleAnalyze = async () => {
+    if (!selected) return;
+    setAnalyzing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ conversation_id: selected.id }),
+        }
+      );
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error);
+
+      const count = result.data?.suggestions?.length || 0;
+      toast({
+        title: count > 0 ? `${count} sugestão(ões) gerada(s)!` : "Nenhuma sugestão gerada",
+        description: count > 0 ? "Veja na página de Sugestões da IA." : "A IA não encontrou ações relevantes nesta conversa.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro na análise",
+        description: error instanceof Error ? error.message : "Erro ao analisar conversa",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const filtered = conversations.filter(c =>
+    (c.contact_name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (c.contact_phone || "").includes(search)
   );
+
+  const formatTime = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    if (diff < 60000) return "agora";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} min`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
+    return d.toLocaleDateString("pt-BR");
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-8rem)]">
@@ -60,73 +154,105 @@ const Conversations = () => {
             </div>
           </div>
           <div className="flex-1 overflow-auto">
-            {filtered.map((contact) => (
-              <div
-                key={contact.id}
-                onClick={() => setSelected(contact)}
-                className={`flex items-center gap-3 p-4 cursor-pointer transition-colors border-b border-border/50 ${
-                  selected.id === contact.id ? "bg-muted" : "hover:bg-muted/50"
-                }`}
-              >
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
-                  {contact.name.split(" ").map(n => n[0]).join("")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">{contact.name}</span>
-                    {contact.linked && <Link2 className="w-3 h-3 text-primary" />}
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate">{contact.lastMessage}</p>
-                </div>
-                <span className="text-xs text-muted-foreground">{contact.time}</span>
+            {filtered.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                Nenhuma conversa encontrada
               </div>
-            ))}
+            ) : (
+              filtered.map((contact) => (
+                <div
+                  key={contact.id}
+                  onClick={() => setSelected(contact)}
+                  className={`flex items-center gap-3 p-4 cursor-pointer transition-colors border-b border-border/50 ${
+                    selected?.id === contact.id ? "bg-muted" : "hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                    {(contact.contact_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">{contact.contact_name || contact.contact_phone}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{contact.last_message}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-xs text-muted-foreground">{formatTime(contact.last_message_at)}</span>
+                    {contact.unread_count > 0 && (
+                      <Badge className="text-[10px] px-1.5 py-0 h-4">{contact.unread_count}</Badge>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
         {/* Chat View */}
-        <div className="flex-1 glass-card flex flex-col">
-          <div className="p-4 border-b border-border flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
-              {selected.name.split(" ").map(n => n[0]).join("")}
+        {selected ? (
+          <div className="flex-1 glass-card flex flex-col">
+            <div className="p-4 border-b border-border flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
+                {(selected.contact_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2)}
+              </div>
+              <div>
+                <p className="font-medium text-foreground">{selected.contact_name || selected.contact_phone}</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Phone className="w-3 h-3" /> {selected.contact_phone}
+                </p>
+              </div>
+              <div className="ml-auto">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAnalyze}
+                  disabled={analyzing}
+                >
+                  {analyzing ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analisando...</>
+                  ) : (
+                    <><Sparkles className="w-4 h-4 mr-1" /> Analisar com IA</>
+                  )}
+                </Button>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-foreground">{selected.name}</p>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Phone className="w-3 h-3" /> {selected.phone}
-              </p>
-            </div>
-            <div className="ml-auto">
-              {selected.linked ? (
-                <Badge variant="outline" className="text-primary border-primary/30">
-                  <Link2 className="w-3 h-3 mr-1" /> Vinculado ao GHL
-                </Badge>
+            <div className="flex-1 overflow-auto p-4 space-y-3">
+              {messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                  Nenhuma mensagem nesta conversa
+                </div>
               ) : (
-                <Badge variant="outline" className="text-warning border-warning/30">Não vinculado</Badge>
+                messages.map((msg, i) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.02 }}
+                    className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div className={`max-w-[70%] rounded-xl px-4 py-2.5 ${
+                      msg.direction === "outbound"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground"
+                    }`}>
+                      <p className="text-sm">{msg.content}</p>
+                      <p className={`text-xs mt-1 ${msg.direction === "outbound" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                        {new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))
               )}
             </div>
           </div>
-          <div className="flex-1 overflow-auto p-4 space-y-3">
-            {selected.messages.map((msg, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className={`flex ${msg.from === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div className={`max-w-[70%] rounded-xl px-4 py-2.5 ${
-                  msg.from === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
-                }`}>
-                  <p className="text-sm">{msg.text}</p>
-                  <p className={`text-xs mt-1 ${msg.from === "user" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>{msg.time}</p>
-                </div>
-              </motion.div>
-            ))}
+        ) : (
+          <div className="flex-1 glass-card flex items-center justify-center">
+            <div className="text-center text-muted-foreground">
+              <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+              <p>Selecione uma conversa para visualizar</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
