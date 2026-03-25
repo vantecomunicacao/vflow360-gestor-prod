@@ -143,12 +143,12 @@ const Integrations = () => {
       const fieldsData = await callGhl("custom_fields");
       const customFields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => {
         // Extract options for dropdown/select fields
-        const fieldOptions: string[] = [];
+        const fieldOptions: FieldOption[] = [];
         if (f.options && Array.isArray(f.options)) {
           for (const opt of f.options) {
-            if (typeof opt === "string") fieldOptions.push(opt);
-            else if (opt?.value) fieldOptions.push(opt.value);
-            else if (opt?.name) fieldOptions.push(opt.name);
+            if (typeof opt === "string") fieldOptions.push({ value: opt, instruction: "" });
+            else if (opt?.value) fieldOptions.push({ value: opt.value, instruction: "" });
+            else if (opt?.name) fieldOptions.push({ value: opt.name, instruction: "" });
           }
         }
         return {
@@ -165,7 +165,22 @@ const Integrations = () => {
       // Merge with saved selections
       const allFields = [...GHL_STANDARD_FIELDS, ...customFields].map(f => {
         const saved = savedFields.find((sf: any) => sf.id === f.id);
-        return saved ? { ...f, selected: true, description: saved.description || "", options: f.options || saved.options } : f;
+        if (saved) {
+          // Merge saved option instructions with current options
+          let mergedOptions = f.options;
+          if (f.options && saved.options) {
+            mergedOptions = f.options.map((opt: FieldOption) => {
+              const savedOpt = saved.options?.find((so: any) => 
+                (typeof so === "string" ? so : so.value) === opt.value
+              );
+              return savedOpt && typeof savedOpt === "object" 
+                ? { ...opt, instruction: savedOpt.instruction || "" }
+                : opt;
+            });
+          }
+          return { ...f, selected: true, description: saved.description || "", options: mergedOptions || saved.options };
+        }
+        return f;
       });
       setGhlFields(allFields);
     } catch (error) {
