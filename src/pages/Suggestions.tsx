@@ -74,6 +74,7 @@ const Suggestions = () => {
   const [openContacts, setOpenContacts] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const { toast } = useToast();
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
