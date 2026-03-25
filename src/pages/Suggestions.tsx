@@ -234,17 +234,7 @@ const Suggestions = () => {
     });
   };
 
-  // Auto-open contacts with pending suggestions
-  useEffect(() => {
-    const pendingKeys = contactGroups.filter(g => g.pendingCount > 0).map(g => g.key);
-    if (pendingKeys.length > 0) {
-      setOpenContacts(prev => {
-        const next = new Set(prev);
-        for (const k of pendingKeys) next.add(k);
-        return next;
-      });
-    }
-  }, [contactGroups]);
+  // All contacts start closed by default
 
   const formatPhone = (phone: string) => {
     if (!phone) return "";
