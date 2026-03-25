@@ -250,6 +250,27 @@ const Suggestions = () => {
     });
   };
 
+  const [rejectingContact, setRejectingContact] = useState<string | null>(null);
+
+  const handleRejectAllByContact = async (group: ContactGroup) => {
+    const pendingIds = group.suggestions.filter(s => s.status === "pending").map(s => s.id);
+    if (pendingIds.length === 0) return;
+    setRejectingContact(group.key);
+    try {
+      const { error } = await supabase
+        .from("suggestions")
+        .update({ status: "rejected" })
+        .in("id", pendingIds);
+      if (error) throw error;
+      setSuggestions(prev => prev.map(s => pendingIds.includes(s.id) ? { ...s, status: "rejected" as SuggestionStatus } : s));
+      toast({ title: "Sugestões rejeitadas", description: `${pendingIds.length} sugestão(ões) de ${group.contactName} foram rejeitadas.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível rejeitar as sugestões.", variant: "destructive" });
+    } finally {
+      setRejectingContact(null);
+    }
+  };
+
   // All contacts start closed by default
 
   const formatPhone = (phone: string) => {
