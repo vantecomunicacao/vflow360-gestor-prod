@@ -129,6 +129,7 @@ const Suggestions = () => {
   };
 
   const [executingId, setExecutingId] = useState<string | null>(null);
+  const [executionResults, setExecutionResults] = useState<Record<string, { opportunityCreated: boolean; message: string }>>({});
 
   const handleAction = async (id: string, action: "approved" | "rejected") => {
     if (action === "approved") {
