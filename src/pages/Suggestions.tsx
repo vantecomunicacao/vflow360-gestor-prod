@@ -72,7 +72,8 @@ const Suggestions = () => {
     Object.fromEntries(suggestionTypeOptions.map(o => [o.key, { enabled: true, autoApprove: false }]))
   );
   const [openContacts, setOpenContacts] = useState<Set<string>>(new Set());
-  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
