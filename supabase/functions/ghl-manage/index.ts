@@ -482,6 +482,35 @@ serve(async (req) => {
               if (targetStage) break;
             }
             if (!targetStage) {
+              // Keyword-based similarity as last resort
+              const keywordMap: Record<string, string[]> = {
+                "orcamento": ["proposta"],
+                "proposta": ["proposta"],
+                "qualificacao": ["qualificando"],
+                "reuniao": ["reuniao"],
+                "fechamento": ["fechamento"],
+                "ganho": ["ganha", "ganhos"],
+                "perdido": ["perdido", "abandonado"],
+              };
+              for (const [keyword, targets] of Object.entries(keywordMap)) {
+                if (searchName.includes(keyword) || keyword.includes(searchName)) {
+                  for (const p of (pipelinesData?.pipelines || [])) {
+                    for (const s of (p.stages || [])) {
+                      const sn = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                      if (targets.some((t: string) => sn.includes(t))) {
+                        targetStage = s;
+                        targetPipelineId = p.id;
+                        console.log(`Fuzzy match: "${targetStageName}" -> "${s.name}"`);
+                        break;
+                      }
+                    }
+                    if (targetStage) break;
+                  }
+                  if (targetStage) break;
+                }
+              }
+            }
+            if (!targetStage) {
               console.error(`Etapas disponíveis: ${allStages.join(", ")}`);
               throw new Error(`Etapa "${targetStageName}" não encontrada. Etapas disponíveis: ${allStages.join(", ")}`);
             }
