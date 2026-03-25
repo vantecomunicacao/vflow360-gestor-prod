@@ -11,6 +11,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+interface FieldOption {
+  value: string;
+  instruction: string;
+}
+
 interface GhlCustomField {
   id: string;
   name: string;
@@ -18,7 +23,7 @@ interface GhlCustomField {
   dataType: string;
   selected: boolean;
   description: string;
-  options?: string[];
+  options?: FieldOption[];
 }
 
 interface GhlPipelineStage {
@@ -138,12 +143,12 @@ const Integrations = () => {
       const fieldsData = await callGhl("custom_fields");
       const customFields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => {
         // Extract options for dropdown/select fields
-        const fieldOptions: string[] = [];
+        const fieldOptions: FieldOption[] = [];
         if (f.options && Array.isArray(f.options)) {
           for (const opt of f.options) {
-            if (typeof opt === "string") fieldOptions.push(opt);
-            else if (opt?.value) fieldOptions.push(opt.value);
-            else if (opt?.name) fieldOptions.push(opt.name);
+            if (typeof opt === "string") fieldOptions.push({ value: opt, instruction: "" });
+            else if (opt?.value) fieldOptions.push({ value: opt.value, instruction: "" });
+            else if (opt?.name) fieldOptions.push({ value: opt.name, instruction: "" });
           }
         }
         return {
@@ -160,7 +165,22 @@ const Integrations = () => {
       // Merge with saved selections
       const allFields = [...GHL_STANDARD_FIELDS, ...customFields].map(f => {
         const saved = savedFields.find((sf: any) => sf.id === f.id);
-        return saved ? { ...f, selected: true, description: saved.description || "", options: f.options || saved.options } : f;
+        if (saved) {
+          // Merge saved option instructions with current options
+          let mergedOptions = f.options;
+          if (f.options && saved.options) {
+            mergedOptions = f.options.map((opt: FieldOption) => {
+              const savedOpt = saved.options?.find((so: any) => 
+                (typeof so === "string" ? so : so.value) === opt.value
+              );
+              return savedOpt && typeof savedOpt === "object" 
+                ? { ...opt, instruction: savedOpt.instruction || "" }
+                : opt;
+            });
+          }
+          return { ...f, selected: true, description: saved.description || "", options: mergedOptions || saved.options };
+        }
+        return f;
       });
       setGhlFields(allFields);
     } catch (error) {
@@ -322,6 +342,16 @@ const Integrations = () => {
 
   const updateFieldDescription = (id: string, description: string) => {
     setGhlFields(prev => prev.map(f => f.id === id ? { ...f, description } : f));
+  };
+
+  const updateOptionInstruction = (fieldId: string, optionValue: string, instruction: string) => {
+    setGhlFields(prev => prev.map(f => {
+      if (f.id !== fieldId || !f.options) return f;
+      return {
+        ...f,
+        options: f.options.map(opt => opt.value === optionValue ? { ...opt, instruction } : opt),
+      };
+    }));
   };
 
   const toggleStage = (id: string) => {
@@ -546,12 +576,30 @@ const Integrations = () => {
                         </div>
                         <p className="text-xs text-muted-foreground font-mono">{field.fieldKey}</p>
                         {field.selected && (
-                          <Input
-                            placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
-                            value={field.description}
-                            onChange={(e) => updateFieldDescription(field.id, e.target.value)}
-                            className="text-sm"
-                          />
+                          <>
+                            <Input
+                              placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
+                              value={field.description}
+                              onChange={(e) => updateFieldDescription(field.id, e.target.value)}
+                              className="text-sm"
+                            />
+                            {field.options && field.options.length > 0 && (
+                              <div className="ml-2 space-y-2 border-l-2 border-border pl-3">
+                                <p className="text-xs font-medium text-muted-foreground">Opções ({field.options.length}):</p>
+                                {field.options.map((opt) => (
+                                  <div key={opt.value} className="space-y-1">
+                                    <p className="text-xs font-medium text-foreground">{opt.value}</p>
+                                    <Input
+                                      placeholder={`Quando usar "${opt.value}"? (ex: 'Quando o lead mencionar...')`}
+                                      value={opt.instruction}
+                                      onChange={(e) => updateOptionInstruction(field.id, opt.value, e.target.value)}
+                                      className="text-xs h-7"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -579,12 +627,30 @@ const Integrations = () => {
                             </div>
                             <p className="text-xs text-muted-foreground font-mono">{field.fieldKey}</p>
                             {field.selected && (
-                              <Input
-                                placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
-                                value={field.description}
-                                onChange={(e) => updateFieldDescription(field.id, e.target.value)}
-                                className="text-sm"
-                              />
+                              <>
+                                <Input
+                                  placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
+                                  value={field.description}
+                                  onChange={(e) => updateFieldDescription(field.id, e.target.value)}
+                                  className="text-sm"
+                                />
+                                {field.options && field.options.length > 0 && (
+                                  <div className="ml-2 space-y-2 border-l-2 border-primary/20 pl-3">
+                                    <p className="text-xs font-medium text-muted-foreground">Opções ({field.options.length}):</p>
+                                    {field.options.map((opt) => (
+                                      <div key={opt.value} className="space-y-1">
+                                        <p className="text-xs font-medium text-foreground">{opt.value}</p>
+                                        <Input
+                                          placeholder={`Quando usar "${opt.value}"? (ex: 'Quando o lead mencionar...')`}
+                                          value={opt.instruction}
+                                          onChange={(e) => updateOptionInstruction(field.id, opt.value, e.target.value)}
+                                          className="text-xs h-7"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
