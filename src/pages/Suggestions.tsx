@@ -74,7 +74,40 @@ const Suggestions = () => {
   const [openContacts, setOpenContacts] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  const fetchDisabledContacts = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("disabled_contacts")
+        .select("contact_phone");
+      if (data) {
+        setDisabledContacts(new Set(data.map((d: any) => d.contact_phone)));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const toggleContactAI = async (phone: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!phone) return;
+    const isDisabled = disabledContacts.has(phone);
+    try {
+      if (isDisabled) {
+        await supabase.from("disabled_contacts").delete().eq("contact_phone", phone);
+        setDisabledContacts(prev => { const next = new Set(prev); next.delete(phone); return next; });
+        toast({ title: "IA ativada", description: "A IA voltará a analisar este contato." });
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await supabase.from("disabled_contacts").insert({ user_id: user.id, contact_phone: phone });
+        setDisabledContacts(prev => new Set(prev).add(phone));
+        toast({ title: "IA desativada", description: "A IA não analisará mais este contato." });
+      }
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível alterar a configuração.", variant: "destructive" });
+    }
+  };
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
