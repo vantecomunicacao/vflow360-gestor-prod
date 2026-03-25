@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -74,7 +74,40 @@ const Suggestions = () => {
   const [openContacts, setOpenContacts] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  const fetchDisabledContacts = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("disabled_contacts")
+        .select("contact_phone");
+      if (data) {
+        setDisabledContacts(new Set(data.map((d: any) => d.contact_phone)));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const toggleContactAI = async (phone: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!phone) return;
+    const isDisabled = disabledContacts.has(phone);
+    try {
+      if (isDisabled) {
+        await supabase.from("disabled_contacts").delete().eq("contact_phone", phone);
+        setDisabledContacts(prev => { const next = new Set(prev); next.delete(phone); return next; });
+        toast({ title: "IA ativada", description: "A IA voltará a analisar este contato." });
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await supabase.from("disabled_contacts").insert({ user_id: user.id, contact_phone: phone });
+        setDisabledContacts(prev => new Set(prev).add(phone));
+        toast({ title: "IA desativada", description: "A IA não analisará mais este contato." });
+      }
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível alterar a configuração.", variant: "destructive" });
+    }
+  };
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
@@ -113,7 +146,8 @@ const Suggestions = () => {
   useEffect(() => {
     fetchSuggestions();
     fetchAiConfig();
-  }, [fetchSuggestions, fetchAiConfig]);
+    fetchDisabledContacts();
+  }, [fetchSuggestions, fetchAiConfig, fetchDisabledContacts]);
 
   const toggleEnabled = async (key: string) => {
     const newConfig = { ...aiConfig, [key]: { ...aiConfig[key], enabled: !aiConfig[key].enabled } };
@@ -411,6 +445,18 @@ const Suggestions = () => {
                         </Badge>
                       )}
                     </div>
+                    {group.contactPhone && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-7 px-2 ${disabledContacts.has(group.contactPhone) ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary"}`}
+                        onClick={(e) => toggleContactAI(group.contactPhone, e)}
+                        title={disabledContacts.has(group.contactPhone) ? "IA desativada para este contato" : "IA ativa para este contato"}
+                      >
+                        <Power className="w-3.5 h-3.5 mr-1" />
+                        <span className="text-xs">{disabledContacts.has(group.contactPhone) ? "IA off" : "IA on"}</span>
+                      </Button>
+                    )}
                     {group.pendingCount > 0 && (
                       <Button
                         variant="ghost"

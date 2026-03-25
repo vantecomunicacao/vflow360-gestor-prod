@@ -80,6 +80,27 @@ export type Database = {
         }
         Relationships: []
       }
+      disabled_contacts: {
+        Row: {
+          contact_phone: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          contact_phone: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          contact_phone?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       integrations: {
         Row: {
           config: Json
