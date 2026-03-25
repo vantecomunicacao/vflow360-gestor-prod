@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -70,6 +72,8 @@ const Suggestions = () => {
     Object.fromEntries(suggestionTypeOptions.map(o => [o.key, { enabled: true, autoApprove: false }]))
   );
   const [openContacts, setOpenContacts] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const { toast } = useToast();
 
   const fetchSuggestions = useCallback(async () => {
@@ -188,10 +192,22 @@ const Suggestions = () => {
     }
   };
 
-  const filtered = filter === "all" ? suggestions : suggestions.filter(s => s.status === filter);
+  const filtered = useMemo(() => {
+    let result = filter === "all" ? suggestions : suggestions.filter(s => s.status === filter);
+    if (typeFilter !== "all") {
+      result = result.filter(s => s.type === typeFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(s => {
+        const name = (s.action_data?.contact_name || "").toLowerCase();
+        const phone = (s.action_data?.contact_phone || "").toLowerCase();
+        return name.includes(q) || phone.includes(q);
+      });
+    }
+    return result;
+  }, [suggestions, filter, typeFilter, searchQuery]);
   const pendingCount = suggestions.filter(s => s.status === "pending").length;
-
-  // Group filtered suggestions by contact
   const contactGroups: ContactGroup[] = useMemo(() => {
     const groups = new Map<string, ContactGroup>();
 
@@ -302,6 +318,29 @@ const Suggestions = () => {
             </Button>
           ))}
         </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome ou telefone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Tipo de sugestão" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            {suggestionTypeOptions.map(opt => (
+              <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (
