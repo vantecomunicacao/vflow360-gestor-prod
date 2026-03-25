@@ -11,6 +11,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+interface FieldOption {
+  value: string;
+  instruction: string;
+}
+
 interface GhlCustomField {
   id: string;
   name: string;
@@ -18,7 +23,7 @@ interface GhlCustomField {
   dataType: string;
   selected: boolean;
   description: string;
-  options?: string[];
+  options?: FieldOption[];
 }
 
 interface GhlPipelineStage {
