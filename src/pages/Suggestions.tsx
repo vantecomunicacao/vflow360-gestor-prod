@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -250,6 +250,27 @@ const Suggestions = () => {
     });
   };
 
+  const [rejectingContact, setRejectingContact] = useState<string | null>(null);
+
+  const handleRejectAllByContact = async (group: ContactGroup) => {
+    const pendingIds = group.suggestions.filter(s => s.status === "pending").map(s => s.id);
+    if (pendingIds.length === 0) return;
+    setRejectingContact(group.key);
+    try {
+      const { error } = await supabase
+        .from("suggestions")
+        .update({ status: "rejected" })
+        .in("id", pendingIds);
+      if (error) throw error;
+      setSuggestions(prev => prev.map(s => pendingIds.includes(s.id) ? { ...s, status: "rejected" as SuggestionStatus } : s));
+      toast({ title: "Sugestões rejeitadas", description: `${pendingIds.length} sugestão(ões) de ${group.contactName} foram rejeitadas.` });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível rejeitar as sugestões.", variant: "destructive" });
+    } finally {
+      setRejectingContact(null);
+    }
+  };
+
   // All contacts start closed by default
 
   const formatPhone = (phone: string) => {
@@ -379,7 +400,7 @@ const Suggestions = () => {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
                         {group.suggestions.length} sugestão{group.suggestions.length !== 1 ? "ões" : ""}
@@ -390,6 +411,24 @@ const Suggestions = () => {
                         </Badge>
                       )}
                     </div>
+                    {group.pendingCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
+                        disabled={rejectingContact === group.key}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRejectAllByContact(group);
+                        }}
+                      >
+                        {rejectingContact === group.key ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <><XCircle className="w-3.5 h-3.5 mr-1" /> Rejeitar todas</>
+                        )}
+                      </Button>
+                    )}
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${openContacts.has(group.key) ? "rotate-180" : ""}`} />
                   </div>
                 </button>
