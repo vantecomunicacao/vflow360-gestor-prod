@@ -287,12 +287,19 @@ const Suggestions = () => {
                         </Badge>
                       )}
                       {suggestion.status === "approved" && executionResults[suggestion.id] && (
-                        <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
-                          ? "bg-success/10 text-success border-success/20"
-                          : "bg-info/10 text-info border-info/20"
-                        }>
-                          {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
-                        </Badge>
+                        <>
+                          {executionResults[suggestion.id].contactCreated && (
+                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                              👤 Contato criado
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
+                            ? "bg-success/10 text-success border-success/20"
+                            : "bg-info/10 text-info border-info/20"
+                          }>
+                            {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
+                          </Badge>
+                        </>
                       )}
                     </div>
 
