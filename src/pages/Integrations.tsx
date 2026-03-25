@@ -144,8 +144,9 @@ const Integrations = () => {
       const customFields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => {
         // Extract options for dropdown/select fields
         const fieldOptions: FieldOption[] = [];
-        if (f.options && Array.isArray(f.options)) {
-          for (const opt of f.options) {
+        const rawOptions = f.picklistOptions || f.options || [];
+        if (Array.isArray(rawOptions)) {
+          for (const opt of rawOptions) {
             if (typeof opt === "string") fieldOptions.push({ value: opt, instruction: "" });
             else if (opt?.value) fieldOptions.push({ value: opt.value, instruction: "" });
             else if (opt?.name) fieldOptions.push({ value: opt.name, instruction: "" });
