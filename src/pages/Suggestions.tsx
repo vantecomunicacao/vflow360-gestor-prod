@@ -207,6 +207,7 @@ const Suggestions = () => {
     }
     return result;
   }, [suggestions, filter, typeFilter, searchQuery]);
+  const pendingCount = suggestions.filter(s => s.status === "pending").length;
   const contactGroups: ContactGroup[] = useMemo(() => {
     const groups = new Map<string, ContactGroup>();
 
