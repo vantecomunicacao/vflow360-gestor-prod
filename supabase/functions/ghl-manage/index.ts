@@ -337,37 +337,80 @@ serve(async (req) => {
         const contactPhone = actionData?.contact_phone;
         if (!contactPhone) throw new Error("Sugestão sem telefone de contato associado.");
 
-        // 1. Search contact in GHL by phone
+        // 1. Search contact in GHL by phone (multiple BR formats) then by email
         const cleanPhone = contactPhone.replace(/\D/g, "");
-        let searchQuery = cleanPhone;
-        if (searchQuery.startsWith("55") && searchQuery.length > 10) {
-          searchQuery = "+" + searchQuery;
+        
+        // Generate all possible phone format variations for BR numbers
+        const phoneVariations: string[] = [];
+        let baseNumber = cleanPhone;
+        // Strip country code if present
+        if (baseNumber.startsWith("55") && baseNumber.length >= 12) {
+          baseNumber = baseNumber.slice(2);
         }
+        // baseNumber is now DDD + number (e.g. 11999998888)
+        // Add variations: +55DDD, 55DDD, DDD only, with and without 9th digit
+        phoneVariations.push(`+55${baseNumber}`, `55${baseNumber}`, baseNumber);
+        // If 11 digits (with 9th digit), also try without it
+        if (baseNumber.length === 11) {
+          const without9 = baseNumber.slice(0, 2) + baseNumber.slice(3);
+          phoneVariations.push(`+55${without9}`, `55${without9}`, without9);
+        }
+        // If 10 digits (without 9th digit), also try with it
+        if (baseNumber.length === 10) {
+          const with9 = baseNumber.slice(0, 2) + "9" + baseNumber.slice(2);
+          phoneVariations.push(`+55${with9}`, `55${with9}`, with9);
+        }
+        // Also try the original input as-is
+        phoneVariations.push(cleanPhone);
         
-        const searchResult = await callGhl(`/contacts/search?query=${encodeURIComponent(searchQuery)}`) as any;
-        const contacts = searchResult?.contacts || [];
-        
+        // Deduplicate
+        const uniqueVariations = [...new Set(phoneVariations)];
+        console.log(`Searching contact with phone variations: ${uniqueVariations.join(", ")}`);
+
+        let contacts: any[] = [];
+        for (const variation of uniqueVariations) {
+          if (contacts.length > 0) break;
+          const result = await callGhl(`/contacts/search?query=${encodeURIComponent(variation)}`) as any;
+          contacts = result?.contacts || [];
+        }
+
+        // Also try searching by email if available
+        const contactEmail = actionData?.contact_email;
+        if (contacts.length === 0 && contactEmail) {
+          console.log(`Phone not found, trying email: ${contactEmail}`);
+          const emailResult = await callGhl(`/contacts/search?query=${encodeURIComponent(contactEmail)}`) as any;
+          contacts = emailResult?.contacts || [];
+        }
+
+        let contactCreated = false;
+        let contactId: string;
+        let contact: any;
+
         if (contacts.length === 0) {
-          // Try without country code
-          const shortPhone = cleanPhone.startsWith("55") ? cleanPhone.slice(2) : cleanPhone;
-          const retryResult = await callGhl(`/contacts/search?query=${encodeURIComponent(shortPhone)}`) as any;
-          const retryContacts = retryResult?.contacts || [];
-          if (retryContacts.length === 0) {
-            // Update suggestion status to failed
-            await supabase.from("suggestions").update({ 
-              status: "approved",
-              action_data: { ...actionData, execution_error: "Contato não encontrado no CRM" }
-            }).eq("id", suggestionId);
-            
-            return new Response(JSON.stringify({ 
-              success: false, 
-              error: `Contato com telefone ${contactPhone} não foi encontrado no CRM (GoHighLevel). Verifique se o contato está cadastrado.` 
-            }), {
-              status: 400,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-          contacts.push(...retryContacts);
+          // Create the contact in GHL
+          console.log(`Contact not found, creating new contact for phone: ${contactPhone}`);
+          const creds = await getGhlCredentials();
+          const formattedPhone = baseNumber.length >= 10 ? `+55${baseNumber}` : contactPhone;
+          const contactName = actionData?.contact_name || `Lead ${formattedPhone}`;
+
+          const newContact = await callGhl("/contacts/", "POST", {
+            locationId: creds.locationId,
+            phone: formattedPhone,
+            name: contactName,
+            firstName: contactName.split(" ")[0],
+            lastName: contactName.split(" ").slice(1).join(" ") || "",
+            ...(contactEmail ? { email: contactEmail } : {}),
+          }, true) as any;
+
+          contact = newContact?.contact || newContact;
+          if (!contact?.id) throw new Error("Falha ao criar contato no CRM.");
+          contactId = contact.id;
+          contactCreated = true;
+          console.log(`Created new GHL contact: ${contactId}`);
+        } else {
+          contact = contacts[0];
+          contactId = contact.id;
+          console.log(`Found GHL contact: ${contactId} (${contact.name || contact.firstName})`);
         }
 
         const contact = contacts[0];
