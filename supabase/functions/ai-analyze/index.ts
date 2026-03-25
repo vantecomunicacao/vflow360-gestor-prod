@@ -103,7 +103,6 @@ serve(async (req) => {
       "mover_funil", "campo_personalizado", "adicionar_nota",
       "valor_negociacao", "agendar_lembrete", "ganho_perdido"
     ];
-    // Default: all enabled, none auto-approved
     for (const a of defaultActions) {
       enabledActions.set(a, { enabled: true, autoApprove: false });
     }
@@ -123,14 +122,53 @@ serve(async (req) => {
       });
     }
 
-    // 5. Build conversation text
+    // Restrict actions based on configured fields/stages
+    const filteredActionTypes = activeActionTypes.filter((action) => {
+      if (action === "mover_funil" && selectedStages.length === 0) return false;
+      if (action === "campo_personalizado" && selectedFields.length === 0) return false;
+      return true;
+    });
+
+    if (filteredActionTypes.length === 0) {
+      return new Response(JSON.stringify({ success: true, data: { suggestions: [] } }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 5. Fetch previous suggestions for this conversation (context)
+    const { data: previousSuggestions } = await supabase
+      .from("suggestions")
+      .select("type, title, description, status, action_data, created_at")
+      .eq("conversation_id", conversationId)
+      .eq("user_id", resolvedUserId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    // Build previous suggestions context for the AI
+    let previousContext = "";
+    if (previousSuggestions && previousSuggestions.length > 0) {
+      const prevTexts = previousSuggestions.map((s) => {
+        const actionData = s.action_data as Record<string, any> || {};
+        return `- [${s.status.toUpperCase()}] ${s.type}: "${s.title}" (campo: ${actionData.field || "N/A"}, valor: ${actionData.value || "N/A"})`;
+      });
+      previousContext = `\n\nSUGESTÕES JÁ GERADAS ANTERIORMENTE PARA ESTE CONTATO (NÃO repita estas):
+${prevTexts.join("\n")}
+
+REGRAS SOBRE SUGESTÕES ANTERIORES:
+- NÃO gere sugestões que já existem acima (mesmo tipo + mesmo campo + mesmo valor)
+- NÃO contradiga sugestões já aprovadas (ex: se já foi aprovado "ganho", não sugira "perdido")
+- Se já existe uma sugestão pendente para o mesmo campo, NÃO gere outra para o mesmo campo
+- Analise o CONTEXTO COMPLETO da conversa antes de decidir. Se há ambiguidade, NÃO sugira.`;
+    }
+
+    // 6. Build conversation text
     const conversationText = messages
       .map((m) => `[${m.direction === "inbound" ? "Lead" : "Atendente"}]: ${m.content}`)
       .join("\n");
 
-    // 6. Build system prompt with strict constraints
+    // 7. Build system prompt with strict constraints
     const fieldsDescription = selectedFields.length > 0
-      ? `\n\nCampos do CRM disponíveis para atualização:\n${selectedFields
+      ? `\n\nCampos do CRM disponíveis para atualização (APENAS estes campos podem ser sugeridos):\n${selectedFields
           .map((f: any) => {
             let desc = `- ${f.name} (chave: ${f.fieldKey}, tipo: ${f.dataType})`;
             if (f.description) desc += `: ${f.description}`;
@@ -147,21 +185,24 @@ serve(async (req) => {
           .join("\n")}`
       : "";
 
-    // Build strict stage names list for the AI
     const stageNames = selectedStages.map((s: any) => s.name);
     const stagesDescription = selectedStages.length > 0
-      ? `\n\nEtapas do funil disponíveis (use EXATAMENTE estes nomes):\n${selectedStages
+      ? `\n\nEtapas do funil disponíveis (use EXATAMENTE estes nomes, APENAS estas etapas podem ser sugeridas):\n${selectedStages
           .map((s: any) => `- "${s.name}" (pipeline: ${s.pipelineName})${s.description ? `: ${s.description}` : ""}`)
           .join("\n")}`
       : "";
 
     const actionTypesDescription = `\n\nTipos de ação que você pode sugerir:
-${activeActionTypes.includes("mover_funil") ? "- mover_funil: Sugerir mover o lead para outra etapa do funil" : ""}
-${activeActionTypes.includes("campo_personalizado") ? "- campo_personalizado: Sugerir preencher/atualizar um campo personalizado" : ""}
-${activeActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
-${activeActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor da negociação" : ""}
-${activeActionTypes.includes("agendar_lembrete") ? "- agendar_lembrete: Sugerir agendar um lembrete/follow-up" : ""}
-${activeActionTypes.includes("ganho_perdido") ? "- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida" : ""}`.replace(/\n\n+/g, "\n");
+${filteredActionTypes.includes("mover_funil") ? "- mover_funil: Sugerir mover o lead para outra etapa do funil" : ""}
+${filteredActionTypes.includes("campo_personalizado") ? "- campo_personalizado: Sugerir preencher/atualizar um campo personalizado" : ""}
+${filteredActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
+${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor da negociação" : ""}
+${filteredActionTypes.includes("agendar_lembrete") ? "- agendar_lembrete: Sugerir agendar um lembrete/follow-up" : ""}
+${filteredActionTypes.includes("ganho_perdido") ? "- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida" : ""}`.replace(/\n\n+/g, "\n");
+
+    // Build valid field keys set for validation
+    const validFieldKeys = new Set(selectedFields.map((f: any) => f.fieldKey));
+    const validStageNames = new Set(stageNames);
 
     const systemPrompt = `Você é um assistente de CRM inteligente. Analise a conversa de WhatsApp abaixo e gere sugestões de ações para o CRM (Go High Level).
 
@@ -169,6 +210,7 @@ ${aiPrompt}
 ${fieldsDescription}
 ${stagesDescription}
 ${actionTypesDescription}
+${previousContext}
 
 Contato: ${conversation?.contact_name || "Desconhecido"} (${conversation?.contact_phone || ""})
 
@@ -178,12 +220,15 @@ REGRAS OBRIGATÓRIAS:
 - Não invente informações que não estão na conversa
 - Seja conservador: na dúvida, não sugira
 - Para "mover_funil": use EXATAMENTE um dos nomes de etapa listados acima. NUNCA invente nomes de etapas.
-- Para "campo_personalizado": se o campo tem OPÇÕES VÁLIDAS listadas, use APENAS um valor dessa lista. NUNCA invente opções.
+- Para "campo_personalizado": use APENAS campos listados acima (pela fieldKey). NUNCA sugira campos que não estão na lista.
+- Se o campo tem OPÇÕES VÁLIDAS listadas, use APENAS um valor dessa lista. NUNCA invente opções.
 - No campo "field" da sugestão, use a CHAVE do campo (fieldKey), não o nome amigável.
 - No campo "value", use o valor exato (nome da etapa para funil, opção para dropdowns, texto para campos livres).
+- NUNCA gere sugestões contraditórias no mesmo lote (ex: ganho E perdido ao mesmo tempo)
+- Analise a conversa INTEIRA para entender a conclusão final do lead antes de sugerir ganho/perdido
 - Retorne as sugestões usando a tool fornecida`;
 
-    // 7. Call Lovable AI with tool calling for structured output
+    // 8. Call Lovable AI with tool calling for structured output
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -212,7 +257,7 @@ REGRAS OBRIGATÓRIAS:
                       properties: {
                         type: {
                           type: "string",
-                          enum: activeActionTypes,
+                          enum: filteredActionTypes,
                           description: "Tipo da ação sugerida",
                         },
                         title: {
@@ -225,7 +270,7 @@ REGRAS OBRIGATÓRIAS:
                         },
                         field: {
                           type: "string",
-                          description: "Para mover_funil: nome EXATO da etapa destino (ex: 'Qualificando'). Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null.",
+                          description: "Para mover_funil: nome EXATO da etapa destino. Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null.",
                         },
                         value: {
                           type: "string",
@@ -272,7 +317,73 @@ REGRAS OBRIGATÓRIAS:
       }
     }
 
-    // 8. Save suggestions to database
+    // 9. POST-GENERATION VALIDATION
+
+    // 9a. Filter out suggestions for unconfigured fields/stages
+    suggestions = suggestions.filter((s) => {
+      if (s.type === "mover_funil") {
+        const stageValue = s.value || s.field;
+        if (!stageValue || !validStageNames.has(stageValue)) {
+          console.log(`Filtered out mover_funil suggestion with invalid stage: ${stageValue}`);
+          return false;
+        }
+      }
+      if (s.type === "campo_personalizado") {
+        if (!s.field || !validFieldKeys.has(s.field)) {
+          console.log(`Filtered out campo_personalizado suggestion with invalid field: ${s.field}`);
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // 9b. Filter contradictions within the same batch
+    const hasGanho = suggestions.some((s) => s.type === "ganho_perdido" && s.value?.toLowerCase()?.includes("ganh"));
+    const hasPerdido = suggestions.some((s) => s.type === "ganho_perdido" && s.value?.toLowerCase()?.includes("perd"));
+    if (hasGanho && hasPerdido) {
+      console.log("Contradiction detected: ganho AND perdido in same batch. Removing all ganho_perdido suggestions.");
+      suggestions = suggestions.filter((s) => s.type !== "ganho_perdido");
+    }
+
+    // 9c. Filter contradictions with previous approved suggestions
+    if (previousSuggestions && previousSuggestions.length > 0) {
+      const approvedTypes = new Map<string, string>();
+      for (const prev of previousSuggestions) {
+        if (prev.status === "approved") {
+          const prevData = prev.action_data as Record<string, any> || {};
+          approvedTypes.set(`${prev.type}:${prevData.field || ""}`, prevData.value || "");
+        }
+      }
+
+      suggestions = suggestions.filter((s) => {
+        const key = `${s.type}:${s.field || ""}`;
+        const prevValue = approvedTypes.get(key);
+        if (prevValue !== undefined && prevValue !== s.value) {
+          console.log(`Filtered contradiction with approved suggestion: ${key} was "${prevValue}", new "${s.value}"`);
+          return false;
+        }
+        return true;
+      });
+
+      // 9d. Filter duplicates with existing suggestions (any status)
+      const existingKeys = new Set(
+        previousSuggestions.map((prev) => {
+          const prevData = prev.action_data as Record<string, any> || {};
+          return `${prev.type}:${prevData.field || ""}:${prevData.value || ""}`;
+        })
+      );
+
+      suggestions = suggestions.filter((s) => {
+        const key = `${s.type}:${s.field || ""}:${s.value || ""}`;
+        if (existingKeys.has(key)) {
+          console.log(`Filtered duplicate suggestion: ${key}`);
+          return false;
+        }
+        return true;
+      });
+    }
+
+    // 10. Save suggestions to database
     const insertedSuggestions = [];
     for (const s of suggestions) {
       const autoApprove = enabledActions.get(s.type)?.autoApprove || false;
