@@ -112,16 +112,25 @@ serve(async (req) => {
       .map((m) => `[${m.direction === "inbound" ? "Lead" : "Atendente"}]: ${m.content}`)
       .join("\n");
 
-    // 6. Build system prompt
+    // 6. Build system prompt with strict constraints
     const fieldsDescription = selectedFields.length > 0
       ? `\n\nCampos do CRM disponíveis para atualização:\n${selectedFields
-          .map((f: any) => `- ${f.name} (${f.fieldKey}, tipo: ${f.dataType})${f.description ? `: ${f.description}` : ""}`)
+          .map((f: any) => {
+            let desc = `- ${f.name} (chave: ${f.fieldKey}, tipo: ${f.dataType})`;
+            if (f.description) desc += `: ${f.description}`;
+            if (f.options && f.options.length > 0) {
+              desc += `\n  OPÇÕES VÁLIDAS (use APENAS estas): [${f.options.join(", ")}]`;
+            }
+            return desc;
+          })
           .join("\n")}`
       : "";
 
+    // Build strict stage names list for the AI
+    const stageNames = selectedStages.map((s: any) => s.name);
     const stagesDescription = selectedStages.length > 0
-      ? `\n\nEtapas do funil disponíveis:\n${selectedStages
-          .map((s: any) => `- ${s.name} (pipeline: ${s.pipelineName})${s.description ? `: ${s.description}` : ""}`)
+      ? `\n\nEtapas do funil disponíveis (use EXATAMENTE estes nomes):\n${selectedStages
+          .map((s: any) => `- "${s.name}" (pipeline: ${s.pipelineName})${s.description ? `: ${s.description}` : ""}`)
           .join("\n")}`
       : "";
 
@@ -142,11 +151,15 @@ ${actionTypesDescription}
 
 Contato: ${conversation?.contact_name || "Desconhecido"} (${conversation?.contact_phone || ""})
 
-REGRAS:
+REGRAS OBRIGATÓRIAS:
 - Gere APENAS sugestões baseadas em evidências claras na conversa
 - Cada sugestão deve ter um trecho da conversa que justifica a ação
 - Não invente informações que não estão na conversa
 - Seja conservador: na dúvida, não sugira
+- Para "mover_funil": use EXATAMENTE um dos nomes de etapa listados acima. NUNCA invente nomes de etapas.
+- Para "campo_personalizado": se o campo tem OPÇÕES VÁLIDAS listadas, use APENAS um valor dessa lista. NUNCA invente opções.
+- No campo "field" da sugestão, use a CHAVE do campo (fieldKey), não o nome amigável.
+- No campo "value", use o valor exato (nome da etapa para funil, opção para dropdowns, texto para campos livres).
 - Retorne as sugestões usando a tool fornecida`;
 
     // 7. Call Lovable AI with tool calling for structured output
