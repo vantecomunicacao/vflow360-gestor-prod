@@ -146,7 +146,8 @@ const Suggestions = () => {
   useEffect(() => {
     fetchSuggestions();
     fetchAiConfig();
-  }, [fetchSuggestions, fetchAiConfig]);
+    fetchDisabledContacts();
+  }, [fetchSuggestions, fetchAiConfig, fetchDisabledContacts]);
 
   const toggleEnabled = async (key: string) => {
     const newConfig = { ...aiConfig, [key]: { ...aiConfig[key], enabled: !aiConfig[key].enabled } };
