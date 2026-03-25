@@ -540,6 +540,10 @@ serve(async (req) => {
         }
 
         // 4. Update suggestion with execution result
+        const creationNotes: string[] = [];
+        if (contactCreated) creationNotes.push("Novo contato criado no CRM");
+        if (opportunityCreated) creationNotes.push("Nova oportunidade criada");
+
         await supabase.from("suggestions").update({
           status: "approved",
           action_data: { 
@@ -549,18 +553,18 @@ serve(async (req) => {
             ghl_contact_id: contactId,
             ghl_opportunity_id: opportunity.id,
             opportunity_created: opportunityCreated,
+            contact_created: contactCreated,
           },
         }).eq("id", suggestionId);
 
-        const resultMessage = opportunityCreated 
-          ? `${executionResult}. Nova oportunidade criada para o contato.`
-          : executionResult;
+        const resultMessage = [executionResult, ...creationNotes].join(". ") + ".";
 
         return new Response(JSON.stringify({ 
           success: true, 
           data: { 
             message: resultMessage,
             opportunityCreated,
+            contactCreated,
             contactId,
             opportunityId: opportunity.id,
           } 
