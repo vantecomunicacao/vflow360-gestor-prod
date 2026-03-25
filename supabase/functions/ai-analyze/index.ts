@@ -204,11 +204,13 @@ REGRAS OBRIGATÓRIAS:
                         },
                         field: {
                           type: "string",
-                          description: "Nome do campo ou etapa afetada (fieldKey para campos, stage name para funil)",
+                          description: "Para mover_funil: nome EXATO da etapa destino (ex: 'Qualificando'). Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null.",
                         },
                         value: {
                           type: "string",
-                          description: "Valor sugerido para o campo ou nome da etapa destino",
+                          description: stageNames.length > 0
+                            ? `Para mover_funil: DEVE ser um destes valores exatos: ${stageNames.map((n: string) => `"${n}"`).join(", ")}. Para campo_personalizado com opções: use apenas valores da lista de opções válidas. Para outros: valor livre.`
+                            : "Valor sugerido para o campo ou nome da etapa destino",
                         },
                       },
                       required: ["type", "title", "description"],
