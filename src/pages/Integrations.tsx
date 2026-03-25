@@ -627,12 +627,30 @@ const Integrations = () => {
                             </div>
                             <p className="text-xs text-muted-foreground font-mono">{field.fieldKey}</p>
                             {field.selected && (
-                              <Input
-                                placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
-                                value={field.description}
-                                onChange={(e) => updateFieldDescription(field.id, e.target.value)}
-                                className="text-sm"
-                              />
+                              <>
+                                <Input
+                                  placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
+                                  value={field.description}
+                                  onChange={(e) => updateFieldDescription(field.id, e.target.value)}
+                                  className="text-sm"
+                                />
+                                {field.options && field.options.length > 0 && (
+                                  <div className="ml-2 space-y-2 border-l-2 border-primary/20 pl-3">
+                                    <p className="text-xs font-medium text-muted-foreground">Opções ({field.options.length}):</p>
+                                    {field.options.map((opt) => (
+                                      <div key={opt.value} className="space-y-1">
+                                        <p className="text-xs font-medium text-foreground">{opt.value}</p>
+                                        <Input
+                                          placeholder={`Quando usar "${opt.value}"? (ex: 'Quando o lead mencionar...')`}
+                                          value={opt.instruction}
+                                          onChange={(e) => updateOptionInstruction(field.id, opt.value, e.target.value)}
+                                          className="text-xs h-7"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
