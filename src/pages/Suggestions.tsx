@@ -129,7 +129,7 @@ const Suggestions = () => {
   };
 
   const [executingId, setExecutingId] = useState<string | null>(null);
-  const [executionResults, setExecutionResults] = useState<Record<string, { opportunityCreated: boolean; message: string }>>({});
+  const [executionResults, setExecutionResults] = useState<Record<string, { opportunityCreated: boolean; contactCreated: boolean; message: string }>>({});
 
   const handleAction = async (id: string, action: "approved" | "rejected") => {
     if (action === "approved") {
@@ -153,6 +153,7 @@ const Suggestions = () => {
           ...prev,
           [id]: {
             opportunityCreated: result.data?.opportunityCreated ?? false,
+            contactCreated: result.data?.contactCreated ?? false,
             message: result.data?.message || "Ação aplicada com sucesso.",
           },
         }));
@@ -286,12 +287,19 @@ const Suggestions = () => {
                         </Badge>
                       )}
                       {suggestion.status === "approved" && executionResults[suggestion.id] && (
-                        <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
-                          ? "bg-success/10 text-success border-success/20"
-                          : "bg-info/10 text-info border-info/20"
-                        }>
-                          {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
-                        </Badge>
+                        <>
+                          {executionResults[suggestion.id].contactCreated && (
+                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                              👤 Contato criado
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
+                            ? "bg-success/10 text-success border-success/20"
+                            : "bg-info/10 text-info border-info/20"
+                          }>
+                            {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
+                          </Badge>
+                        </>
                       )}
                     </div>
 
