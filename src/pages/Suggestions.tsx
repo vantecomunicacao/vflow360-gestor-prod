@@ -192,10 +192,21 @@ const Suggestions = () => {
     }
   };
 
-  const filtered = filter === "all" ? suggestions : suggestions.filter(s => s.status === filter);
-  const pendingCount = suggestions.filter(s => s.status === "pending").length;
-
-  // Group filtered suggestions by contact
+  const filtered = useMemo(() => {
+    let result = filter === "all" ? suggestions : suggestions.filter(s => s.status === filter);
+    if (typeFilter !== "all") {
+      result = result.filter(s => s.type === typeFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(s => {
+        const name = (s.action_data?.contact_name || "").toLowerCase();
+        const phone = (s.action_data?.contact_phone || "").toLowerCase();
+        return name.includes(q) || phone.includes(q);
+      });
+    }
+    return result;
+  }, [suggestions, filter, typeFilter, searchQuery]);
   const contactGroups: ContactGroup[] = useMemo(() => {
     const groups = new Map<string, ContactGroup>();
 
