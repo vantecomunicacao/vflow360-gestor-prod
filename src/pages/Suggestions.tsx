@@ -445,6 +445,18 @@ const Suggestions = () => {
                         </Badge>
                       )}
                     </div>
+                    {group.contactPhone && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-7 px-2 ${disabledContacts.has(group.contactPhone) ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary"}`}
+                        onClick={(e) => toggleContactAI(group.contactPhone, e)}
+                        title={disabledContacts.has(group.contactPhone) ? "IA desativada para este contato" : "IA ativa para este contato"}
+                      >
+                        <Power className="w-3.5 h-3.5 mr-1" />
+                        <span className="text-xs">{disabledContacts.has(group.contactPhone) ? "IA off" : "IA on"}</span>
+                      </Button>
+                    )}
                     {group.pendingCount > 0 && (
                       <Button
                         variant="ghost"
