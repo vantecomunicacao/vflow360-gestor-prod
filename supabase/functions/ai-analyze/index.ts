@@ -63,6 +63,22 @@ serve(async (req) => {
       .eq("id", conversationId)
       .single();
 
+    // 2b. Check if this contact is disabled for AI analysis
+    if (conversation?.contact_phone) {
+      const { data: disabledEntry } = await supabase
+        .from("disabled_contacts")
+        .select("id")
+        .eq("user_id", resolvedUserId)
+        .eq("contact_phone", conversation.contact_phone)
+        .maybeSingle();
+
+      if (disabledEntry) {
+        return new Response(JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason: "Contact AI analysis is disabled" } }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // 3. Fetch GHL integration config (mappings)
     const { data: ghlIntegration } = await supabase
       .from("integrations")
