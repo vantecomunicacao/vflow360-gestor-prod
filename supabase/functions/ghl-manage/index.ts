@@ -461,17 +461,30 @@ serve(async (req) => {
             const targetStageName = actionData?.value;
             if (!targetStageName) throw new Error("Etapa de destino não especificada na sugestão.");
             
-            // Find the stage
+            // Find the stage (exact, then partial/fuzzy match)
             const pipelinesData = await callGhl("/opportunities/pipelines") as any;
             let targetStage: any = null;
             let targetPipelineId = "";
+            const allStages: string[] = [];
+            const searchName = targetStageName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
             for (const p of (pipelinesData?.pipelines || [])) {
-              const found = p.stages?.find((s: any) => 
-                s.name.toLowerCase() === targetStageName.toLowerCase()
-              );
-              if (found) { targetStage = found; targetPipelineId = p.id; break; }
+              for (const s of (p.stages || [])) {
+                allStages.push(s.name);
+                const stageName = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                // Exact match or partial/contains match
+                if (stageName === searchName || stageName.includes(searchName) || searchName.includes(stageName)) {
+                  targetStage = s;
+                  targetPipelineId = p.id;
+                  break;
+                }
+              }
+              if (targetStage) break;
             }
-            if (!targetStage) throw new Error(`Etapa "${targetStageName}" não encontrada nos funis do CRM.`);
+            if (!targetStage) {
+              console.error(`Etapas disponíveis: ${allStages.join(", ")}`);
+              throw new Error(`Etapa "${targetStageName}" não encontrada. Etapas disponíveis: ${allStages.join(", ")}`);
+            }
             
             await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
               pipelineId: targetPipelineId,
