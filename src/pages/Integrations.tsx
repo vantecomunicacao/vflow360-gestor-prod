@@ -344,6 +344,16 @@ const Integrations = () => {
     setGhlFields(prev => prev.map(f => f.id === id ? { ...f, description } : f));
   };
 
+  const updateOptionInstruction = (fieldId: string, optionValue: string, instruction: string) => {
+    setGhlFields(prev => prev.map(f => {
+      if (f.id !== fieldId || !f.options) return f;
+      return {
+        ...f,
+        options: f.options.map(opt => opt.value === optionValue ? { ...opt, instruction } : opt),
+      };
+    }));
+  };
+
   const toggleStage = (id: string) => {
     setGhlStages(prev => prev.map(s => s.id === id ? { ...s, selected: !s.selected } : s));
   };
