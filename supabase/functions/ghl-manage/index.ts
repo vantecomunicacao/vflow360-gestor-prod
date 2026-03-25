@@ -370,7 +370,7 @@ serve(async (req) => {
         let contacts: any[] = [];
         for (const variation of uniqueVariations) {
           if (contacts.length > 0) break;
-          const result = await callGhl(`/contacts/search?query=${encodeURIComponent(variation)}`) as any;
+          const result = await callGhl(`/contacts/?query=${encodeURIComponent(variation)}`) as any;
           contacts = result?.contacts || [];
         }
 
@@ -378,7 +378,7 @@ serve(async (req) => {
         const contactEmail = actionData?.contact_email;
         if (contacts.length === 0 && contactEmail) {
           console.log(`Phone not found, trying email: ${contactEmail}`);
-          const emailResult = await callGhl(`/contacts/search?query=${encodeURIComponent(contactEmail)}`) as any;
+          const emailResult = await callGhl(`/contacts/?query=${encodeURIComponent(contactEmail)}`) as any;
           contacts = emailResult?.contacts || [];
         }
 
@@ -414,7 +414,7 @@ serve(async (req) => {
         }
 
         // 2. Search for latest opportunity for this contact
-        const oppsResult = await callGhl(`/opportunities/search?contact_id=${contactId}`) as any;
+        const oppsResult = await callGhl(`/opportunities/search?location_id=${creds.locationId}&contact_id=${contactId}`, "GET", undefined, true) as any;
         const opportunities = oppsResult?.opportunities || [];
         
         let opportunity: any = null;
