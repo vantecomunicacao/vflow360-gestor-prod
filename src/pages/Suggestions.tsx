@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +25,14 @@ interface Suggestion {
   };
   created_at: string;
   conversation_id: string | null;
+}
+
+interface ContactGroup {
+  key: string;
+  contactName: string;
+  contactPhone: string;
+  suggestions: Suggestion[];
+  pendingCount: number;
 }
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -60,7 +69,7 @@ const Suggestions = () => {
   const [aiConfig, setAiConfig] = useState<Record<string, { enabled: boolean; autoApprove: boolean }>>(
     Object.fromEntries(suggestionTypeOptions.map(o => [o.key, { enabled: true, autoApprove: false }]))
   );
-  const [savingConfig, setSavingConfig] = useState(false);
+  const [openContacts, setOpenContacts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const fetchSuggestions = useCallback(async () => {
@@ -133,7 +142,6 @@ const Suggestions = () => {
 
   const handleAction = async (id: string, action: "approved" | "rejected") => {
     if (action === "approved") {
-      // Execute the suggestion in GHL
       setExecutingId(id);
       try {
         const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", {
@@ -143,7 +151,6 @@ const Suggestions = () => {
         if (fnError || !result?.success) {
           const errorMsg = result?.error || fnError?.message || "Erro ao executar a sugestão no CRM.";
           toast({ title: "Erro ao executar", description: errorMsg, variant: "destructive" });
-          // Still update locally to show the error state
           setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: "approved" as SuggestionStatus } : s));
           return;
         }
@@ -167,7 +174,6 @@ const Suggestions = () => {
         setExecutingId(null);
       }
     } else {
-      // Reject
       try {
         const { error } = await supabase
           .from("suggestions")
@@ -184,6 +190,69 @@ const Suggestions = () => {
 
   const filtered = filter === "all" ? suggestions : suggestions.filter(s => s.status === filter);
   const pendingCount = suggestions.filter(s => s.status === "pending").length;
+
+  // Group filtered suggestions by contact
+  const contactGroups: ContactGroup[] = useMemo(() => {
+    const groups = new Map<string, ContactGroup>();
+
+    for (const s of filtered) {
+      const name = s.action_data?.contact_name || "Contato desconhecido";
+      const phone = s.action_data?.contact_phone || "";
+      const key = `${phone || name}`;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          contactName: name,
+          contactPhone: phone,
+          suggestions: [],
+          pendingCount: 0,
+        });
+      }
+
+      const group = groups.get(key)!;
+      group.suggestions.push(s);
+      if (s.status === "pending") group.pendingCount++;
+    }
+
+    // Sort: contacts with pending suggestions first, then by most recent suggestion
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.pendingCount > 0 && b.pendingCount === 0) return -1;
+      if (b.pendingCount > 0 && a.pendingCount === 0) return 1;
+      const aLatest = a.suggestions[0]?.created_at || "";
+      const bLatest = b.suggestions[0]?.created_at || "";
+      return bLatest.localeCompare(aLatest);
+    });
+  }, [filtered]);
+
+  const toggleContact = (key: string) => {
+    setOpenContacts(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Auto-open contacts with pending suggestions
+  useEffect(() => {
+    const pendingKeys = contactGroups.filter(g => g.pendingCount > 0).map(g => g.key);
+    if (pendingKeys.length > 0) {
+      setOpenContacts(prev => {
+        const next = new Set(prev);
+        for (const k of pendingKeys) next.add(k);
+        return next;
+      });
+    }
+  }, [contactGroups]);
+
+  const formatPhone = (phone: string) => {
+    if (!phone) return "";
+    const clean = phone.replace(/\D/g, "");
+    if (clean.length === 13) return `+${clean.slice(0, 2)} (${clean.slice(2, 4)}) ${clean.slice(4, 9)}-${clean.slice(9)}`;
+    if (clean.length === 12) return `+${clean.slice(0, 2)} (${clean.slice(2, 4)}) ${clean.slice(4, 8)}-${clean.slice(8)}`;
+    return phone;
+  };
 
   return (
     <div className="space-y-6">
@@ -249,7 +318,7 @@ const Suggestions = () => {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : contactGroups.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <Sparkles className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">Nenhuma sugestão encontrada</h3>
@@ -258,101 +327,140 @@ const Suggestions = () => {
           </p>
         </div>
       ) : (
-        <AnimatePresence>
-          <div className="space-y-4">
-            {filtered.map((suggestion, i) => (
-              <motion.div
-                key={suggestion.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="glass-card p-5"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Badge variant="outline" className={typeColors[suggestion.type] || ""}>
-                        {ACTION_TYPE_LABELS[suggestion.type] || suggestion.type}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">•</span>
-                      <span className="text-sm text-muted-foreground">
-                        {suggestion.action_data?.contact_name || "Contato"}
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {new Date(suggestion.created_at).toLocaleString("pt-BR")}
-                      </span>
-                      {suggestion.status !== "pending" && (
-                        <Badge variant={suggestion.status === "approved" ? "default" : "destructive"}>
-                          {suggestion.status === "approved" ? "Aprovada" : "Rejeitada"}
-                        </Badge>
-                      )}
-                      {suggestion.status === "approved" && executionResults[suggestion.id] && (
-                        <>
-                          {executionResults[suggestion.id].contactCreated && (
-                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
-                              👤 Contato criado
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
-                            ? "bg-success/10 text-success border-success/20"
-                            : "bg-info/10 text-info border-info/20"
-                          }>
-                            {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
-                          </Badge>
-                        </>
+        <div className="space-y-3">
+          {contactGroups.map((group) => (
+            <Collapsible
+              key={group.key}
+              open={openContacts.has(group.key)}
+              onOpenChange={() => toggleContact(group.key)}
+            >
+              <CollapsibleTrigger asChild>
+                <button className="w-full glass-card p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <User className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-foreground">{group.contactName}</p>
+                      {group.contactPhone && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {formatPhone(group.contactPhone)}
+                        </p>
                       )}
                     </div>
-
-                    <h4 className="text-sm font-semibold text-foreground mb-2">{suggestion.title}</h4>
-
-                    {(suggestion.action_data?.field || suggestion.action_data?.value) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                        {suggestion.action_data?.field && (
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Campo</p>
-                            <p className="text-sm text-foreground font-medium">{suggestion.action_data.field}</p>
-                          </div>
-                        )}
-                        {suggestion.action_data?.value && (
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Valor sugerido</p>
-                            <p className="text-sm text-primary font-semibold flex items-center gap-1">
-                              <ArrowRight className="w-3 h-3" /> {suggestion.action_data.value}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {suggestion.description && (
-                      <div className="bg-muted/50 rounded-lg p-3 mb-3">
-                        <div className="flex items-start gap-2">
-                          <MessageSquare className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                          <p className="text-sm text-foreground">{suggestion.description}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {suggestion.status === "pending" && (
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleAction(suggestion.id, "approved")} disabled={executingId === suggestion.id}>
-                          {executingId === suggestion.id ? (
-                            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Executando...</>
-                          ) : (
-                            <><Check className="w-4 h-4 mr-1" /> Aprovar e Executar</>
-                          )}
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleAction(suggestion.id, "rejected")} disabled={!!executingId}>
-                          <X className="w-4 h-4 mr-1" /> Rejeitar
-                        </Button>
-                      </div>
-                    )}
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </AnimatePresence>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {group.suggestions.length} sugestão{group.suggestions.length !== 1 ? "ões" : ""}
+                      </span>
+                      {group.pendingCount > 0 && (
+                        <Badge variant="default" className="text-xs">
+                          {group.pendingCount} pendente{group.pendingCount !== 1 ? "s" : ""}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${openContacts.has(group.key) ? "rotate-180" : ""}`} />
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <AnimatePresence>
+                  <div className="space-y-3 pl-4 border-l-2 border-primary/20 ml-5 mt-2 mb-2">
+                    {group.suggestions.map((suggestion, i) => (
+                      <motion.div
+                        key={suggestion.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="glass-card p-4"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <Badge variant="outline" className={typeColors[suggestion.type] || ""}>
+                                {ACTION_TYPE_LABELS[suggestion.type] || suggestion.type}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                {new Date(suggestion.created_at).toLocaleString("pt-BR")}
+                              </span>
+                              {suggestion.status !== "pending" && (
+                                <Badge variant={suggestion.status === "approved" ? "default" : "destructive"}>
+                                  {suggestion.status === "approved" ? "Aprovada" : "Rejeitada"}
+                                </Badge>
+                              )}
+                              {suggestion.status === "approved" && executionResults[suggestion.id] && (
+                                <>
+                                  {executionResults[suggestion.id].contactCreated && (
+                                    <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                                      👤 Contato criado
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
+                                    ? "bg-success/10 text-success border-success/20"
+                                    : "bg-info/10 text-info border-info/20"
+                                  }>
+                                    {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+
+                            <h4 className="text-sm font-semibold text-foreground mb-2">{suggestion.title}</h4>
+
+                            {(suggestion.action_data?.field || suggestion.action_data?.value) && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                                {suggestion.action_data?.field && (
+                                  <div>
+                                    <p className="text-xs text-muted-foreground mb-0.5">Campo</p>
+                                    <p className="text-sm text-foreground font-medium">{suggestion.action_data.field}</p>
+                                  </div>
+                                )}
+                                {suggestion.action_data?.value && (
+                                  <div>
+                                    <p className="text-xs text-muted-foreground mb-0.5">Valor sugerido</p>
+                                    <p className="text-sm text-primary font-semibold flex items-center gap-1">
+                                      <ArrowRight className="w-3 h-3" /> {suggestion.action_data.value}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {suggestion.description && (
+                              <div className="bg-muted/50 rounded-lg p-3 mb-2">
+                                <div className="flex items-start gap-2">
+                                  <MessageSquare className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                                  <p className="text-sm text-foreground">{suggestion.description}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {suggestion.status === "pending" && (
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => handleAction(suggestion.id, "approved")} disabled={executingId === suggestion.id}>
+                                  {executingId === suggestion.id ? (
+                                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Executando...</>
+                                  ) : (
+                                    <><Check className="w-4 h-4 mr-1" /> Aprovar e Executar</>
+                                  )}
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => handleAction(suggestion.id, "rejected")} disabled={!!executingId}>
+                                  <X className="w-4 h-4 mr-1" /> Rejeitar
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </AnimatePresence>
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
       )}
     </div>
   );
