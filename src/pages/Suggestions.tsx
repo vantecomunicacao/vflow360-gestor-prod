@@ -400,7 +400,7 @@ const Suggestions = () => {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
                         {group.suggestions.length} sugestão{group.suggestions.length !== 1 ? "ões" : ""}
@@ -411,6 +411,24 @@ const Suggestions = () => {
                         </Badge>
                       )}
                     </div>
+                    {group.pendingCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
+                        disabled={rejectingContact === group.key}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRejectAllByContact(group);
+                        }}
+                      >
+                        {rejectingContact === group.key ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <><XCircle className="w-3.5 h-3.5 mr-1" /> Rejeitar todas</>
+                        )}
+                      </Button>
+                    )}
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${openContacts.has(group.key) ? "rotate-180" : ""}`} />
                   </div>
                 </button>
