@@ -129,7 +129,7 @@ const Suggestions = () => {
   };
 
   const [executingId, setExecutingId] = useState<string | null>(null);
-  const [executionResults, setExecutionResults] = useState<Record<string, { opportunityCreated: boolean; message: string }>>({});
+  const [executionResults, setExecutionResults] = useState<Record<string, { opportunityCreated: boolean; contactCreated: boolean; message: string }>>({});
 
   const handleAction = async (id: string, action: "approved" | "rejected") => {
     if (action === "approved") {
@@ -153,6 +153,7 @@ const Suggestions = () => {
           ...prev,
           [id]: {
             opportunityCreated: result.data?.opportunityCreated ?? false,
+            contactCreated: result.data?.contactCreated ?? false,
             message: result.data?.message || "Ação aplicada com sucesso.",
           },
         }));
