@@ -160,7 +160,7 @@ const Integrations = () => {
       // Merge with saved selections
       const allFields = [...GHL_STANDARD_FIELDS, ...customFields].map(f => {
         const saved = savedFields.find((sf: any) => sf.id === f.id);
-        return saved ? { ...f, selected: true, description: saved.description || "" } : f;
+        return saved ? { ...f, selected: true, description: saved.description || "", options: f.options || saved.options } : f;
       });
       setGhlFields(allFields);
     } catch (error) {
