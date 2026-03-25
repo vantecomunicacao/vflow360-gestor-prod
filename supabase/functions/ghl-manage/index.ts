@@ -385,11 +385,11 @@ serve(async (req) => {
         let contactCreated = false;
         let contactId: string;
         let contact: any;
+        const creds = await getGhlCredentials();
 
         if (contacts.length === 0) {
           // Create the contact in GHL
           console.log(`Contact not found, creating new contact for phone: ${contactPhone}`);
-          const creds = await getGhlCredentials();
           const formattedPhone = baseNumber.length >= 10 ? `+55${baseNumber}` : contactPhone;
           const contactName = actionData?.contact_name || `Lead ${formattedPhone}`;
 
@@ -413,9 +413,7 @@ serve(async (req) => {
           console.log(`Found GHL contact: ${contactId} (${contact.name || contact.firstName})`);
         }
 
-
         // 2. Search for latest opportunity for this contact
-        const creds2 = await getGhlCredentials();
         const oppsResult = await callGhl(`/opportunities/search?contact_id=${contactId}`) as any;
         const opportunities = oppsResult?.opportunities || [];
         
