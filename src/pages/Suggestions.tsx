@@ -285,6 +285,14 @@ const Suggestions = () => {
                           {suggestion.status === "approved" ? "Aprovada" : "Rejeitada"}
                         </Badge>
                       )}
+                      {suggestion.status === "approved" && executionResults[suggestion.id] && (
+                        <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
+                          ? "bg-success/10 text-success border-success/20"
+                          : "bg-info/10 text-info border-info/20"
+                        }>
+                          {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
+                        </Badge>
+                      )}
                     </div>
 
                     <h4 className="text-sm font-semibold text-foreground mb-2">{suggestion.title}</h4>
