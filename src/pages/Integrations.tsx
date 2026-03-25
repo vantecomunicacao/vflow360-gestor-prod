@@ -18,6 +18,7 @@ interface GhlCustomField {
   dataType: string;
   selected: boolean;
   description: string;
+  options?: string[];
 }
 
 interface GhlPipelineStage {
@@ -135,19 +136,31 @@ const Integrations = () => {
 
     try {
       const fieldsData = await callGhl("custom_fields");
-      const customFields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => ({
-        id: f.id,
-        name: f.name || f.fieldKey || f.id,
-        fieldKey: f.fieldKey || f.key || f.id,
-        dataType: f.dataType || f.type || "text",
-        selected: false,
-        description: "",
-      }));
+      const customFields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => {
+        // Extract options for dropdown/select fields
+        const fieldOptions: string[] = [];
+        if (f.options && Array.isArray(f.options)) {
+          for (const opt of f.options) {
+            if (typeof opt === "string") fieldOptions.push(opt);
+            else if (opt?.value) fieldOptions.push(opt.value);
+            else if (opt?.name) fieldOptions.push(opt.name);
+          }
+        }
+        return {
+          id: f.id,
+          name: f.name || f.fieldKey || f.id,
+          fieldKey: f.fieldKey || f.key || f.id,
+          dataType: f.dataType || f.type || "text",
+          selected: false,
+          description: "",
+          options: fieldOptions.length > 0 ? fieldOptions : undefined,
+        };
+      });
       
       // Merge with saved selections
       const allFields = [...GHL_STANDARD_FIELDS, ...customFields].map(f => {
         const saved = savedFields.find((sf: any) => sf.id === f.id);
-        return saved ? { ...f, selected: true, description: saved.description || "" } : f;
+        return saved ? { ...f, selected: true, description: saved.description || "", options: f.options || saved.options } : f;
       });
       setGhlFields(allFields);
     } catch (error) {
@@ -320,7 +333,7 @@ const Integrations = () => {
   };
 
   const handleSaveMappings = async () => {
-    const selectedFields = ghlFields.filter(f => f.selected).map(f => ({ id: f.id, fieldKey: f.fieldKey, name: f.name, dataType: f.dataType, description: f.description }));
+    const selectedFields = ghlFields.filter(f => f.selected).map(f => ({ id: f.id, fieldKey: f.fieldKey, name: f.name, dataType: f.dataType, description: f.description, options: f.options || undefined }));
     const selectedStages = ghlStages.filter(s => s.selected).map(s => ({ id: s.id, name: s.name, pipelineId: s.pipelineId, pipelineName: s.pipelineName, description: s.description }));
     try {
       await callGhl("save_mappings", { selectedFields, selectedStages, aiPrompt });
