@@ -119,7 +119,12 @@ serve(async (req) => {
             let desc = `- ${f.name} (chave: ${f.fieldKey}, tipo: ${f.dataType})`;
             if (f.description) desc += `: ${f.description}`;
             if (f.options && f.options.length > 0) {
-              desc += `\n  OPÇÕES VÁLIDAS (use APENAS estas): [${f.options.join(", ")}]`;
+              const optionsWithInstructions = f.options.map((opt: any) => {
+                const val = typeof opt === "string" ? opt : opt.value;
+                const instr = typeof opt === "object" && opt.instruction ? opt.instruction : "";
+                return instr ? `"${val}" → ${instr}` : `"${val}"`;
+              });
+              desc += `\n  OPÇÕES VÁLIDAS (use APENAS estas):\n${optionsWithInstructions.map((o: string) => `    • ${o}`).join("\n")}`;
             }
             return desc;
           })
