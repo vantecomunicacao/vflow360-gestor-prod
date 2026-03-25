@@ -419,10 +419,10 @@ const Suggestions = () => {
               onOpenChange={() => toggleContact(group.key)}
             >
               <CollapsibleTrigger asChild>
-                <button className="w-full glass-card p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer rounded-lg">
+                <button className={`w-full glass-card p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer rounded-lg ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "opacity-50 border-dashed" : ""}`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <User className="w-5 h-5 text-primary" />
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "bg-muted" : "bg-primary/10"}`}>
+                      <User className={`w-5 h-5 ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "text-muted-foreground" : "text-primary"}`} />
                     </div>
                     <div className="text-left">
                       <p className="text-sm font-semibold text-foreground">{group.contactName}</p>
