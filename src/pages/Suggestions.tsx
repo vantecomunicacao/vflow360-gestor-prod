@@ -129,6 +129,7 @@ const Suggestions = () => {
   };
 
   const [executingId, setExecutingId] = useState<string | null>(null);
+  const [executionResults, setExecutionResults] = useState<Record<string, { opportunityCreated: boolean; message: string }>>({});
 
   const handleAction = async (id: string, action: "approved" | "rejected") => {
     if (action === "approved") {
@@ -148,6 +149,13 @@ const Suggestions = () => {
         }
 
         setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: "approved" as SuggestionStatus } : s));
+        setExecutionResults(prev => ({
+          ...prev,
+          [id]: {
+            opportunityCreated: result.data?.opportunityCreated ?? false,
+            message: result.data?.message || "Ação aplicada com sucesso.",
+          },
+        }));
         toast({
           title: "✅ Sugestão executada!",
           description: result.data?.message || "Ação aplicada com sucesso no CRM.",
@@ -275,6 +283,14 @@ const Suggestions = () => {
                       {suggestion.status !== "pending" && (
                         <Badge variant={suggestion.status === "approved" ? "default" : "destructive"}>
                           {suggestion.status === "approved" ? "Aprovada" : "Rejeitada"}
+                        </Badge>
+                      )}
+                      {suggestion.status === "approved" && executionResults[suggestion.id] && (
+                        <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
+                          ? "bg-success/10 text-success border-success/20"
+                          : "bg-info/10 text-info border-info/20"
+                        }>
+                          {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
                         </Badge>
                       )}
                     </div>
