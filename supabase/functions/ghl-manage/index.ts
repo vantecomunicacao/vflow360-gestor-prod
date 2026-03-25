@@ -413,12 +413,9 @@ serve(async (req) => {
           console.log(`Found GHL contact: ${contactId} (${contact.name || contact.firstName})`);
         }
 
-        const contact = contacts[0];
-        const contactId = contact.id;
-        console.log(`Found GHL contact: ${contactId} (${contact.name || contact.firstName})`);
 
         // 2. Search for latest opportunity for this contact
-        const creds = await getGhlCredentials();
+        const creds2 = await getGhlCredentials();
         const oppsResult = await callGhl(`/opportunities/search?contact_id=${contactId}`) as any;
         const opportunities = oppsResult?.opportunities || [];
         
