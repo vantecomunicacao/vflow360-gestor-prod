@@ -222,7 +222,7 @@ const Conversations = () => {
                   <Phone className="w-3 h-3" /> {selected.contact_phone}
                 </p>
               </div>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
@@ -234,6 +234,14 @@ const Conversations = () => {
                   ) : (
                     <><Sparkles className="w-4 h-4 mr-1" /> Analisar com IA</>
                   )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => handleDelete(selected)}
+                >
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </div>
