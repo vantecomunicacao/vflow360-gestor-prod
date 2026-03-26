@@ -8,17 +8,26 @@ const corsHeaders = {
 };
 
 // Transcribe audio using Lovable AI (Gemini with audio support)
-async function transcribeAudio(mediaUrl: string, apiKey: string): Promise<string> {
+async function transcribeAudio(mediaUrl: string, apiKey: string, existingBase64?: string, existingMime?: string): Promise<string> {
   try {
-    // Download the audio file
-    const mediaResp = await fetch(mediaUrl);
-    if (!mediaResp.ok) {
-      console.error("Failed to download audio:", mediaResp.status);
-      return "[🎵 Áudio recebido - não foi possível transcrever]";
+    let base64Audio: string;
+    let contentType: string;
+
+    if (existingBase64) {
+      base64Audio = existingBase64;
+      contentType = existingMime || "audio/ogg";
+    } else if (mediaUrl) {
+      const mediaResp = await fetch(mediaUrl);
+      if (!mediaResp.ok) {
+        console.error("Failed to download audio:", mediaResp.status);
+        return "[🎵 Áudio recebido - não foi possível transcrever]";
+      }
+      const audioBuffer = await mediaResp.arrayBuffer();
+      base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+      contentType = mediaResp.headers.get("content-type") || "audio/ogg";
+    } else {
+      return "[🎵 Áudio recebido - sem URL ou dados]";
     }
-    const audioBuffer = await mediaResp.arrayBuffer();
-    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
-    const contentType = mediaResp.headers.get("content-type") || "audio/ogg";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -61,16 +70,26 @@ async function transcribeAudio(mediaUrl: string, apiKey: string): Promise<string
 }
 
 // Describe image using Lovable AI (Gemini vision)
-async function describeImage(mediaUrl: string, apiKey: string): Promise<string> {
+async function describeImage(mediaUrl: string, apiKey: string, existingBase64?: string, existingMime?: string): Promise<string> {
   try {
-    const mediaResp = await fetch(mediaUrl);
-    if (!mediaResp.ok) {
-      console.error("Failed to download image:", mediaResp.status);
-      return "[📷 Imagem recebida - não foi possível analisar]";
+    let base64Image: string;
+    let contentType: string;
+
+    if (existingBase64) {
+      base64Image = existingBase64;
+      contentType = existingMime || "image/jpeg";
+    } else if (mediaUrl) {
+      const mediaResp = await fetch(mediaUrl);
+      if (!mediaResp.ok) {
+        console.error("Failed to download image:", mediaResp.status);
+        return "[📷 Imagem recebida - não foi possível analisar]";
+      }
+      const imageBuffer = await mediaResp.arrayBuffer();
+      base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+      contentType = mediaResp.headers.get("content-type") || "image/jpeg";
+    } else {
+      return "[📷 Imagem recebida - sem URL ou dados]";
     }
-    const imageBuffer = await mediaResp.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-    const contentType = mediaResp.headers.get("content-type") || "image/jpeg";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -112,48 +131,56 @@ async function describeImage(mediaUrl: string, apiKey: string): Promise<string> 
 }
 
 // Detect media type and extract URL from Uazap payload
-function extractMedia(message: any): { type: string; url: string } | null {
-  // Uazap v2 media fields
-  if (message?.mediaUrl) {
-    const mimeType = message.mimetype || message.mediaType || "";
-    let type = "other";
-    if (mimeType.startsWith("audio/") || message.type === "audio" || message.type === "ptt") {
-      type = "audio";
-    } else if (mimeType.startsWith("image/") || message.type === "image") {
-      type = "image";
-    } else if (mimeType.startsWith("video/") || message.type === "video") {
-      type = "video";
-    } else if (mimeType.startsWith("application/") || message.type === "document") {
-      type = "document";
-    } else if (message.type === "sticker") {
-      type = "sticker";
+function extractMedia(message: any): { type: string; url: string; base64?: string; mimetype?: string } | null {
+  if (!message) return null;
+
+  const mimeType = message.mimetype || message.mediaType || message.media?.mimetype || "";
+  const msgType = message.type || "";
+
+  // Determine media type from mimetype or message type
+  function detectType(mime: string, type: string): string {
+    if (mime.startsWith("audio/") || type === "audio" || type === "ptt") return "audio";
+    if (mime.startsWith("image/") || type === "image") return "image";
+    if (mime.startsWith("video/") || type === "video") return "video";
+    if (mime.startsWith("application/") || type === "document") return "document";
+    if (type === "sticker") return "sticker";
+    return "other";
+  }
+
+  // Uazap v2: mediaUrl field directly on message
+  if (message.mediaUrl) {
+    return { type: detectType(mimeType, msgType), url: message.mediaUrl, mimetype: mimeType };
+  }
+
+  // Uazap v2: hasMedia flag with media object or base64
+  if (message.hasMedia) {
+    const url = message.media?.url || message.media?.link || "";
+    const base64 = message.media?.base64 || message.base64 || "";
+    if (url || base64) {
+      return { type: detectType(mimeType, msgType), url, base64, mimetype: mimeType || message.media?.mimetype || "" };
     }
-    return { type, url: message.mediaUrl };
   }
 
-  // Check message type directly
-  if (message?.type === "audio" || message?.type === "ptt") {
-    return { type: "audio", url: message.mediaUrl || message.media?.url || "" };
-  }
-  if (message?.type === "image") {
-    return { type: "image", url: message.mediaUrl || message.media?.url || "" };
-  }
-  if (message?.type === "video" || message?.type === "document" || message?.type === "sticker") {
-    return { type: message.type, url: message.mediaUrl || message.media?.url || "" };
+  // Check message type directly (audio, ptt, image, video, document, sticker)
+  if (["audio", "ptt", "image", "video", "document", "sticker"].includes(msgType)) {
+    const url = message.media?.url || message.media?.link || "";
+    const base64 = message.media?.base64 || message.base64 || "";
+    return { type: detectType(mimeType, msgType), url, base64, mimetype: mimeType };
   }
 
-  // Check for media in content object
-  const rawContent = message?.content;
+  // Check for media in content object (baileys format)
+  const rawContent = message.content;
   if (rawContent && typeof rawContent === "object") {
-    if (rawContent.imageMessage || rawContent.audioMessage || rawContent.videoMessage || rawContent.documentMessage || rawContent.stickerMessage) {
-      const mediaKey = Object.keys(rawContent).find(k => k.endsWith("Message"));
-      if (mediaKey) {
-        const mediaObj = rawContent[mediaKey];
-        const url = mediaObj?.url || mediaObj?.directPath || "";
-        if (mediaKey === "audioMessage") return { type: "audio", url };
-        if (mediaKey === "imageMessage") return { type: "image", url };
-        return { type: "other", url };
-      }
+    const mediaKey = Object.keys(rawContent).find(k => k.endsWith("Message"));
+    if (mediaKey) {
+      const mediaObj = rawContent[mediaKey];
+      const url = mediaObj?.url || mediaObj?.directPath || "";
+      if (mediaKey === "audioMessage") return { type: "audio", url };
+      if (mediaKey === "imageMessage") return { type: "image", url };
+      if (mediaKey === "videoMessage") return { type: "video", url };
+      if (mediaKey === "documentMessage") return { type: "document", url };
+      if (mediaKey === "stickerMessage") return { type: "sticker", url };
+      return { type: "other", url };
     }
   }
 
@@ -241,19 +268,25 @@ serve(async (req) => {
 
       const isFromMe = message?.fromMe ?? message?.key?.fromMe ?? false;
 
+      // Debug: log full message keys and relevant fields for media detection
+      console.log("Message keys:", Object.keys(message || {}));
+      console.log("Message type:", message?.type, "hasMedia:", message?.hasMedia, "mediaUrl:", message?.mediaUrl?.slice?.(0, 80));
+      if (message?.media) console.log("Message.media:", JSON.stringify(message.media).slice(0, 200));
+
       // Check for media first
       const media = extractMedia(message);
       let content = "";
       let mediaUrl: string | null = null;
 
-      if (media && media.url) {
-        mediaUrl = media.url;
-        console.log(`Media detected: type=${media.type}, url=${media.url.slice(0, 80)}`);
+      if (media && (media.url || media.base64)) {
+        mediaUrl = media.url || null;
+        const mediaSource = media.url || (media.base64 ? `base64:${media.mimetype}` : "");
+        console.log(`Media detected: type=${media.type}, hasUrl=${!!media.url}, hasBase64=${!!media.base64}, mime=${media.mimetype}`);
 
         if (media.type === "audio" && LOVABLE_API_KEY) {
-          content = await transcribeAudio(media.url, LOVABLE_API_KEY);
+          content = await transcribeAudio(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
         } else if (media.type === "image" && LOVABLE_API_KEY) {
-          content = await describeImage(media.url, LOVABLE_API_KEY);
+          content = await describeImage(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
         } else if (media.type === "video") {
           content = "[📹 Vídeo recebido - mídia não suportada]";
         } else if (media.type === "document") {
