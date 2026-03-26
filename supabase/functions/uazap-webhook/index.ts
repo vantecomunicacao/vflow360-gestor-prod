@@ -116,13 +116,11 @@ async function downloadMediaViaUazap(messageId: string, instanceName: string, in
       return null;
     }
 
-    const url = `https://${subdomain}.uazapi.com/message/download/${instanceName}?token=${instanceToken}`;
+    const url = `https://${subdomain}.uazapi.com/message/download/${instanceName}?token=${instanceToken}&messageId=${messageId}`;
     console.log("Downloading media via Uazap API:", { messageId, instanceName });
 
     const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messageId }),
+      method: "GET",
     });
 
     if (!resp.ok) {
