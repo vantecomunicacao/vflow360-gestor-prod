@@ -287,20 +287,18 @@ serve(async (req) => {
 
       const isFromMe = message?.fromMe ?? message?.key?.fromMe ?? false;
 
-      // Debug: log full message keys and relevant fields for media detection
+      // Debug: log fields for media detection
       console.log("Message keys:", Object.keys(message || {}));
-      console.log("Message type:", message?.type, "hasMedia:", message?.hasMedia, "mediaUrl:", message?.mediaUrl?.slice?.(0, 80));
-      if (message?.media) console.log("Message.media:", JSON.stringify(message.media).slice(0, 200));
+      console.log("Media fields:", { type: message?.type, mediaType: message?.mediaType, messageType: message?.messageType, hasMedia: message?.hasMedia, mediaUrl: message?.mediaUrl?.slice?.(0, 80), contentType: typeof message?.content, contentLen: typeof message?.content === "string" ? message.content.length : 0 });
 
       // Check for media first
       const media = extractMedia(message);
       let content = "";
       let mediaUrl: string | null = null;
 
-      if (media && (media.url || media.base64)) {
+      if (media) {
         mediaUrl = media.url || null;
-        const mediaSource = media.url || (media.base64 ? `base64:${media.mimetype}` : "");
-        console.log(`Media detected: type=${media.type}, hasUrl=${!!media.url}, hasBase64=${!!media.base64}, mime=${media.mimetype}`);
+        console.log(`Media detected: type=${media.type}, hasUrl=${!!media.url}, hasBase64=${!!(media.base64 && media.base64.length > 0)}, mime=${media.mimetype}`);
 
         if (media.type === "audio" && LOVABLE_API_KEY) {
           content = await transcribeAudio(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
