@@ -184,13 +184,17 @@ async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: st
     });
 
     if (!response.ok) {
-      console.error("AI transcription error:", response.status);
+      const errBody = await response.text();
+      console.error("AI transcription error:", response.status, errBody);
       return "[🎵 Áudio recebido - não foi possível transcrever]";
     }
 
     const data = await response.json();
     const transcription = data.choices?.[0]?.message?.content?.trim();
-    return transcription ? `🎵 [Áudio]: ${transcription}` : "[🎵 Áudio recebido - não foi possível transcrever]";
+    console.log("Transcription result:", transcription?.slice(0, 100));
+    return transcription && transcription !== "[Áudio inaudível]" 
+      ? `🎵 [Áudio]: ${transcription}` 
+      : "[🎵 Áudio recebido - não foi possível transcrever]";
   } catch (e) {
     console.error("Audio transcription failed:", e);
     return "[🎵 Áudio recebido - não foi possível transcrever]";
