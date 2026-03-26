@@ -107,27 +107,55 @@ function extractMediaData(input: unknown, depth = 0, seen = new WeakSet<object>(
   return acc;
 }
 
-// Transcribe audio using Lovable AI (Gemini with audio support)
-async function transcribeAudio(mediaUrl: string, apiKey: string, existingBase64?: string, existingMime?: string): Promise<string> {
+// Download media via Uazap API (the proper way to get WhatsApp media)
+async function downloadMediaViaUazap(messageId: string, instanceName: string, instanceToken: string): Promise<{ base64: string; mimetype: string } | null> {
   try {
-    let base64Audio: string;
-    let contentType: string;
-
-    if (existingBase64) {
-      base64Audio = existingBase64;
-      contentType = existingMime || "audio/ogg";
-    } else if (mediaUrl) {
-      const mediaResp = await fetch(mediaUrl);
-      if (!mediaResp.ok) {
-        console.error("Failed to download audio:", mediaResp.status);
-        return "[🎵 Áudio recebido - não foi possível transcrever]";
-      }
-      const audioBuffer = await mediaResp.arrayBuffer();
-      base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
-      contentType = mediaResp.headers.get("content-type") || "audio/ogg";
-    } else {
-      return "[🎵 Áudio recebido - sem URL ou dados]";
+    const subdomain = Deno.env.get("UAZAP_SUBDOMAIN") || "";
+    if (!subdomain || !messageId || !instanceName) {
+      console.error("Missing params for Uazap download:", { subdomain: !!subdomain, messageId: !!messageId, instanceName: !!instanceName });
+      return null;
     }
+
+    const url = `https://${subdomain}.uazapi.com/message/download/${instanceName}?token=${instanceToken}`;
+    console.log("Downloading media via Uazap API:", { messageId, instanceName });
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("Uazap download error:", resp.status, errText);
+      return null;
+    }
+
+    const data = await resp.json();
+    const base64 = data.base64 || data.data || data.file || "";
+    const mimetype = data.mimetype || data.mimeType || data.contentType || "";
+
+    if (base64 && base64.length > 100) {
+      console.log("Uazap download success:", { mimeLen: mimetype, base64Len: base64.length });
+      return { base64: cleanBase64(base64), mimetype };
+    }
+
+    console.log("Uazap download returned no usable data:", Object.keys(data));
+    return null;
+  } catch (e) {
+    console.error("Uazap download failed:", e);
+    return null;
+  }
+}
+
+// Transcribe audio using Lovable AI (Gemini with audio support)
+async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: string): Promise<string> {
+  try {
+    if (!base64Audio || base64Audio.length < 100) {
+      return "[🎵 Áudio recebido - sem dados para transcrever]";
+    }
+
+    const contentType = mimetype || "audio/ogg";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -156,13 +184,17 @@ async function transcribeAudio(mediaUrl: string, apiKey: string, existingBase64?
     });
 
     if (!response.ok) {
-      console.error("AI transcription error:", response.status);
+      const errBody = await response.text();
+      console.error("AI transcription error:", response.status, errBody);
       return "[🎵 Áudio recebido - não foi possível transcrever]";
     }
 
     const data = await response.json();
     const transcription = data.choices?.[0]?.message?.content?.trim();
-    return transcription ? `🎵 [Áudio]: ${transcription}` : "[🎵 Áudio recebido - não foi possível transcrever]";
+    console.log("Transcription result:", transcription?.slice(0, 100));
+    return transcription && transcription !== "[Áudio inaudível]" 
+      ? `🎵 [Áudio]: ${transcription}` 
+      : "[🎵 Áudio recebido - não foi possível transcrever]";
   } catch (e) {
     console.error("Audio transcription failed:", e);
     return "[🎵 Áudio recebido - não foi possível transcrever]";
@@ -170,26 +202,13 @@ async function transcribeAudio(mediaUrl: string, apiKey: string, existingBase64?
 }
 
 // Describe image using Lovable AI (Gemini vision)
-async function describeImage(mediaUrl: string, apiKey: string, existingBase64?: string, existingMime?: string): Promise<string> {
+async function describeImage(base64Image: string, apiKey: string, mimetype: string): Promise<string> {
   try {
-    let base64Image: string;
-    let contentType: string;
-
-    if (existingBase64) {
-      base64Image = existingBase64;
-      contentType = existingMime || "image/jpeg";
-    } else if (mediaUrl) {
-      const mediaResp = await fetch(mediaUrl);
-      if (!mediaResp.ok) {
-        console.error("Failed to download image:", mediaResp.status);
-        return "[📷 Imagem recebida - não foi possível analisar]";
-      }
-      const imageBuffer = await mediaResp.arrayBuffer();
-      base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-      contentType = mediaResp.headers.get("content-type") || "image/jpeg";
-    } else {
-      return "[📷 Imagem recebida - sem URL ou dados]";
+    if (!base64Image || base64Image.length < 100) {
+      return "[📷 Imagem recebida - sem dados para analisar]";
     }
+
+    const contentType = mimetype || "image/jpeg";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -217,12 +236,14 @@ async function describeImage(mediaUrl: string, apiKey: string, existingBase64?: 
     });
 
     if (!response.ok) {
-      console.error("AI image description error:", response.status);
+      const errBody = await response.text();
+      console.error("AI image description error:", response.status, errBody);
       return "[📷 Imagem recebida - não foi possível analisar]";
     }
 
     const data = await response.json();
     const description = data.choices?.[0]?.message?.content?.trim();
+    console.log("Image description result:", description?.slice(0, 100));
     return description ? `📷 [Imagem]: ${description}` : "[📷 Imagem recebida - não foi possível analisar]";
   } catch (e) {
     console.error("Image description failed:", e);
@@ -314,7 +335,8 @@ serve(async (req) => {
     }
 
     const userId = integration.user_id;
-
+    const integrationConfig = integration.config as { token?: string; instanceName?: string };
+    const instToken = integrationConfig.token || instanceToken || "";
     // Handle connection status changes
     if (event === "status" || event === "connection.update" || event === "status_instance") {
       const status = payload.data?.status || payload.status || payload.instance?.status;
@@ -377,24 +399,38 @@ serve(async (req) => {
         mediaUrl = media.url || null;
         console.log(`Media detected: type=${media.type}, hasUrl=${!!media.url}, hasBase64=${!!(media.base64 && media.base64.length > 0)}, mime=${media.mimetype}`);
 
-        const hasData = !!(media.url || (media.base64 && media.base64.length > 0));
+        // Try to get media base64 via Uazap download API first
+        let mediaBase64 = media.base64 || "";
+        let mediaMime = media.mimetype || "";
+        const messageId = message?.messageid || message?.id || message?.key?.id || "";
+
+        if ((!mediaBase64 || mediaBase64.length < 100) && messageId && instanceName) {
+          console.log("Attempting Uazap API download for message:", messageId);
+          const downloaded = await downloadMediaViaUazap(messageId, instanceName, instToken);
+          if (downloaded) {
+            mediaBase64 = downloaded.base64;
+            mediaMime = downloaded.mimetype || mediaMime;
+          }
+        }
+
+        const hasUsableData = mediaBase64.length > 100;
         
-        if (media.type === "audio" && LOVABLE_API_KEY && hasData) {
-          content = await transcribeAudio(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
-        } else if (media.type === "image" && LOVABLE_API_KEY && hasData) {
-          content = await describeImage(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
+        if (media.type === "audio" && LOVABLE_API_KEY && hasUsableData) {
+          content = await transcribeAudio(mediaBase64, LOVABLE_API_KEY, mediaMime);
+        } else if (media.type === "image" && LOVABLE_API_KEY && hasUsableData) {
+          content = await describeImage(mediaBase64, LOVABLE_API_KEY, mediaMime);
         } else if (media.type === "audio") {
           content = "[🎵 Áudio recebido]";
         } else if (media.type === "image") {
           content = "[📷 Imagem recebida]";
         } else if (media.type === "video") {
-          content = "[Enviado uma mídia não surtada]";
+          content = "[Enviado uma mídia não suportada]";
         } else if (media.type === "document") {
-          content = "[Enviado uma mídia não surtada]";
+          content = "[Enviado uma mídia não suportada]";
         } else if (media.type === "sticker") {
           content = "[🎨 Figurinha recebida]";
         } else {
-          content = "[Enviado uma mídia não surtada]";
+          content = "[Enviado uma mídia não suportada]";
         }
 
         // If there's also a caption/text with the media, append it
