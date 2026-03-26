@@ -320,9 +320,9 @@ serve(async (req) => {
           content = "[📎 Mídia recebida - tipo não suportado]";
         }
 
-        // If there's also a caption with the media, append it
-        const caption = message?.caption || message?.content?.caption || "";
-        if (caption) {
+        // If there's also a caption/text with the media, append it
+        const caption = message?.caption || message?.text || message?.content?.caption || "";
+        if (caption && typeof caption === "string") {
           content += `\nLegenda: ${caption}`;
         }
       }
