@@ -265,9 +265,9 @@ serve(async (req) => {
         console.log(`Media detected: type=${media.type}, hasUrl=${!!media.url}, hasBase64=${!!media.base64}, mime=${media.mimetype}`);
 
         if (media.type === "audio" && LOVABLE_API_KEY) {
-          content = await transcribeAudio(media.url, LOVABLE_API_KEY);
+          content = await transcribeAudio(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
         } else if (media.type === "image" && LOVABLE_API_KEY) {
-          content = await describeImage(media.url, LOVABLE_API_KEY);
+          content = await describeImage(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
         } else if (media.type === "video") {
           content = "[📹 Vídeo recebido - mídia não suportada]";
         } else if (media.type === "document") {
