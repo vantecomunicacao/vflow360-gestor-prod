@@ -241,6 +241,11 @@ serve(async (req) => {
 
       const isFromMe = message?.fromMe ?? message?.key?.fromMe ?? false;
 
+      // Debug: log full message keys and relevant fields for media detection
+      console.log("Message keys:", Object.keys(message || {}));
+      console.log("Message type:", message?.type, "hasMedia:", message?.hasMedia, "mediaUrl:", message?.mediaUrl?.slice?.(0, 80));
+      if (message?.media) console.log("Message.media:", JSON.stringify(message.media).slice(0, 200));
+
       // Check for media first
       const media = extractMedia(message);
       let content = "";
