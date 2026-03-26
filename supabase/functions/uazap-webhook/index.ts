@@ -300,10 +300,16 @@ serve(async (req) => {
         mediaUrl = media.url || null;
         console.log(`Media detected: type=${media.type}, hasUrl=${!!media.url}, hasBase64=${!!(media.base64 && media.base64.length > 0)}, mime=${media.mimetype}`);
 
-        if (media.type === "audio" && LOVABLE_API_KEY) {
+        const hasData = !!(media.url || (media.base64 && media.base64.length > 0));
+        
+        if (media.type === "audio" && LOVABLE_API_KEY && hasData) {
           content = await transcribeAudio(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
-        } else if (media.type === "image" && LOVABLE_API_KEY) {
+        } else if (media.type === "image" && LOVABLE_API_KEY && hasData) {
           content = await describeImage(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
+        } else if (media.type === "audio") {
+          content = "[🎵 Áudio recebido]";
+        } else if (media.type === "image") {
+          content = "[📷 Imagem recebida]";
         } else if (media.type === "video") {
           content = "[📹 Vídeo recebido - mídia não suportada]";
         } else if (media.type === "document") {
