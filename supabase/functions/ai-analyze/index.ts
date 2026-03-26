@@ -366,16 +366,40 @@ REGRAS OBRIGATÓRIAS:
       });
 
       // 9d. Filter duplicates with existing suggestions (any status)
-      // Use both exact key match AND normalized title similarity
+      // Use exact key match, title match, AND fuzzy keyword similarity
       const existingKeys = new Set(
         previousSuggestions.map((prev) => {
           const prevData = prev.action_data as Record<string, any> || {};
           return `${prev.type}:${prevData.field || ""}:${prevData.value || ""}`;
         })
       );
-      const existingTitles = new Set(
-        previousSuggestions.map((prev) => `${prev.type}:${prev.title.toLowerCase().trim()}`)
-      );
+
+      // Normalize title: extract significant keywords (3+ chars), sorted
+      const normalizeTitle = (title: string): string => {
+        const stopWords = new Set(["de", "do", "da", "dos", "das", "para", "por", "com", "sem", "em", "no", "na", "nos", "nas", "um", "uma", "que", "se", "ou", "ao", "os", "as", "este", "esta", "esse", "essa", "são", "está", "foi", "ser"]);
+        return title.toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+          .replace(/[^a-z0-9\s]/g, " ")
+          .split(/\s+/)
+          .filter(w => w.length >= 3 && !stopWords.has(w))
+          .sort()
+          .join(" ");
+      };
+
+      // Check keyword overlap ratio between two normalized titles
+      const titlesSimilar = (a: string, b: string): boolean => {
+        const wordsA = new Set(a.split(" "));
+        const wordsB = new Set(b.split(" "));
+        if (wordsA.size === 0 || wordsB.size === 0) return false;
+        const intersection = [...wordsA].filter(w => wordsB.has(w)).length;
+        const minSize = Math.min(wordsA.size, wordsB.size);
+        return intersection / minSize >= 0.6; // 60%+ keyword overlap = duplicate
+      };
+
+      const existingNormTitles = previousSuggestions.map((prev) => ({
+        type: prev.type,
+        norm: normalizeTitle(prev.title),
+      }));
 
       suggestions = suggestions.filter((s) => {
         // Exact match on type+field+value
@@ -384,10 +408,13 @@ REGRAS OBRIGATÓRIAS:
           console.log(`Filtered duplicate suggestion (exact): ${key}`);
           return false;
         }
-        // Similar title match (same type + same/very similar title)
-        const titleKey = `${s.type}:${s.title.toLowerCase().trim()}`;
-        if (existingTitles.has(titleKey)) {
-          console.log(`Filtered duplicate suggestion (title): ${titleKey}`);
+        // Fuzzy title similarity match
+        const normTitle = normalizeTitle(s.title);
+        const hasSimilar = existingNormTitles.some(
+          (prev) => prev.type === s.type && titlesSimilar(normTitle, prev.norm)
+        );
+        if (hasSimilar) {
+          console.log(`Filtered duplicate suggestion (fuzzy title): "${s.title}"`);
           return false;
         }
         return true;
