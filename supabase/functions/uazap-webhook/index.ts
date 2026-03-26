@@ -112,48 +112,56 @@ async function describeImage(mediaUrl: string, apiKey: string): Promise<string> 
 }
 
 // Detect media type and extract URL from Uazap payload
-function extractMedia(message: any): { type: string; url: string } | null {
-  // Uazap v2 media fields
-  if (message?.mediaUrl) {
-    const mimeType = message.mimetype || message.mediaType || "";
-    let type = "other";
-    if (mimeType.startsWith("audio/") || message.type === "audio" || message.type === "ptt") {
-      type = "audio";
-    } else if (mimeType.startsWith("image/") || message.type === "image") {
-      type = "image";
-    } else if (mimeType.startsWith("video/") || message.type === "video") {
-      type = "video";
-    } else if (mimeType.startsWith("application/") || message.type === "document") {
-      type = "document";
-    } else if (message.type === "sticker") {
-      type = "sticker";
+function extractMedia(message: any): { type: string; url: string; base64?: string; mimetype?: string } | null {
+  if (!message) return null;
+
+  const mimeType = message.mimetype || message.mediaType || message.media?.mimetype || "";
+  const msgType = message.type || "";
+
+  // Determine media type from mimetype or message type
+  function detectType(mime: string, type: string): string {
+    if (mime.startsWith("audio/") || type === "audio" || type === "ptt") return "audio";
+    if (mime.startsWith("image/") || type === "image") return "image";
+    if (mime.startsWith("video/") || type === "video") return "video";
+    if (mime.startsWith("application/") || type === "document") return "document";
+    if (type === "sticker") return "sticker";
+    return "other";
+  }
+
+  // Uazap v2: mediaUrl field directly on message
+  if (message.mediaUrl) {
+    return { type: detectType(mimeType, msgType), url: message.mediaUrl, mimetype: mimeType };
+  }
+
+  // Uazap v2: hasMedia flag with media object or base64
+  if (message.hasMedia) {
+    const url = message.media?.url || message.media?.link || "";
+    const base64 = message.media?.base64 || message.base64 || "";
+    if (url || base64) {
+      return { type: detectType(mimeType, msgType), url, base64, mimetype: mimeType || message.media?.mimetype || "" };
     }
-    return { type, url: message.mediaUrl };
   }
 
-  // Check message type directly
-  if (message?.type === "audio" || message?.type === "ptt") {
-    return { type: "audio", url: message.mediaUrl || message.media?.url || "" };
-  }
-  if (message?.type === "image") {
-    return { type: "image", url: message.mediaUrl || message.media?.url || "" };
-  }
-  if (message?.type === "video" || message?.type === "document" || message?.type === "sticker") {
-    return { type: message.type, url: message.mediaUrl || message.media?.url || "" };
+  // Check message type directly (audio, ptt, image, video, document, sticker)
+  if (["audio", "ptt", "image", "video", "document", "sticker"].includes(msgType)) {
+    const url = message.media?.url || message.media?.link || "";
+    const base64 = message.media?.base64 || message.base64 || "";
+    return { type: detectType(mimeType, msgType), url, base64, mimetype: mimeType };
   }
 
-  // Check for media in content object
-  const rawContent = message?.content;
+  // Check for media in content object (baileys format)
+  const rawContent = message.content;
   if (rawContent && typeof rawContent === "object") {
-    if (rawContent.imageMessage || rawContent.audioMessage || rawContent.videoMessage || rawContent.documentMessage || rawContent.stickerMessage) {
-      const mediaKey = Object.keys(rawContent).find(k => k.endsWith("Message"));
-      if (mediaKey) {
-        const mediaObj = rawContent[mediaKey];
-        const url = mediaObj?.url || mediaObj?.directPath || "";
-        if (mediaKey === "audioMessage") return { type: "audio", url };
-        if (mediaKey === "imageMessage") return { type: "image", url };
-        return { type: "other", url };
-      }
+    const mediaKey = Object.keys(rawContent).find(k => k.endsWith("Message"));
+    if (mediaKey) {
+      const mediaObj = rawContent[mediaKey];
+      const url = mediaObj?.url || mediaObj?.directPath || "";
+      if (mediaKey === "audioMessage") return { type: "audio", url };
+      if (mediaKey === "imageMessage") return { type: "image", url };
+      if (mediaKey === "videoMessage") return { type: "video", url };
+      if (mediaKey === "documentMessage") return { type: "document", url };
+      if (mediaKey === "stickerMessage") return { type: "sticker", url };
+      return { type: "other", url };
     }
   }
 
