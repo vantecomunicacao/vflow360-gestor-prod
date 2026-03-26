@@ -107,27 +107,55 @@ function extractMediaData(input: unknown, depth = 0, seen = new WeakSet<object>(
   return acc;
 }
 
-// Transcribe audio using Lovable AI (Gemini with audio support)
-async function transcribeAudio(mediaUrl: string, apiKey: string, existingBase64?: string, existingMime?: string): Promise<string> {
+// Download media via Uazap API (the proper way to get WhatsApp media)
+async function downloadMediaViaUazap(messageId: string, instanceName: string, instanceToken: string): Promise<{ base64: string; mimetype: string } | null> {
   try {
-    let base64Audio: string;
-    let contentType: string;
-
-    if (existingBase64) {
-      base64Audio = existingBase64;
-      contentType = existingMime || "audio/ogg";
-    } else if (mediaUrl) {
-      const mediaResp = await fetch(mediaUrl);
-      if (!mediaResp.ok) {
-        console.error("Failed to download audio:", mediaResp.status);
-        return "[🎵 Áudio recebido - não foi possível transcrever]";
-      }
-      const audioBuffer = await mediaResp.arrayBuffer();
-      base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
-      contentType = mediaResp.headers.get("content-type") || "audio/ogg";
-    } else {
-      return "[🎵 Áudio recebido - sem URL ou dados]";
+    const subdomain = Deno.env.get("UAZAP_SUBDOMAIN") || "";
+    if (!subdomain || !messageId || !instanceName) {
+      console.error("Missing params for Uazap download:", { subdomain: !!subdomain, messageId: !!messageId, instanceName: !!instanceName });
+      return null;
     }
+
+    const url = `https://${subdomain}.uazapi.com/message/download/${instanceName}?token=${instanceToken}`;
+    console.log("Downloading media via Uazap API:", { messageId, instanceName });
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("Uazap download error:", resp.status, errText);
+      return null;
+    }
+
+    const data = await resp.json();
+    const base64 = data.base64 || data.data || data.file || "";
+    const mimetype = data.mimetype || data.mimeType || data.contentType || "";
+
+    if (base64 && base64.length > 100) {
+      console.log("Uazap download success:", { mimeLen: mimetype, base64Len: base64.length });
+      return { base64: cleanBase64(base64), mimetype };
+    }
+
+    console.log("Uazap download returned no usable data:", Object.keys(data));
+    return null;
+  } catch (e) {
+    console.error("Uazap download failed:", e);
+    return null;
+  }
+}
+
+// Transcribe audio using Lovable AI (Gemini with audio support)
+async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: string): Promise<string> {
+  try {
+    if (!base64Audio || base64Audio.length < 100) {
+      return "[🎵 Áudio recebido - sem dados para transcrever]";
+    }
+
+    const contentType = mimetype || "audio/ogg";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
