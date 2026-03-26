@@ -399,24 +399,38 @@ serve(async (req) => {
         mediaUrl = media.url || null;
         console.log(`Media detected: type=${media.type}, hasUrl=${!!media.url}, hasBase64=${!!(media.base64 && media.base64.length > 0)}, mime=${media.mimetype}`);
 
-        const hasData = !!(media.url || (media.base64 && media.base64.length > 0));
+        // Try to get media base64 via Uazap download API first
+        let mediaBase64 = media.base64 || "";
+        let mediaMime = media.mimetype || "";
+        const messageId = message?.messageid || message?.id || message?.key?.id || "";
+
+        if ((!mediaBase64 || mediaBase64.length < 100) && messageId && instanceName) {
+          console.log("Attempting Uazap API download for message:", messageId);
+          const downloaded = await downloadMediaViaUazap(messageId, instanceName, instToken);
+          if (downloaded) {
+            mediaBase64 = downloaded.base64;
+            mediaMime = downloaded.mimetype || mediaMime;
+          }
+        }
+
+        const hasUsableData = mediaBase64.length > 100;
         
-        if (media.type === "audio" && LOVABLE_API_KEY && hasData) {
-          content = await transcribeAudio(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
-        } else if (media.type === "image" && LOVABLE_API_KEY && hasData) {
-          content = await describeImage(media.url, LOVABLE_API_KEY, media.base64, media.mimetype);
+        if (media.type === "audio" && LOVABLE_API_KEY && hasUsableData) {
+          content = await transcribeAudio(mediaBase64, LOVABLE_API_KEY, mediaMime);
+        } else if (media.type === "image" && LOVABLE_API_KEY && hasUsableData) {
+          content = await describeImage(mediaBase64, LOVABLE_API_KEY, mediaMime);
         } else if (media.type === "audio") {
           content = "[🎵 Áudio recebido]";
         } else if (media.type === "image") {
           content = "[📷 Imagem recebida]";
         } else if (media.type === "video") {
-          content = "[Enviado uma mídia não surtada]";
+          content = "[Enviado uma mídia não suportada]";
         } else if (media.type === "document") {
-          content = "[Enviado uma mídia não surtada]";
+          content = "[Enviado uma mídia não suportada]";
         } else if (media.type === "sticker") {
           content = "[🎨 Figurinha recebida]";
         } else {
-          content = "[Enviado uma mídia não surtada]";
+          content = "[Enviado uma mídia não suportada]";
         }
 
         // If there's also a caption/text with the media, append it
