@@ -259,9 +259,10 @@ serve(async (req) => {
       let content = "";
       let mediaUrl: string | null = null;
 
-      if (media && media.url) {
-        mediaUrl = media.url;
-        console.log(`Media detected: type=${media.type}, url=${media.url.slice(0, 80)}`);
+      if (media && (media.url || media.base64)) {
+        mediaUrl = media.url || null;
+        const mediaSource = media.url || (media.base64 ? `base64:${media.mimetype}` : "");
+        console.log(`Media detected: type=${media.type}, hasUrl=${!!media.url}, hasBase64=${!!media.base64}, mime=${media.mimetype}`);
 
         if (media.type === "audio" && LOVABLE_API_KEY) {
           content = await transcribeAudio(media.url, LOVABLE_API_KEY);
