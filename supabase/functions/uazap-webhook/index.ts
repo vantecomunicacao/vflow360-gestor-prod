@@ -7,6 +7,159 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Transcribe audio using Lovable AI (Gemini with audio support)
+async function transcribeAudio(mediaUrl: string, apiKey: string): Promise<string> {
+  try {
+    // Download the audio file
+    const mediaResp = await fetch(mediaUrl);
+    if (!mediaResp.ok) {
+      console.error("Failed to download audio:", mediaResp.status);
+      return "[🎵 Áudio recebido - não foi possível transcrever]";
+    }
+    const audioBuffer = await mediaResp.arrayBuffer();
+    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+    const contentType = mediaResp.headers.get("content-type") || "audio/ogg";
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Transcreva este áudio em português. Retorne APENAS o texto transcrito, sem explicações adicionais. Se não conseguir entender, diga '[Áudio inaudível]'." },
+              {
+                type: "input_audio",
+                input_audio: {
+                  data: base64Audio,
+                  format: contentType.includes("ogg") ? "ogg" : contentType.includes("mp4") || contentType.includes("m4a") ? "m4a" : "mp3",
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("AI transcription error:", response.status);
+      return "[🎵 Áudio recebido - não foi possível transcrever]";
+    }
+
+    const data = await response.json();
+    const transcription = data.choices?.[0]?.message?.content?.trim();
+    return transcription ? `🎵 [Áudio]: ${transcription}` : "[🎵 Áudio recebido - não foi possível transcrever]";
+  } catch (e) {
+    console.error("Audio transcription failed:", e);
+    return "[🎵 Áudio recebido - não foi possível transcrever]";
+  }
+}
+
+// Describe image using Lovable AI (Gemini vision)
+async function describeImage(mediaUrl: string, apiKey: string): Promise<string> {
+  try {
+    const mediaResp = await fetch(mediaUrl);
+    if (!mediaResp.ok) {
+      console.error("Failed to download image:", mediaResp.status);
+      return "[📷 Imagem recebida - não foi possível analisar]";
+    }
+    const imageBuffer = await mediaResp.arrayBuffer();
+    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    const contentType = mediaResp.headers.get("content-type") || "image/jpeg";
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Descreva esta imagem de forma objetiva e concisa em português. Se houver texto na imagem, transcreva-o. Se for um documento, descreva o conteúdo. Se for um print de tela, descreva o que aparece. Retorne APENAS a descrição." },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${contentType};base64,${base64Image}`,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("AI image description error:", response.status);
+      return "[📷 Imagem recebida - não foi possível analisar]";
+    }
+
+    const data = await response.json();
+    const description = data.choices?.[0]?.message?.content?.trim();
+    return description ? `📷 [Imagem]: ${description}` : "[📷 Imagem recebida - não foi possível analisar]";
+  } catch (e) {
+    console.error("Image description failed:", e);
+    return "[📷 Imagem recebida - não foi possível analisar]";
+  }
+}
+
+// Detect media type and extract URL from Uazap payload
+function extractMedia(message: any): { type: string; url: string } | null {
+  // Uazap v2 media fields
+  if (message?.mediaUrl) {
+    const mimeType = message.mimetype || message.mediaType || "";
+    let type = "other";
+    if (mimeType.startsWith("audio/") || message.type === "audio" || message.type === "ptt") {
+      type = "audio";
+    } else if (mimeType.startsWith("image/") || message.type === "image") {
+      type = "image";
+    } else if (mimeType.startsWith("video/") || message.type === "video") {
+      type = "video";
+    } else if (mimeType.startsWith("application/") || message.type === "document") {
+      type = "document";
+    } else if (message.type === "sticker") {
+      type = "sticker";
+    }
+    return { type, url: message.mediaUrl };
+  }
+
+  // Check message type directly
+  if (message?.type === "audio" || message?.type === "ptt") {
+    return { type: "audio", url: message.mediaUrl || message.media?.url || "" };
+  }
+  if (message?.type === "image") {
+    return { type: "image", url: message.mediaUrl || message.media?.url || "" };
+  }
+  if (message?.type === "video" || message?.type === "document" || message?.type === "sticker") {
+    return { type: message.type, url: message.mediaUrl || message.media?.url || "" };
+  }
+
+  // Check for media in content object
+  const rawContent = message?.content;
+  if (rawContent && typeof rawContent === "object") {
+    if (rawContent.imageMessage || rawContent.audioMessage || rawContent.videoMessage || rawContent.documentMessage || rawContent.stickerMessage) {
+      const mediaKey = Object.keys(rawContent).find(k => k.endsWith("Message"));
+      if (mediaKey) {
+        const mediaObj = rawContent[mediaKey];
+        const url = mediaObj?.url || mediaObj?.directPath || "";
+        if (mediaKey === "audioMessage") return { type: "audio", url };
+        if (mediaKey === "imageMessage") return { type: "image", url };
+        return { type: "other", url };
+      }
+    }
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -15,6 +168,7 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const payload = await req.json();
@@ -87,24 +241,54 @@ serve(async (req) => {
 
       const isFromMe = message?.fromMe ?? message?.key?.fromMe ?? false;
 
-      // Extract text - content can be string or object {text: "..."}
+      // Check for media first
+      const media = extractMedia(message);
       let content = "";
-      const rawContent = message?.content;
-      if (typeof rawContent === "string") {
-        content = rawContent;
-      } else if (rawContent && typeof rawContent === "object") {
-        content = rawContent.text || rawContent.conversation || "";
+      let mediaUrl: string | null = null;
+
+      if (media && media.url) {
+        mediaUrl = media.url;
+        console.log(`Media detected: type=${media.type}, url=${media.url.slice(0, 80)}`);
+
+        if (media.type === "audio" && LOVABLE_API_KEY) {
+          content = await transcribeAudio(media.url, LOVABLE_API_KEY);
+        } else if (media.type === "image" && LOVABLE_API_KEY) {
+          content = await describeImage(media.url, LOVABLE_API_KEY);
+        } else if (media.type === "video") {
+          content = "[📹 Vídeo recebido - mídia não suportada]";
+        } else if (media.type === "document") {
+          content = "[📄 Documento recebido - mídia não suportada]";
+        } else if (media.type === "sticker") {
+          content = "[🎨 Figurinha recebida]";
+        } else {
+          content = "[📎 Mídia recebida - tipo não suportado]";
+        }
+
+        // If there's also a caption with the media, append it
+        const caption = message?.caption || message?.content?.caption || "";
+        if (caption) {
+          content += `\nLegenda: ${caption}`;
+        }
       }
-      // Fallback to other fields
+
+      // If no media content, extract text normally
       if (!content) {
-        content = message?.body || message?.text || 
-                  message?.message?.conversation || 
-                  message?.message?.extendedTextMessage?.text || 
-                  chat?.wa_lastMessageTextVote || "";
+        const rawContent = message?.content;
+        if (typeof rawContent === "string") {
+          content = rawContent;
+        } else if (rawContent && typeof rawContent === "object") {
+          content = rawContent.text || rawContent.conversation || "";
+        }
+        if (!content) {
+          content = message?.body || message?.text ||
+                    message?.message?.conversation ||
+                    message?.message?.extendedTextMessage?.text ||
+                    chat?.wa_lastMessageTextVote || "";
+        }
       }
 
       if (!content) {
-        console.log("Skipping: no text content");
+        console.log("Skipping: no content");
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -114,7 +298,7 @@ serve(async (req) => {
       const phone = chatId.replace("@s.whatsapp.net", "").replace("@g.us", "");
       const contactName = chat?.name || chat?.wa_name || message?.pushName || phone;
 
-      console.log("Processing:", { phone, contactName, isFromMe, content: content.slice(0, 80) });
+      console.log("Processing:", { phone, contactName, isFromMe, content: content.slice(0, 80), hasMedia: !!media });
 
       // Find or create conversation
       let { data: conversation } = await supabase
@@ -124,6 +308,8 @@ serve(async (req) => {
         .eq("contact_phone", phone)
         .single();
 
+      const displayMessage = content.length > 100 ? content.slice(0, 100) + "..." : content;
+
       if (!conversation) {
         const { data: newConv } = await supabase
           .from("conversations")
@@ -131,7 +317,7 @@ serve(async (req) => {
             user_id: userId,
             contact_name: contactName,
             contact_phone: phone,
-            last_message: content,
+            last_message: displayMessage,
             last_message_at: new Date().toISOString(),
             unread_count: isFromMe ? 0 : 1,
           })
@@ -142,7 +328,7 @@ serve(async (req) => {
         await supabase
           .from("conversations")
           .update({
-            last_message: content,
+            last_message: displayMessage,
             last_message_at: new Date().toISOString(),
             contact_name: contactName,
             unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
@@ -155,6 +341,7 @@ serve(async (req) => {
           conversation_id: conversation.id,
           direction: isFromMe ? "outbound" : "inbound",
           content,
+          media_url: mediaUrl,
         });
 
         // Trigger AI analysis for inbound messages (fire-and-forget)
