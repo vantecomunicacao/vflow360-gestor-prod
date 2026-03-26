@@ -7,6 +7,106 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+type ExtractedMedia = {
+  url?: string;
+  base64?: string;
+  mimetype?: string;
+};
+
+function toText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanBase64(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const dataUrlMatch = trimmed.match(/^data:([^;]+);base64,(.+)$/s);
+  if (dataUrlMatch) {
+    return dataUrlMatch[2].replace(/\s/g, "");
+  }
+
+  const normalized = trimmed.replace(/\s/g, "");
+  if (normalized.length < 120) return "";
+  return /^[A-Za-z0-9+/=]+$/.test(normalized) ? normalized : "";
+}
+
+function extractDataUrl(value: string): ExtractedMedia {
+  const match = value.trim().match(/^data:([^;]+);base64,(.+)$/s);
+  if (!match) return {};
+  return {
+    mimetype: match[1],
+    base64: match[2].replace(/\s/g, ""),
+  };
+}
+
+function mergeMedia(primary: ExtractedMedia, fallback: ExtractedMedia): ExtractedMedia {
+  return {
+    url: primary.url || fallback.url,
+    base64: primary.base64 || fallback.base64,
+    mimetype: primary.mimetype || fallback.mimetype,
+  };
+}
+
+function extractMediaData(input: unknown, depth = 0, seen = new WeakSet<object>()): ExtractedMedia {
+  if (depth > 6 || input == null) return {};
+
+  if (typeof input === "string") {
+    const maybeDataUrl = extractDataUrl(input);
+    if (maybeDataUrl.base64) return maybeDataUrl;
+    if (/^https?:\/\//i.test(input.trim())) return { url: input.trim() };
+    const maybeBase64 = cleanBase64(input);
+    return maybeBase64 ? { base64: maybeBase64 } : {};
+  }
+
+  if (Array.isArray(input)) {
+    let acc: ExtractedMedia = {};
+    for (const item of input) {
+      acc = mergeMedia(acc, extractMediaData(item, depth + 1, seen));
+      if (acc.url && acc.base64 && acc.mimetype) break;
+    }
+    return acc;
+  }
+
+  if (typeof input !== "object") return {};
+  const obj = input as Record<string, unknown>;
+  if (seen.has(obj)) return {};
+  seen.add(obj);
+
+  const directUrl =
+    toText(obj.mediaUrl) ||
+    toText(obj.url) ||
+    toText(obj.link) ||
+    toText(obj.downloadUrl) ||
+    toText(obj.fileUrl) ||
+    toText(obj.directPath);
+
+  const directMime =
+    toText(obj.mimetype) ||
+    toText(obj.mimeType) ||
+    toText(obj.contentType) ||
+    toText(obj.fileType);
+
+  const directBase64 =
+    cleanBase64(toText(obj.base64)) ||
+    cleanBase64(toText(obj.data)) ||
+    cleanBase64(toText(obj.fileData)) ||
+    cleanBase64(toText(obj.body));
+
+  let acc: ExtractedMedia = {
+    url: /^https?:\/\//i.test(directUrl) ? directUrl : "",
+    base64: directBase64,
+    mimetype: directMime,
+  };
+
+  for (const value of Object.values(obj)) {
+    acc = mergeMedia(acc, extractMediaData(value, depth + 1, seen));
+    if (acc.url && acc.base64 && acc.mimetype) break;
+  }
+
+  return acc;
+}
+
 // Transcribe audio using Lovable AI (Gemini with audio support)
 async function transcribeAudio(mediaUrl: string, apiKey: string, existingBase64?: string, existingMime?: string): Promise<string> {
   try {
@@ -150,60 +250,28 @@ function extractMedia(message: any): { type: string; url: string; base64?: strin
     return "other";
   }
 
-  // Uazap v2: mediaUrl field directly on message
-  if (message.mediaUrl) {
-    return { type: detectType(mimeType, msgType, mediaType, messageType), url: message.mediaUrl, mimetype: mimeType };
-  }
+  const isKnownMediaMessageType = /audio|image|video|document|sticker/i.test(messageType || "");
+  const isKnownMediaType = ["audio", "ptt", "image", "video", "document", "sticker", "media"].includes(msgType);
+  const hasMediaHint = isKnownMediaType || !!mediaType || isKnownMediaMessageType || message.hasMedia === true;
 
-  // Uazap v2: type === "media" with mediaType field - media may be in content as base64 or needs API fetch
-  if (msgType === "media" || mediaType || messageType) {
-    const detectedType = detectType(mimeType, msgType, mediaType, messageType);
-    const url = message.media?.url || message.media?.link || "";
-    const base64 = message.media?.base64 || message.base64 || "";
-    
-    // content might be base64 string of the media
-    const contentBase64 = (typeof message.content === "string" && message.content.length > 200) ? message.content : "";
-    
-    if (url || base64 || contentBase64) {
-      return { type: detectedType, url, base64: base64 || contentBase64, mimetype: mimeType || `${detectedType}/*` };
-    }
-    // Even without data, flag it as media so we get a placeholder
-    return { type: detectedType, url: "", mimetype: mimeType };
-  }
+  if (!hasMediaHint) return null;
 
-  // Uazap v2: hasMedia flag
-  if (message.hasMedia) {
-    const url = message.media?.url || message.media?.link || "";
-    const base64 = message.media?.base64 || message.base64 || "";
-    if (url || base64) {
-      return { type: detectType(mimeType, msgType, mediaType, messageType), url, base64, mimetype: mimeType || message.media?.mimetype || "" };
-    }
-  }
+  const detectedType = detectType(mimeType, msgType, mediaType, messageType);
+  const extracted = mergeMedia(
+    extractMediaData(message),
+    mergeMedia(extractMediaData(message.media), extractMediaData(message.content)),
+  );
 
-  // Check message type directly
-  if (["audio", "ptt", "image", "video", "document", "sticker"].includes(msgType)) {
-    const url = message.media?.url || message.media?.link || "";
-    const base64 = message.media?.base64 || message.base64 || "";
-    return { type: detectType(mimeType, msgType, mediaType, messageType), url, base64, mimetype: mimeType };
-  }
+  const finalUrl = extracted.url || "";
+  const finalBase64 = extracted.base64 || "";
+  const finalMime = mimeType || extracted.mimetype || (detectedType !== "other" ? `${detectedType}/*` : "");
 
-  // Check for media in content object (baileys format)
-  const rawContent = message.content;
-  if (rawContent && typeof rawContent === "object") {
-    const mediaKey = Object.keys(rawContent).find(k => k.endsWith("Message"));
-    if (mediaKey) {
-      const mediaObj = rawContent[mediaKey];
-      const url = mediaObj?.url || mediaObj?.directPath || "";
-      if (mediaKey === "audioMessage") return { type: "audio", url };
-      if (mediaKey === "imageMessage") return { type: "image", url };
-      if (mediaKey === "videoMessage") return { type: "video", url };
-      if (mediaKey === "documentMessage") return { type: "document", url };
-      if (mediaKey === "stickerMessage") return { type: "sticker", url };
-      return { type: "other", url };
-    }
-  }
-
-  return null;
+  return {
+    type: detectedType,
+    url: finalUrl,
+    base64: finalBase64 || undefined,
+    mimetype: finalMime || undefined,
+  };
 }
 
 serve(async (req) => {
@@ -289,7 +357,16 @@ serve(async (req) => {
 
       // Debug: log fields for media detection
       console.log("Message keys:", Object.keys(message || {}));
-      console.log("Media fields:", { type: message?.type, mediaType: message?.mediaType, messageType: message?.messageType, hasMedia: message?.hasMedia, mediaUrl: message?.mediaUrl?.slice?.(0, 80), contentType: typeof message?.content, contentLen: typeof message?.content === "string" ? message.content.length : 0 });
+      console.log("Media fields:", {
+        type: message?.type,
+        mediaType: message?.mediaType,
+        messageType: message?.messageType,
+        hasMedia: message?.hasMedia,
+        mediaUrl: message?.mediaUrl?.slice?.(0, 80),
+        contentType: typeof message?.content,
+        contentLen: typeof message?.content === "string" ? message.content.length : 0,
+        contentKeys: message?.content && typeof message.content === "object" ? Object.keys(message.content).slice(0, 10) : [],
+      });
 
       // Check for media first
       const media = extractMedia(message);
@@ -311,13 +388,13 @@ serve(async (req) => {
         } else if (media.type === "image") {
           content = "[📷 Imagem recebida]";
         } else if (media.type === "video") {
-          content = "[📹 Vídeo recebido - mídia não suportada]";
+          content = "[Enviado uma mídia não surtada]";
         } else if (media.type === "document") {
-          content = "[📄 Documento recebido - mídia não suportada]";
+          content = "[Enviado uma mídia não surtada]";
         } else if (media.type === "sticker") {
           content = "[🎨 Figurinha recebida]";
         } else {
-          content = "[📎 Mídia recebida - tipo não suportado]";
+          content = "[Enviado uma mídia não surtada]";
         }
 
         // If there's also a caption/text with the media, append it
