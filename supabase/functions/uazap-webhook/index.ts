@@ -335,7 +335,8 @@ serve(async (req) => {
     }
 
     const userId = integration.user_id;
-
+    const integrationConfig = integration.config as { token?: string; instanceName?: string };
+    const instToken = integrationConfig.token || instanceToken || "";
     // Handle connection status changes
     if (event === "status" || event === "connection.update" || event === "status_instance") {
       const status = payload.data?.status || payload.status || payload.instance?.status;
