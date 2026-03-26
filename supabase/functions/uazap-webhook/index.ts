@@ -70,16 +70,26 @@ async function transcribeAudio(mediaUrl: string, apiKey: string, existingBase64?
 }
 
 // Describe image using Lovable AI (Gemini vision)
-async function describeImage(mediaUrl: string, apiKey: string): Promise<string> {
+async function describeImage(mediaUrl: string, apiKey: string, existingBase64?: string, existingMime?: string): Promise<string> {
   try {
-    const mediaResp = await fetch(mediaUrl);
-    if (!mediaResp.ok) {
-      console.error("Failed to download image:", mediaResp.status);
-      return "[📷 Imagem recebida - não foi possível analisar]";
+    let base64Image: string;
+    let contentType: string;
+
+    if (existingBase64) {
+      base64Image = existingBase64;
+      contentType = existingMime || "image/jpeg";
+    } else if (mediaUrl) {
+      const mediaResp = await fetch(mediaUrl);
+      if (!mediaResp.ok) {
+        console.error("Failed to download image:", mediaResp.status);
+        return "[📷 Imagem recebida - não foi possível analisar]";
+      }
+      const imageBuffer = await mediaResp.arrayBuffer();
+      base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+      contentType = mediaResp.headers.get("content-type") || "image/jpeg";
+    } else {
+      return "[📷 Imagem recebida - sem URL ou dados]";
     }
-    const imageBuffer = await mediaResp.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-    const contentType = mediaResp.headers.get("content-type") || "image/jpeg";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
