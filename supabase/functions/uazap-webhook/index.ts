@@ -8,17 +8,26 @@ const corsHeaders = {
 };
 
 // Transcribe audio using Lovable AI (Gemini with audio support)
-async function transcribeAudio(mediaUrl: string, apiKey: string): Promise<string> {
+async function transcribeAudio(mediaUrl: string, apiKey: string, existingBase64?: string, existingMime?: string): Promise<string> {
   try {
-    // Download the audio file
-    const mediaResp = await fetch(mediaUrl);
-    if (!mediaResp.ok) {
-      console.error("Failed to download audio:", mediaResp.status);
-      return "[🎵 Áudio recebido - não foi possível transcrever]";
+    let base64Audio: string;
+    let contentType: string;
+
+    if (existingBase64) {
+      base64Audio = existingBase64;
+      contentType = existingMime || "audio/ogg";
+    } else if (mediaUrl) {
+      const mediaResp = await fetch(mediaUrl);
+      if (!mediaResp.ok) {
+        console.error("Failed to download audio:", mediaResp.status);
+        return "[🎵 Áudio recebido - não foi possível transcrever]";
+      }
+      const audioBuffer = await mediaResp.arrayBuffer();
+      base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+      contentType = mediaResp.headers.get("content-type") || "audio/ogg";
+    } else {
+      return "[🎵 Áudio recebido - sem URL ou dados]";
     }
-    const audioBuffer = await mediaResp.arrayBuffer();
-    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
-    const contentType = mediaResp.headers.get("content-type") || "audio/ogg";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
