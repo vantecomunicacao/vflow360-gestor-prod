@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2 } from "lucide-react";
+import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,27 @@ const Conversations = () => {
       fetchMessages(selected.id);
     }
   }, [selected, fetchMessages]);
+
+  const handleDelete = async (conversation: Conversation) => {
+    if (!confirm(`Tem certeza que deseja apagar a conversa com ${conversation.contact_name || conversation.contact_phone}? Todas as mensagens e sugestões serão removidas.`)) return;
+
+    try {
+      // Delete messages, suggestions, then conversation
+      await supabase.from("messages").delete().eq("conversation_id", conversation.id);
+      await supabase.from("suggestions").delete().eq("conversation_id", conversation.id);
+      const { error } = await supabase.from("conversations").delete().eq("id", conversation.id);
+      if (error) throw error;
+
+      setConversations(prev => prev.filter(c => c.id !== conversation.id));
+      if (selected?.id === conversation.id) {
+        setSelected(null);
+        setMessages([]);
+      }
+      toast({ title: "Conversa apagada com sucesso" });
+    } catch (error) {
+      toast({ title: "Erro ao apagar conversa", description: error instanceof Error ? error.message : "Erro desconhecido", variant: "destructive" });
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!selected) return;
