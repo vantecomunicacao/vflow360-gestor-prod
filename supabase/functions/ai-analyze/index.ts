@@ -366,17 +366,28 @@ REGRAS OBRIGATÓRIAS:
       });
 
       // 9d. Filter duplicates with existing suggestions (any status)
+      // Use both exact key match AND normalized title similarity
       const existingKeys = new Set(
         previousSuggestions.map((prev) => {
           const prevData = prev.action_data as Record<string, any> || {};
           return `${prev.type}:${prevData.field || ""}:${prevData.value || ""}`;
         })
       );
+      const existingTitles = new Set(
+        previousSuggestions.map((prev) => `${prev.type}:${prev.title.toLowerCase().trim()}`)
+      );
 
       suggestions = suggestions.filter((s) => {
+        // Exact match on type+field+value
         const key = `${s.type}:${s.field || ""}:${s.value || ""}`;
         if (existingKeys.has(key)) {
-          console.log(`Filtered duplicate suggestion: ${key}`);
+          console.log(`Filtered duplicate suggestion (exact): ${key}`);
+          return false;
+        }
+        // Similar title match (same type + same/very similar title)
+        const titleKey = `${s.type}:${s.title.toLowerCase().trim()}`;
+        if (existingTitles.has(titleKey)) {
+          console.log(`Filtered duplicate suggestion (title): ${titleKey}`);
           return false;
         }
         return true;
