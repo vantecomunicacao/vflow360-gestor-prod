@@ -40,6 +40,16 @@ function extractDataUrl(value: string): ExtractedMedia {
   };
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 function mergeMedia(primary: ExtractedMedia, fallback: ExtractedMedia): ExtractedMedia {
   return {
     url: primary.url || fallback.url,
@@ -107,38 +117,119 @@ function extractMediaData(input: unknown, depth = 0, seen = new WeakSet<object>(
   return acc;
 }
 
-// Download media via Uazap API (the proper way to get WhatsApp media)
-async function downloadMediaViaUazap(messageId: string, instanceName: string, instanceToken: string): Promise<{ base64: string; mimetype: string } | null> {
+// Download media via Uazap API
+async function downloadMediaViaUazap(
+  messageId: string,
+  instanceName: string,
+  instanceToken: string,
+  mediaType: string,
+): Promise<{ base64: string; mimetype: string } | null> {
   try {
     const subdomain = Deno.env.get("UAZAP_SUBDOMAIN") || "";
-    if (!subdomain || !messageId || !instanceName) {
-      console.error("Missing params for Uazap download:", { subdomain: !!subdomain, messageId: !!messageId, instanceName: !!instanceName });
+    if (!subdomain || !messageId || !instanceToken) {
+      console.error("Missing params for Uazap download:", {
+        subdomain: !!subdomain,
+        messageId: !!messageId,
+        instanceToken: !!instanceToken,
+      });
       return null;
     }
 
-    const url = `https://${subdomain}.uazapi.com/message/download/${instanceName}?token=${instanceToken}&messageId=${messageId}`;
-    console.log("Downloading media via Uazap API:", { messageId, instanceName });
+    const apiUrl = `https://${subdomain}.uazapi.com/message/download`;
+    console.log("Downloading media via Uazap API:", { messageId, instanceName, apiUrl });
 
-    const resp = await fetch(url, {
-      method: "GET",
+    // Official endpoint from Uazap OpenAPI spec
+    const resp = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        token: instanceToken,
+      },
+      body: JSON.stringify({
+        id: messageId,
+        return_base64: true,
+        return_link: true,
+        generate_mp3: mediaType === "audio",
+        transcribe: false,
+        download_quoted: false,
+      }),
     });
 
     if (!resp.ok) {
       const errText = await resp.text();
-      console.error("Uazap download error:", resp.status, errText);
+      console.error("Uazap download error (official endpoint):", resp.status, errText);
+
+      // Legacy fallback for older environments
+      const legacyUrl = `https://${subdomain}.uazapi.com/message/download/${instanceName}?token=${instanceToken}&messageId=${messageId}`;
+      const legacyResp = await fetch(legacyUrl, { method: "GET" });
+      if (!legacyResp.ok) {
+        const legacyErrText = await legacyResp.text();
+        console.error("Uazap download error (legacy endpoint):", legacyResp.status, legacyErrText);
+        return null;
+      }
+
+      const legacyData = await legacyResp.json();
+      const legacyBase64 = cleanBase64(
+        toText(legacyData.base64Data) ||
+          toText(legacyData.base64) ||
+          toText(legacyData.data) ||
+          toText(legacyData.file),
+      );
+      const legacyMime =
+        toText(legacyData.mimetype) ||
+        toText(legacyData.mimeType) ||
+        toText(legacyData.contentType) ||
+        "";
+
+      if (legacyBase64.length > 100) {
+        console.log("Uazap download success (legacy endpoint):", {
+          mime: legacyMime,
+          base64Len: legacyBase64.length,
+        });
+        return { base64: legacyBase64, mimetype: legacyMime };
+      }
+
       return null;
     }
 
     const data = await resp.json();
-    const base64 = data.base64 || data.data || data.file || "";
-    const mimetype = data.mimetype || data.mimeType || data.contentType || "";
+    let base64 = cleanBase64(
+      toText(data.base64Data) ||
+        toText(data.base64) ||
+        toText(data.data) ||
+        toText(data.file),
+    );
+    let mimetype =
+      toText(data.mimetype) ||
+      toText(data.mimeType) ||
+      toText(data.contentType) ||
+      "";
 
-    if (base64 && base64.length > 100) {
-      console.log("Uazap download success:", { mimeLen: mimetype, base64Len: base64.length });
-      return { base64: cleanBase64(base64), mimetype };
+    // Fallback: if API only returns link, fetch the binary and convert to base64
+    const fileURL = toText(data.fileURL);
+    if (base64.length < 100 && fileURL) {
+      try {
+        const fileResp = await fetch(fileURL);
+        if (fileResp.ok) {
+          const contentType = fileResp.headers.get("content-type") || "";
+          const fileBuffer = await fileResp.arrayBuffer();
+          base64 = arrayBufferToBase64(fileBuffer);
+          if (!mimetype && contentType) mimetype = contentType;
+        }
+      } catch (fileErr) {
+        console.error("Uazap fileURL fetch failed:", fileErr);
+      }
     }
 
-    console.log("Uazap download returned no usable data:", Object.keys(data));
+    if (base64.length > 100) {
+      console.log("Uazap download success (official endpoint):", {
+        mime: mimetype,
+        base64Len: base64.length,
+      });
+      return { base64, mimetype };
+    }
+
+    console.log("Uazap download returned no usable data (official endpoint):", Object.keys(data));
     return null;
   } catch (e) {
     console.error("Uazap download failed:", e);
@@ -404,7 +495,7 @@ serve(async (req) => {
 
         if ((!mediaBase64 || mediaBase64.length < 100) && messageId && instanceName) {
           console.log("Attempting Uazap API download for message:", messageId);
-          const downloaded = await downloadMediaViaUazap(messageId, instanceName, instToken);
+          const downloaded = await downloadMediaViaUazap(messageId, instanceName, instToken, media.type);
           if (downloaded) {
             mediaBase64 = downloaded.base64;
             mediaMime = downloaded.mimetype || mediaMime;
