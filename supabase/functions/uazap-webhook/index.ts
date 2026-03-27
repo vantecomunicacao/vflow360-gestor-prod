@@ -299,8 +299,8 @@ async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: st
   }
 }
 
-// Describe image using Lovable AI (Gemini vision)
-async function describeImage(base64Image: string, apiKey: string, mimetype: string): Promise<string> {
+// Describe image using AI (supports Lovable AI and OpenAI)
+async function describeImage(base64Image: string, apiKey: string, mimetype: string, endpoint: string = "https://ai.gateway.lovable.dev/v1/chat/completions", model: string = "google/gemini-2.5-flash"): Promise<string> {
   try {
     if (!base64Image || base64Image.length < 100) {
       return "[📷 Imagem recebida - sem dados para analisar]";
@@ -308,14 +308,14 @@ async function describeImage(base64Image: string, apiKey: string, mimetype: stri
 
     const contentType = mimetype || "image/jpeg";
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages: [
           {
             role: "user",
