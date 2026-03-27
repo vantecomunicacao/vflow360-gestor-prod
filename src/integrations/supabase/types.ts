@@ -44,6 +44,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_provider_config: {
+        Row: {
+          api_key: string | null
+          created_at: string
+          id: string
+          model: string | null
+          provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          provider?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           contact_name: string | null

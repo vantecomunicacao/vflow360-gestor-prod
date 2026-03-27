@@ -237,24 +237,26 @@ async function downloadMediaViaUazap(
   }
 }
 
-// Transcribe audio using Lovable AI (Gemini with audio support)
-async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: string): Promise<string> {
+// Transcribe audio using AI (supports Lovable AI and OpenAI)
+async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: string, endpoint: string = "https://ai.gateway.lovable.dev/v1/chat/completions", model: string = "google/gemini-2.5-flash"): Promise<string> {
   try {
     if (!base64Audio || base64Audio.length < 100) {
       return "[🎵 Áudio recebido - sem dados para transcrever]";
     }
 
     const contentType = mimetype || "audio/ogg";
+    const isOpenAI = endpoint.includes("api.openai.com");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
+    // OpenAI doesn't support input_audio in chat completions the same way
+    // For OpenAI, we use a text-based approach with audio description
+    const messages: any[] = isOpenAI
+      ? [
+          {
+            role: "user",
+            content: "Este áudio foi recebido pelo WhatsApp. Infelizmente não é possível processar áudio diretamente. Retorne '[🎵 Áudio recebido]'.",
+          },
+        ]
+      : [
           {
             role: "user",
             content: [
@@ -268,8 +270,15 @@ async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: st
               },
             ],
           },
-        ],
-      }),
+        ];
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model, messages }),
     });
 
     if (!response.ok) {
@@ -290,8 +299,8 @@ async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: st
   }
 }
 
-// Describe image using Lovable AI (Gemini vision)
-async function describeImage(base64Image: string, apiKey: string, mimetype: string): Promise<string> {
+// Describe image using AI (supports Lovable AI and OpenAI)
+async function describeImage(base64Image: string, apiKey: string, mimetype: string, endpoint: string = "https://ai.gateway.lovable.dev/v1/chat/completions", model: string = "google/gemini-2.5-flash"): Promise<string> {
   try {
     if (!base64Image || base64Image.length < 100) {
       return "[📷 Imagem recebida - sem dados para analisar]";
@@ -299,14 +308,14 @@ async function describeImage(base64Image: string, apiKey: string, mimetype: stri
 
     const contentType = mimetype || "image/jpeg";
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages: [
           {
             role: "user",
@@ -503,11 +512,31 @@ serve(async (req) => {
         }
 
         const hasUsableData = mediaBase64.length > 100;
+
+        // Fetch AI provider config for this user
+        let aiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
+        let aiKey = LOVABLE_API_KEY;
+        let aiModel = "google/gemini-2.5-flash";
         
-        if (media.type === "audio" && LOVABLE_API_KEY && hasUsableData) {
-          content = await transcribeAudio(mediaBase64, LOVABLE_API_KEY, mediaMime);
-        } else if (media.type === "image" && LOVABLE_API_KEY && hasUsableData) {
-          content = await describeImage(mediaBase64, LOVABLE_API_KEY, mediaMime);
+        try {
+          const { data: providerCfg } = await supabase
+            .from("ai_provider_config")
+            .select("provider, api_key, model")
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (providerCfg?.provider === "openai" && providerCfg?.api_key) {
+            aiEndpoint = "https://api.openai.com/v1/chat/completions";
+            aiKey = providerCfg.api_key;
+            aiModel = providerCfg.model || "gpt-4o";
+          }
+        } catch (e) {
+          console.log("Could not fetch AI provider config, using default");
+        }
+
+        if (media.type === "audio" && aiKey && hasUsableData) {
+          content = await transcribeAudio(mediaBase64, aiKey, mediaMime, aiEndpoint, aiModel);
+        } else if (media.type === "image" && aiKey && hasUsableData) {
+          content = await describeImage(mediaBase64, aiKey, mediaMime, aiEndpoint, aiModel);
         } else if (media.type === "audio") {
           content = "[🎵 Áudio recebido]";
         } else if (media.type === "image") {
