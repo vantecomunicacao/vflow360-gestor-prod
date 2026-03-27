@@ -227,77 +227,98 @@ REGRAS OBRIGATÓRIAS:
 - Analise a conversa INTEIRA para entender a conclusão final do lead antes de sugerir ganho/perdido
 - Retorne as sugestões usando a tool fornecida`;
 
-    // 8. Call Lovable AI with tool calling for structured output
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Analise esta conversa e gere sugestões de ações para o CRM:\n\n${conversationText}` },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "suggest_crm_actions",
-              description: "Retorna sugestões de ações para o CRM baseadas na análise da conversa.",
-              parameters: {
-                type: "object",
-                properties: {
-                  suggestions: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        type: {
-                          type: "string",
-                          enum: filteredActionTypes,
-                          description: "Tipo da ação sugerida",
-                        },
-                        title: {
-                          type: "string",
-                          description: "Título curto da sugestão (ex: 'Mover para Qualificado')",
-                        },
-                        description: {
-                          type: "string",
-                          description: "Justificativa detalhada com trecho da conversa",
-                        },
-                        field: {
-                          type: "string",
-                          description: "Para mover_funil: nome EXATO da etapa destino. Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null.",
-                        },
-                        value: {
-                          type: "string",
-                          description: stageNames.length > 0
-                            ? `Para mover_funil: DEVE ser um destes valores exatos: ${stageNames.map((n: string) => `"${n}"`).join(", ")}. Para campo_personalizado com opções: use apenas valores da lista de opções válidas. Para outros: valor livre.`
-                            : "Valor sugerido para o campo ou nome da etapa destino",
-                        },
+    // 7b. Fetch AI provider config for this user
+    const { data: providerConfig } = await supabase
+      .from("ai_provider_config")
+      .select("provider, api_key, model")
+      .eq("user_id", resolvedUserId)
+      .maybeSingle();
+
+    const useOpenAI = providerConfig?.provider === "openai" && providerConfig?.api_key;
+    const aiEndpoint = useOpenAI
+      ? "https://api.openai.com/v1/chat/completions"
+      : "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const aiApiKey = useOpenAI ? providerConfig.api_key : LOVABLE_API_KEY;
+    const aiModel = useOpenAI ? (providerConfig.model || "gpt-4o") : "google/gemini-2.5-flash";
+
+    if (!aiApiKey) throw new Error("No AI API key configured. Please configure an AI provider in Settings.");
+
+    console.log(`Using AI provider: ${useOpenAI ? "OpenAI" : "Lovable AI"}, model: ${aiModel}`);
+
+    // 8. Call AI with tool calling for structured output
+    const aiRequestBody: any = {
+      model: aiModel,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Analise esta conversa e gere sugestões de ações para o CRM:\n\n${conversationText}` },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "suggest_crm_actions",
+            description: "Retorna sugestões de ações para o CRM baseadas na análise da conversa.",
+            parameters: {
+              type: "object",
+              properties: {
+                suggestions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      type: {
+                        type: "string",
+                        enum: filteredActionTypes,
+                        description: "Tipo da ação sugerida",
                       },
-                      required: ["type", "title", "description"],
-                      additionalProperties: false,
+                      title: {
+                        type: "string",
+                        description: "Título curto da sugestão (ex: 'Mover para Qualificado')",
+                      },
+                      description: {
+                        type: "string",
+                        description: "Justificativa detalhada com trecho da conversa",
+                      },
+                      field: {
+                        type: "string",
+                        description: "Para mover_funil: nome EXATO da etapa destino. Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null.",
+                      },
+                      value: {
+                        type: "string",
+                        description: stageNames.length > 0
+                          ? `Para mover_funil: DEVE ser um destes valores exatos: ${stageNames.map((n: string) => `"${n}"`).join(", ")}. Para campo_personalizado com opções: use apenas valores da lista de opções válidas. Para outros: valor livre.`
+                          : "Valor sugerido para o campo ou nome da etapa destino",
+                      },
                     },
+                    required: ["type", "title", "description"],
+                    additionalProperties: false,
                   },
                 },
-                required: ["suggestions"],
-                additionalProperties: false,
               },
+              required: ["suggestions"],
+              additionalProperties: false,
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "suggest_crm_actions" } },
-      }),
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "suggest_crm_actions" } },
+    };
+
+    const aiResponse = await fetch(aiEndpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${aiApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(aiRequestBody),
     });
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errText);
+      console.error("AI error:", aiResponse.status, errText);
       if (aiResponse.status === 429) throw new Error("Rate limit exceeded. Try again later.");
       if (aiResponse.status === 402) throw new Error("AI credits exhausted. Please add funds.");
+      if (aiResponse.status === 401) throw new Error("Invalid AI API key. Please check your settings.");
       throw new Error(`AI analysis failed [${aiResponse.status}]`);
     }
 
