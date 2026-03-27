@@ -512,11 +512,31 @@ serve(async (req) => {
         }
 
         const hasUsableData = mediaBase64.length > 100;
+
+        // Fetch AI provider config for this user
+        let aiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
+        let aiKey = LOVABLE_API_KEY;
+        let aiModel = "google/gemini-2.5-flash";
         
-        if (media.type === "audio" && LOVABLE_API_KEY && hasUsableData) {
-          content = await transcribeAudio(mediaBase64, LOVABLE_API_KEY, mediaMime);
-        } else if (media.type === "image" && LOVABLE_API_KEY && hasUsableData) {
-          content = await describeImage(mediaBase64, LOVABLE_API_KEY, mediaMime);
+        try {
+          const { data: providerCfg } = await supabase
+            .from("ai_provider_config")
+            .select("provider, api_key, model")
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (providerCfg?.provider === "openai" && providerCfg?.api_key) {
+            aiEndpoint = "https://api.openai.com/v1/chat/completions";
+            aiKey = providerCfg.api_key;
+            aiModel = providerCfg.model || "gpt-4o";
+          }
+        } catch (e) {
+          console.log("Could not fetch AI provider config, using default");
+        }
+
+        if (media.type === "audio" && aiKey && hasUsableData) {
+          content = await transcribeAudio(mediaBase64, aiKey, mediaMime, aiEndpoint, aiModel);
+        } else if (media.type === "image" && aiKey && hasUsableData) {
+          content = await describeImage(mediaBase64, aiKey, mediaMime, aiEndpoint, aiModel);
         } else if (media.type === "audio") {
           content = "[🎵 Áudio recebido]";
         } else if (media.type === "image") {
