@@ -37,10 +37,19 @@ interface GhlPipelineStage {
 
 type WhatsAppStatus = "not_created" | "disconnected" | "connecting" | "connected";
 
+interface WhatsAppInstance {
+  id: string;
+  instanceName: string;
+  label: string;
+  status: WhatsAppStatus;
+  qrCode?: string | null;
+  loading?: boolean;
+}
+
 const Integrations = () => {
-  const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>("not_created");
-  const [qrCode, setQrCode] = useState<string | null>(null);
-  const [loadingWa, setLoadingWa] = useState(false);
+  const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
+  const [loadingInstances, setLoadingInstances] = useState(true);
+  const [creatingNew, setCreatingNew] = useState(false);
   const [ghlConnected, setGhlConnected] = useState(false);
   const [ghlLocationName, setGhlLocationName] = useState("");
   const [loadingGhl, setLoadingGhl] = useState(false);
