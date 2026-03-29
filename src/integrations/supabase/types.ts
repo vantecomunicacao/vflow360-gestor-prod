@@ -80,6 +80,7 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           id: string
+          integration_type: string | null
           last_message: string | null
           last_message_at: string | null
           unread_count: number
@@ -91,6 +92,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          integration_type?: string | null
           last_message?: string | null
           last_message_at?: string | null
           unread_count?: number
@@ -102,6 +104,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          integration_type?: string | null
           last_message?: string | null
           last_message_at?: string | null
           unread_count?: number
