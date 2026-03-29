@@ -226,6 +226,7 @@ export type Database = {
       suggestions: {
         Row: {
           action_data: Json
+          ai_provider: string | null
           conversation_id: string | null
           created_at: string
           description: string | null
@@ -238,6 +239,7 @@ export type Database = {
         }
         Insert: {
           action_data?: Json
+          ai_provider?: string | null
           conversation_id?: string | null
           created_at?: string
           description?: string | null
@@ -250,6 +252,7 @@ export type Database = {
         }
         Update: {
           action_data?: Json
+          ai_provider?: string | null
           conversation_id?: string | null
           created_at?: string
           description?: string | null

@@ -27,6 +27,7 @@ interface Suggestion {
   };
   created_at: string;
   conversation_id: string | null;
+  ai_provider: string | null;
 }
 
 interface ContactGroup {
@@ -496,6 +497,14 @@ const Suggestions = () => {
                               <Badge variant="outline" className={typeColors[suggestion.type] || ""}>
                                 {ACTION_TYPE_LABELS[suggestion.type] || suggestion.type}
                               </Badge>
+                              {suggestion.ai_provider && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">
+                                  {suggestion.ai_provider.startsWith("openai") ? "🤖 OpenAI" : "✨ Lovable AI"}
+                                  {suggestion.ai_provider.includes("/") && (
+                                    <span className="ml-1 opacity-60">{suggestion.ai_provider.split("/").pop()}</span>
+                                  )}
+                                </Badge>
+                              )}
                               <span className="text-xs text-muted-foreground ml-auto">
                                 {new Date(suggestion.created_at).toLocaleString("pt-BR")}
                               </span>
