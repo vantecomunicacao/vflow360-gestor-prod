@@ -184,7 +184,7 @@ serve(async (req) => {
     }
 
     // Use pushName or phone as contact name
-    const contactName = sourceMsg?.pushName || sourceMsg?.PushName || payload.senderName || payload.pushName || phone;
+    const contactName = sourceMsg?.pushName || sourceMsg?.PushName || infoData?.PushName || infoData?.pushName || payload.senderName || payload.pushName || phone;
 
     console.log("Stevo processing:", { phone, contactName, isFromMe, content: content.slice(0, 80) });
 
@@ -199,7 +199,7 @@ serve(async (req) => {
     const displayMessage = content.length > 100 ? content.slice(0, 100) + "..." : content;
 
     // Use messageTimestamp if available
-    const rawTs = sourceMsg?.messageTimestamp || payload?.messageTimestamp;
+    const rawTs = sourceMsg?.messageTimestamp || infoData?.Timestamp || payload?.messageTimestamp;
     const msgTimestamp = rawTs
       ? new Date(Number(rawTs) * 1000).toISOString()
       : new Date().toISOString();
