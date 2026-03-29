@@ -21,6 +21,7 @@ interface Conversation {
   last_message: string | null;
   last_message_at: string | null;
   unread_count: number;
+  integration_type: string | null;
 }
 
 const Conversations = () => {
@@ -218,9 +219,16 @@ const Conversations = () => {
               </div>
               <div>
                 <p className="font-medium text-foreground">{selected.contact_name || selected.contact_phone}</p>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Phone className="w-3 h-3" /> {selected.contact_phone}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="w-3 h-3" /> {selected.contact_phone}
+                  </p>
+                  {selected.integration_type && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                      {selected.integration_type === "stevo" ? "Stevo" : "Uazap"}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <Button

@@ -166,6 +166,7 @@ serve(async (req) => {
           last_message: displayMessage,
           last_message_at: msgTimestamp,
           unread_count: isFromMe ? 0 : 1,
+          integration_type: "stevo",
         })
         .select("id, unread_count")
         .single();
@@ -178,6 +179,7 @@ serve(async (req) => {
           last_message_at: msgTimestamp,
           contact_name: contactName,
           unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
+          integration_type: "stevo",
         })
         .eq("id", conversation.id);
     }

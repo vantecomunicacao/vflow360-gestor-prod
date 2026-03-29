@@ -606,6 +606,7 @@ serve(async (req) => {
             last_message: displayMessage,
             last_message_at: new Date().toISOString(),
             unread_count: isFromMe ? 0 : 1,
+            integration_type: "uazap",
           })
           .select("id, unread_count")
           .single();
@@ -618,6 +619,7 @@ serve(async (req) => {
             last_message_at: new Date().toISOString(),
             contact_name: contactName,
             unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
+            integration_type: "uazap",
           })
           .eq("id", conversation.id);
       }
