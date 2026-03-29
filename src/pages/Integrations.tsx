@@ -1,4 +1,4 @@
-import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Settings, Sparkles, Loader2, Wifi, WifiOff, Download, Plus, Trash2, Pencil } from "lucide-react";
+import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Sparkles, Loader2, Wifi, WifiOff, Download, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -136,7 +136,6 @@ const Integrations = () => {
     setGhlFields([]);
     setGhlStages([]);
     
-    // Load saved mappings first
     let savedFields: any[] = [];
     let savedStages: any[] = [];
     let savedPrompt = "";
@@ -151,7 +150,6 @@ const Integrations = () => {
     try {
       const fieldsData = await callGhl("custom_fields");
       const customFields: GhlCustomField[] = (fieldsData?.customFields || fieldsData || []).map((f: any) => {
-        // Extract options for dropdown/select fields
         const fieldOptions: FieldOption[] = [];
         const rawOptions = f.picklistOptions || f.options || [];
         if (Array.isArray(rawOptions)) {
@@ -172,11 +170,9 @@ const Integrations = () => {
         };
       });
       
-      // Merge with saved selections
       const allFields = [...GHL_STANDARD_FIELDS, ...customFields].map(f => {
         const saved = savedFields.find((sf: any) => sf.id === f.id);
         if (saved) {
-          // Merge saved option instructions with current options
           let mergedOptions = f.options;
           if (f.options && saved.options) {
             mergedOptions = f.options.map((opt: FieldOption) => {
@@ -231,21 +227,27 @@ const Integrations = () => {
     }
   }, [callGhl]);
 
-  // Check status on mount
+  // Fetch all WhatsApp instances on mount
   useEffect(() => {
     const checkStatus = async () => {
+      setLoadingInstances(true);
       try {
         const data = await callUazap("status");
-        // data.status can be an object like {connected: true} or a string
-        const isConnected = data?.status?.connected === true || data?.instance?.status === "connected" || data?.status === "connected";
-        if (isConnected) {
-          setWhatsappStatus("connected");
-        } else if (data?.status === "not_created" || (!data?.instance && !data?.status)) {
-          setWhatsappStatus("not_created");
+        if (data?.instances && data.instances.length > 0) {
+          setInstances(data.instances.map((inst: any) => ({
+            id: inst.id,
+            instanceName: inst.instanceName || "",
+            label: inst.label || inst.instanceName || "WhatsApp",
+            status: inst.status as WhatsAppStatus,
+          })));
         } else {
-          setWhatsappStatus("disconnected");
+          setInstances([]);
         }
-      } catch { /* silent */ }
+      } catch {
+        setInstances([]);
+      } finally {
+        setLoadingInstances(false);
+      }
 
       try {
         const data = await callGhl("status");
@@ -260,89 +262,120 @@ const Integrations = () => {
     checkStatus();
   }, [callUazap, callGhl, resetGhlState]);
 
-  // Fetch fields/stages when GHL connects
   useEffect(() => {
     if (ghlConnected) {
       fetchGhlFieldsAndStages();
     }
   }, [ghlConnected, fetchGhlFieldsAndStages]);
 
-  // Poll for WA status while connecting
+  // Poll for connecting instances
   useEffect(() => {
-    if (whatsappStatus !== "connecting") return;
+    const connectingInstances = instances.filter(i => i.status === "connecting");
+    if (connectingInstances.length === 0) return;
+
     const interval = setInterval(async () => {
-      try {
-        const data = await callUazap("status");
-        if (data?.status === "connected" || data?.instance?.status === "connected") {
-          setWhatsappStatus("connected");
-          setQrCode(null);
-          toast({ title: "WhatsApp conectado com sucesso!" });
-        } else {
-          // Update QR code if available from status
-          const newQr = data?.instance?.qrcode || data?.qrcode;
-          if (newQr) setQrCode(newQr);
-        }
-      } catch { /* ignore */ }
+      for (const inst of connectingInstances) {
+        try {
+          const data = await callUazap("status", { integration_id: inst.id });
+          if (data?.status === "connected" || data?.instance?.status === "connected") {
+            setInstances(prev => prev.map(i =>
+              i.id === inst.id ? { ...i, status: "connected", qrCode: null } : i
+            ));
+            toast({ title: `${inst.label} conectado com sucesso!` });
+          } else {
+            const newQr = data?.instance?.qrcode || data?.qrcode;
+            if (newQr) {
+              setInstances(prev => prev.map(i =>
+                i.id === inst.id ? { ...i, qrCode: newQr } : i
+              ));
+            }
+          }
+        } catch { /* ignore */ }
+      }
     }, 5000);
     return () => clearInterval(interval);
-  }, [whatsappStatus, callUazap, toast]);
+  }, [instances, callUazap, toast]);
 
-  const handleCreateAndConnect = async () => {
-    setLoadingWa(true);
+  const updateInstance = (id: string, updates: Partial<WhatsAppInstance>) => {
+    setInstances(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+  };
+
+  const handleCreateInstance = async () => {
+    setCreatingNew(true);
     try {
-      await callUazap("create");
+      const data = await callUazap("create");
+      const newId = data.integration_id;
       toast({ title: "Instância criada!", description: "Gerando QR Code..." });
-      const connectData = await callUazap("connect");
+
+      const connectData = await callUazap("connect", { integration_id: newId });
       const qr = connectData?.qrcode || connectData?.instance?.qrcode || connectData?.base64 || null;
-      if (qr) {
-        setQrCode(qr);
-        setWhatsappStatus("connecting");
-      } else {
-        // Fallback: use status endpoint which returns qrcode when connecting
-        const statusData = await callUazap("status");
+
+      if (!qr) {
+        const statusData = await callUazap("status", { integration_id: newId });
         const statusQr = statusData?.instance?.qrcode || statusData?.qrcode || null;
-        setQrCode(statusQr);
-        setWhatsappStatus("connecting");
+        setInstances(prev => [...prev, {
+          id: newId,
+          instanceName: data.instanceName || "",
+          label: `WhatsApp #${prev.length + 1}`,
+          status: "connecting",
+          qrCode: statusQr,
+        }]);
+      } else {
+        setInstances(prev => [...prev, {
+          id: newId,
+          instanceName: data.instanceName || "",
+          label: `WhatsApp #${prev.length + 1}`,
+          status: "connecting",
+          qrCode: qr,
+        }]);
       }
     } catch (error) {
-      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao conectar", variant: "destructive" });
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao criar instância", variant: "destructive" });
     } finally {
-      setLoadingWa(false);
+      setCreatingNew(false);
     }
   };
 
-  const handleReconnect = async () => {
-    setLoadingWa(true);
+  const handleReconnect = async (inst: WhatsAppInstance) => {
+    updateInstance(inst.id, { loading: true });
     try {
-      const connectData = await callUazap("connect");
+      const connectData = await callUazap("connect", { integration_id: inst.id });
       const qr = connectData?.qrcode || connectData?.instance?.qrcode || connectData?.base64 || null;
       if (qr) {
-        setQrCode(qr);
-        setWhatsappStatus("connecting");
+        updateInstance(inst.id, { status: "connecting", qrCode: qr, loading: false });
       } else {
-        const statusData = await callUazap("status");
+        const statusData = await callUazap("status", { integration_id: inst.id });
         const statusQr = statusData?.instance?.qrcode || statusData?.qrcode || null;
-        setQrCode(statusQr);
-        setWhatsappStatus("connecting");
+        updateInstance(inst.id, { status: "connecting", qrCode: statusQr, loading: false });
       }
     } catch (error) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao reconectar", variant: "destructive" });
-    } finally {
-      setLoadingWa(false);
+      updateInstance(inst.id, { loading: false });
     }
   };
 
-  const handleDisconnect = async () => {
-    setLoadingWa(true);
+  const handleDisconnect = async (inst: WhatsAppInstance) => {
+    updateInstance(inst.id, { loading: true });
     try {
-      await callUazap("disconnect");
-      setWhatsappStatus("disconnected");
-      setQrCode(null);
-      toast({ title: "WhatsApp desconectado" });
+      await callUazap("disconnect", { integration_id: inst.id });
+      updateInstance(inst.id, { status: "disconnected", qrCode: null, loading: false });
+      toast({ title: `${inst.label} desconectado` });
     } catch (error) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao desconectar", variant: "destructive" });
-    } finally {
-      setLoadingWa(false);
+      updateInstance(inst.id, { loading: false });
+    }
+  };
+
+  const handleDeleteInstance = async (inst: WhatsAppInstance) => {
+    if (!confirm(`Tem certeza que deseja remover ${inst.label}? A instância será desconectada e removida.`)) return;
+    updateInstance(inst.id, { loading: true });
+    try {
+      await callUazap("delete", { integration_id: inst.id });
+      setInstances(prev => prev.filter(i => i.id !== inst.id));
+      toast({ title: `${inst.label} removido` });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao remover", variant: "destructive" });
+      updateInstance(inst.id, { loading: false });
     }
   };
 
@@ -383,8 +416,8 @@ const Integrations = () => {
     }
   };
 
-  const getWhatsAppBadge = () => {
-    switch (whatsappStatus) {
+  const getStatusBadge = (status: WhatsAppStatus) => {
+    switch (status) {
       case "connected":
         return <Badge variant="outline" className="text-success border-success/30"><CheckCircle className="w-3 h-3 mr-1" /> Conectado</Badge>;
       case "connecting":
@@ -412,60 +445,97 @@ const Integrations = () => {
             </div>
             <div>
               <h3 className="font-semibold text-foreground">WhatsApp (Uazap)</h3>
-              <p className="text-sm text-muted-foreground">Conexão via QR Code</p>
+              <p className="text-sm text-muted-foreground">
+                {instances.length === 0 ? "Nenhum número conectado" : `${instances.length} número${instances.length > 1 ? "s" : ""} configurado${instances.length > 1 ? "s" : ""}`}
+              </p>
             </div>
           </div>
-          {getWhatsAppBadge()}
+          <Button size="sm" onClick={handleCreateInstance} disabled={creatingNew}>
+            {creatingNew ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Criando...</> : <><Plus className="w-4 h-4 mr-1" /> Adicionar número</>}
+          </Button>
         </div>
 
-        {whatsappStatus === "not_created" && (
+        {loadingInstances ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : instances.length === 0 ? (
           <div className="bg-muted rounded-lg p-6 flex flex-col items-center gap-4">
             <Wifi className="w-12 h-12 text-muted-foreground" />
             <p className="text-sm text-muted-foreground text-center">Conecte seu WhatsApp para começar a receber e analisar mensagens automaticamente.</p>
-            <Button onClick={handleCreateAndConnect} disabled={loadingWa}>
-              {loadingWa ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Criando...</> : <><MessageSquare className="w-4 h-4 mr-2" /> Conectar WhatsApp</>}
+            <Button onClick={handleCreateInstance} disabled={creatingNew}>
+              {creatingNew ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Criando...</> : <><MessageSquare className="w-4 h-4 mr-2" /> Conectar WhatsApp</>}
             </Button>
           </div>
-        )}
+        ) : (
+          <div className="space-y-3">
+            {instances.map((inst) => (
+              <div key={inst.id} className="border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-success" />
+                    <span className="text-sm font-medium text-foreground">{inst.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(inst.status)}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7 p-0"
+                      onClick={() => handleDeleteInstance(inst)}
+                      disabled={inst.loading}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
 
-        {whatsappStatus === "connecting" && (
-          <div className="bg-muted rounded-lg p-6 flex flex-col items-center gap-4">
-            {qrCode ? (
-              <>
-                <div className="w-64 h-64 bg-background rounded-lg flex items-center justify-center overflow-hidden border border-border">
-                  <img src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR Code WhatsApp" className="w-full h-full object-contain" />
-                </div>
-                <p className="text-sm text-muted-foreground text-center">Escaneie o QR Code com seu WhatsApp para conectar</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Aguardando conexão...
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Gerando QR Code...</p>
+                {inst.status === "connecting" && (
+                  <div className="bg-muted rounded-lg p-4 flex flex-col items-center gap-3">
+                    {inst.qrCode ? (
+                      <>
+                        <div className="w-52 h-52 bg-background rounded-lg flex items-center justify-center overflow-hidden border border-border">
+                          <img src={inst.qrCode.startsWith("data:") ? inst.qrCode : `data:image/png;base64,${inst.qrCode}`} alt="QR Code" className="w-full h-full object-contain" />
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">Escaneie o QR Code com seu WhatsApp</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Aguardando conexão...
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        <p className="text-xs text-muted-foreground">Gerando QR Code...</p>
+                      </div>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => handleReconnect(inst)} disabled={inst.loading}>
+                      <RefreshCw className="w-3 h-3 mr-1" /> Novo QR Code
+                    </Button>
+                  </div>
+                )}
+
+                {inst.status === "disconnected" && (
+                  <div className="bg-muted rounded-lg p-3 flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">Instância desconectada</p>
+                    <Button size="sm" variant="outline" onClick={() => handleReconnect(inst)} disabled={inst.loading}>
+                      {inst.loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                      Reconectar
+                    </Button>
+                  </div>
+                )}
+
+                {inst.status === "connected" && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleReconnect(inst)} disabled={inst.loading}>
+                      <RefreshCw className="w-3 h-3 mr-1" /> Reconectar
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDisconnect(inst)} disabled={inst.loading}>
+                      Desconectar
+                    </Button>
+                  </div>
+                )}
               </div>
-            )}
-            <Button variant="outline" size="sm" onClick={handleReconnect} disabled={loadingWa}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Gerar novo QR Code
-            </Button>
-          </div>
-        )}
-
-        {whatsappStatus === "disconnected" && (
-          <div className="bg-muted rounded-lg p-6 flex flex-col items-center gap-4">
-            <WifiOff className="w-12 h-12 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground text-center">Sua instância está desconectada. Reconecte para continuar recebendo mensagens.</p>
-            <Button onClick={handleReconnect} disabled={loadingWa}>
-              {loadingWa ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reconectando...</> : <><RefreshCw className="w-4 h-4 mr-2" /> Reconectar</>}
-            </Button>
-          </div>
-        )}
-
-        {whatsappStatus === "connected" && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleReconnect} disabled={loadingWa}><RefreshCw className="w-4 h-4 mr-1" /> Reconectar</Button>
-            <Button variant="outline" size="sm" onClick={handleDisconnect} disabled={loadingWa}>Desconectar</Button>
+            ))}
           </div>
         )}
       </motion.div>
@@ -567,44 +637,26 @@ const Integrations = () => {
                 <p className="text-sm text-muted-foreground py-4">Nenhum campo encontrado no GHL.</p>
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                  {/* Standard fields */}
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-1">Campos padrão</p>
                   {ghlFields.filter(f => f.id.startsWith("std_")).map((field) => (
                     <div key={field.id} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
-                      <Checkbox
-                        id={`field-${field.id}`}
-                        checked={field.selected}
-                        onCheckedChange={() => toggleField(field.id)}
-                        className="mt-1"
-                      />
+                      <Checkbox id={`field-${field.id}`} checked={field.selected} onCheckedChange={() => toggleField(field.id)} className="mt-1" />
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <label htmlFor={`field-${field.id}`} className="text-sm font-medium text-foreground cursor-pointer">
-                            {field.name}
-                          </label>
+                          <label htmlFor={`field-${field.id}`} className="text-sm font-medium text-foreground cursor-pointer">{field.name}</label>
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{field.dataType}</Badge>
                         </div>
                         <p className="text-xs text-muted-foreground font-mono">{field.fieldKey}</p>
                         {field.selected && (
                           <>
-                            <Input
-                              placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
-                              value={field.description}
-                              onChange={(e) => updateFieldDescription(field.id, e.target.value)}
-                              className="text-sm"
-                            />
+                            <Input placeholder="Descreva este campo para a IA" value={field.description} onChange={(e) => updateFieldDescription(field.id, e.target.value)} className="text-sm" />
                             {field.options && field.options.length > 0 && (
                               <div className="ml-2 space-y-2 border-l-2 border-border pl-3">
                                 <p className="text-xs font-medium text-muted-foreground">Opções ({field.options.length}):</p>
                                 {field.options.map((opt) => (
                                   <div key={opt.value} className="space-y-1">
                                     <p className="text-xs font-medium text-foreground">{opt.value}</p>
-                                    <Input
-                                      placeholder={`Quando usar "${opt.value}"? (ex: 'Quando o lead mencionar...')`}
-                                      value={opt.instruction}
-                                      onChange={(e) => updateOptionInstruction(field.id, opt.value, e.target.value)}
-                                      className="text-xs h-7"
-                                    />
+                                    <Input placeholder={`Quando usar "${opt.value}"?`} value={opt.instruction} onChange={(e) => updateOptionInstruction(field.id, opt.value, e.target.value)} className="text-xs h-7" />
                                   </div>
                                 ))}
                               </div>
@@ -615,47 +667,29 @@ const Integrations = () => {
                     </div>
                   ))}
 
-                  {/* Custom fields */}
                   {ghlFields.filter(f => !f.id.startsWith("std_")).length > 0 && (
                     <>
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-3">Campos personalizados</p>
                       {ghlFields.filter(f => !f.id.startsWith("std_")).map((field) => (
                         <div key={field.id} className="flex items-start gap-3 p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors">
-                          <Checkbox
-                            id={`field-${field.id}`}
-                            checked={field.selected}
-                            onCheckedChange={() => toggleField(field.id)}
-                            className="mt-1"
-                          />
+                          <Checkbox id={`field-${field.id}`} checked={field.selected} onCheckedChange={() => toggleField(field.id)} className="mt-1" />
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center gap-2">
-                              <label htmlFor={`field-${field.id}`} className="text-sm font-medium text-foreground cursor-pointer">
-                                {field.name}
-                              </label>
+                              <label htmlFor={`field-${field.id}`} className="text-sm font-medium text-foreground cursor-pointer">{field.name}</label>
                               <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">personalizado</Badge>
                               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{field.dataType}</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground font-mono">{field.fieldKey}</p>
                             {field.selected && (
                               <>
-                                <Input
-                                  placeholder="Descreva este campo para a IA (ex: 'Interesse principal do lead')"
-                                  value={field.description}
-                                  onChange={(e) => updateFieldDescription(field.id, e.target.value)}
-                                  className="text-sm"
-                                />
+                                <Input placeholder="Descreva este campo para a IA" value={field.description} onChange={(e) => updateFieldDescription(field.id, e.target.value)} className="text-sm" />
                                 {field.options && field.options.length > 0 && (
                                   <div className="ml-2 space-y-2 border-l-2 border-primary/20 pl-3">
                                     <p className="text-xs font-medium text-muted-foreground">Opções ({field.options.length}):</p>
                                     {field.options.map((opt) => (
                                       <div key={opt.value} className="space-y-1">
                                         <p className="text-xs font-medium text-foreground">{opt.value}</p>
-                                        <Input
-                                          placeholder={`Quando usar "${opt.value}"? (ex: 'Quando o lead mencionar...')`}
-                                          value={opt.instruction}
-                                          onChange={(e) => updateOptionInstruction(field.id, opt.value, e.target.value)}
-                                          className="text-xs h-7"
-                                        />
+                                        <Input placeholder={`Quando usar "${opt.value}"?`} value={opt.instruction} onChange={(e) => updateOptionInstruction(field.id, opt.value, e.target.value)} className="text-xs h-7" />
                                       </div>
                                     ))}
                                   </div>
@@ -690,26 +724,14 @@ const Integrations = () => {
                 <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                   {ghlStages.map((stage) => (
                     <div key={stage.id} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
-                      <Checkbox
-                        id={`stage-${stage.id}`}
-                        checked={stage.selected}
-                        onCheckedChange={() => toggleStage(stage.id)}
-                        className="mt-1"
-                      />
+                      <Checkbox id={`stage-${stage.id}`} checked={stage.selected} onCheckedChange={() => toggleStage(stage.id)} className="mt-1" />
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <label htmlFor={`stage-${stage.id}`} className="text-sm font-medium text-foreground cursor-pointer">
-                            {stage.name}
-                          </label>
+                          <label htmlFor={`stage-${stage.id}`} className="text-sm font-medium text-foreground cursor-pointer">{stage.name}</label>
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{stage.pipelineName}</Badge>
                         </div>
                         {stage.selected && (
-                          <Input
-                            placeholder="Quando mover o lead para esta etapa? (ex: 'Quando confirmar interesse em agendar')"
-                            value={stage.description}
-                            onChange={(e) => updateStageDescription(stage.id, e.target.value)}
-                            className="text-sm"
-                          />
+                          <Input placeholder="Quando mover o lead para esta etapa?" value={stage.description} onChange={(e) => updateStageDescription(stage.id, e.target.value)} className="text-sm" />
                         )}
                       </div>
                     </div>
