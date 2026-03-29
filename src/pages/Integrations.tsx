@@ -368,7 +368,44 @@ const Integrations = () => {
     }
   };
 
+  const handleCreateStevoInstance = async () => {
+    setCreatingNew(true);
+    setShowProviderPicker(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { data: inserted, error } = await supabase.from("integrations").insert({
+        user_id: session.user.id,
+        type: "whatsapp_stevo",
+        config: { label: `Stevo #${instances.filter(i => i.provider === "stevo").length + 1}` },
+        status: "disconnected",
+      }).select().single();
+
+      if (error) throw error;
+
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${inserted.id}`;
+
+      setInstances(prev => [...prev, {
+        id: inserted.id,
+        instanceName: "",
+        label: `Stevo #${prev.filter(i => i.provider === "stevo").length + 1}`,
+        status: "disconnected",
+        provider: "stevo",
+        webhookUrl,
+        lastWebhookAt: null,
+      }]);
+
+      toast({ title: "Instância Stevo criada!", description: "Copie o webhook e cole no Stevo." });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao criar", variant: "destructive" });
+    } finally {
+      setCreatingNew(false);
+    }
+  };
+
   const handleReconnect = async (inst: WhatsAppInstance) => {
+    if (inst.provider !== "uazap") return;
     updateInstance(inst.id, { loading: true });
     try {
       const connectData = await callUazap("connect", { integration_id: inst.id });
@@ -387,6 +424,7 @@ const Integrations = () => {
   };
 
   const handleDisconnect = async (inst: WhatsAppInstance) => {
+    if (inst.provider !== "uazap") return;
     updateInstance(inst.id, { loading: true });
     try {
       await callUazap("disconnect", { integration_id: inst.id });
@@ -399,16 +437,25 @@ const Integrations = () => {
   };
 
   const handleDeleteInstance = async (inst: WhatsAppInstance) => {
-    if (!confirm(`Tem certeza que deseja remover ${inst.label}? A instância será desconectada e removida.`)) return;
+    if (!confirm(`Tem certeza que deseja remover ${inst.label}?`)) return;
     updateInstance(inst.id, { loading: true });
     try {
-      await callUazap("delete", { integration_id: inst.id });
+      if (inst.provider === "uazap") {
+        await callUazap("delete", { integration_id: inst.id });
+      } else {
+        await supabase.from("integrations").delete().eq("id", inst.id);
+      }
       setInstances(prev => prev.filter(i => i.id !== inst.id));
       toast({ title: `${inst.label} removido` });
     } catch (error) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao remover", variant: "destructive" });
       updateInstance(inst.id, { loading: false });
     }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copiado!", description: "Webhook URL copiado para a área de transferência." });
   };
 
   const toggleField = (id: string) => {
