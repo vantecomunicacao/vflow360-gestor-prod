@@ -55,8 +55,33 @@ serve(async (req) => {
       })
       .eq("id", integration.id);
 
-    const payload = await req.json();
+    let payload = await req.json();
+    
+    // Handle array wrapper - some webhook systems wrap in array
+    if (Array.isArray(payload)) {
+      payload = payload[0] || {};
+    }
+    
+    // Handle nested data wrapper
+    if (payload.data && typeof payload.data === "object" && !payload.SourceWebMsg) {
+      const inner = payload.data;
+      if (inner.SourceWebMsg || inner.Message) {
+        payload = { ...inner, event: payload.event || inner.event, instanceName: payload.instanceName || inner.instanceName };
+      }
+    }
+    
+    console.log("Stevo webhook payload keys:", JSON.stringify(Object.keys(payload)));
     console.log("Stevo webhook event:", payload.event, "instance:", payload.instanceName);
+    
+    // Log SourceWebMsg structure for debugging
+    if (payload.SourceWebMsg) {
+      console.log("SourceWebMsg keys:", JSON.stringify(Object.keys(payload.SourceWebMsg)));
+      if (payload.SourceWebMsg.key) {
+        console.log("SourceWebMsg.key:", JSON.stringify(payload.SourceWebMsg.key));
+      }
+    } else {
+      console.log("No SourceWebMsg, full payload sample:", JSON.stringify(payload).slice(0, 500));
+    }
 
     const event = payload.event;
 
@@ -68,18 +93,22 @@ serve(async (req) => {
       });
     }
 
-    const sourceMsg = payload.SourceWebMsg;
-    const messageData = payload.Message;
+    // Try multiple paths for source message data
+    const sourceMsg = payload.SourceWebMsg || payload.sourceWebMsg || payload;
+    const messageData = payload.Message || payload.message || {};
 
-    if (!sourceMsg?.key) {
-      console.log("Stevo: no SourceWebMsg.key in payload");
+    // Try multiple paths for the key
+    const msgKey = sourceMsg?.key || sourceMsg?.Key || payload?.key || payload?.Key;
+    
+    if (!msgKey) {
+      console.log("Stevo: no key found. sourceMsg keys:", JSON.stringify(Object.keys(sourceMsg || {})));
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const remoteJID = sourceMsg.key.remoteJID || sourceMsg.key.remoteJid || "";
-    const isFromMe = sourceMsg.key.fromMe === true;
+    const remoteJID = msgKey.remoteJID || msgKey.remoteJid || msgKey.RemoteJID || "";
+    const isFromMe = msgKey.fromMe === true || msgKey.FromMe === true;
 
     // Skip group messages (groups end with @g.us)
     if (!remoteJID || remoteJID.endsWith("@g.us")) {
