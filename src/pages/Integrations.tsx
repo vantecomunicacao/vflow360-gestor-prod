@@ -1,4 +1,4 @@
-import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Settings, Sparkles, Loader2, Wifi, WifiOff, Download } from "lucide-react";
+import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Settings, Sparkles, Loader2, Wifi, WifiOff, Download, Plus, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
