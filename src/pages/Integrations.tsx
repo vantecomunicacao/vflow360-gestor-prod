@@ -303,9 +303,9 @@ const Integrations = () => {
     }
   }, [ghlConnected, fetchGhlFieldsAndStages]);
 
-  // Poll for connecting instances
+  // Poll for connecting Uazap instances only
   useEffect(() => {
-    const connectingInstances = instances.filter(i => i.status === "connecting");
+    const connectingInstances = instances.filter(i => i.status === "connecting" && i.provider === "uazap");
     if (connectingInstances.length === 0) return;
 
     const interval = setInterval(async () => {
@@ -335,8 +335,9 @@ const Integrations = () => {
     setInstances(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
   };
 
-  const handleCreateInstance = async () => {
+  const handleCreateUazapInstance = async () => {
     setCreatingNew(true);
+    setShowProviderPicker(false);
     try {
       const data = await callUazap("create");
       const newId = data.integration_id;
@@ -345,25 +346,21 @@ const Integrations = () => {
       const connectData = await callUazap("connect", { integration_id: newId });
       const qr = connectData?.qrcode || connectData?.instance?.qrcode || connectData?.base64 || null;
 
+      const newInst: WhatsAppInstance = {
+        id: newId,
+        instanceName: data.instanceName || "",
+        label: `Uazap #${instances.filter(i => i.provider === "uazap").length + 1}`,
+        status: "connecting",
+        provider: "uazap",
+        qrCode: qr || null,
+      };
+
       if (!qr) {
         const statusData = await callUazap("status", { integration_id: newId });
-        const statusQr = statusData?.instance?.qrcode || statusData?.qrcode || null;
-        setInstances(prev => [...prev, {
-          id: newId,
-          instanceName: data.instanceName || "",
-          label: `WhatsApp #${prev.length + 1}`,
-          status: "connecting",
-          qrCode: statusQr,
-        }]);
-      } else {
-        setInstances(prev => [...prev, {
-          id: newId,
-          instanceName: data.instanceName || "",
-          label: `WhatsApp #${prev.length + 1}`,
-          status: "connecting",
-          qrCode: qr,
-        }]);
+        newInst.qrCode = statusData?.instance?.qrcode || statusData?.qrcode || null;
       }
+
+      setInstances(prev => [...prev, newInst]);
     } catch (error) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao criar instância", variant: "destructive" });
     } finally {
