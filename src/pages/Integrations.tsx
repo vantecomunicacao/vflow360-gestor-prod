@@ -1,4 +1,4 @@
-import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Sparkles, Loader2, Wifi, WifiOff, Download, Plus, Trash2 } from "lucide-react";
+import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Sparkles, Loader2, Wifi, WifiOff, Download, Plus, Trash2, Copy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -36,20 +36,25 @@ interface GhlPipelineStage {
 }
 
 type WhatsAppStatus = "not_created" | "disconnected" | "connecting" | "connected";
+type WhatsAppProvider = "uazap" | "stevo";
 
 interface WhatsAppInstance {
   id: string;
   instanceName: string;
   label: string;
   status: WhatsAppStatus;
+  provider: WhatsAppProvider;
   qrCode?: string | null;
   loading?: boolean;
+  webhookUrl?: string;
+  lastWebhookAt?: string | null;
 }
 
 const Integrations = () => {
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(true);
   const [creatingNew, setCreatingNew] = useState(false);
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
   const [ghlConnected, setGhlConnected] = useState(false);
   const [ghlLocationName, setGhlLocationName] = useState("");
   const [loadingGhl, setLoadingGhl] = useState(false);
@@ -227,27 +232,57 @@ const Integrations = () => {
     }
   }, [callGhl]);
 
-  // Fetch all WhatsApp instances on mount
+  // Fetch all WhatsApp instances on mount (Uazap + Stevo)
   useEffect(() => {
     const checkStatus = async () => {
       setLoadingInstances(true);
+      const allInstances: WhatsAppInstance[] = [];
+
+      // Fetch Uazap instances
       try {
         const data = await callUazap("status");
         if (data?.instances && data.instances.length > 0) {
-          setInstances(data.instances.map((inst: any) => ({
-            id: inst.id,
-            instanceName: inst.instanceName || "",
-            label: inst.label || inst.instanceName || "WhatsApp",
-            status: inst.status as WhatsAppStatus,
-          })));
-        } else {
-          setInstances([]);
+          for (const inst of data.instances) {
+            allInstances.push({
+              id: inst.id,
+              instanceName: inst.instanceName || "",
+              label: inst.label || inst.instanceName || "WhatsApp",
+              status: inst.status as WhatsAppStatus,
+              provider: "uazap",
+            });
+          }
         }
-      } catch {
-        setInstances([]);
-      } finally {
-        setLoadingInstances(false);
-      }
+      } catch { /* silent */ }
+
+      // Fetch Stevo instances from DB
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: stevoIntegrations } = await supabase
+            .from("integrations")
+            .select("*")
+            .eq("type", "whatsapp_stevo")
+            .order("created_at", { ascending: true });
+
+          if (stevoIntegrations) {
+            for (const int of stevoIntegrations) {
+              const config = int.config as { label?: string; last_webhook_at?: string } || {};
+              allInstances.push({
+                id: int.id,
+                instanceName: "",
+                label: config.label || "Stevo",
+                status: (int.status as WhatsAppStatus) || "disconnected",
+                provider: "stevo",
+                webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${int.id}`,
+                lastWebhookAt: config.last_webhook_at || null,
+              });
+            }
+          }
+        }
+      } catch { /* silent */ }
+
+      setInstances(allInstances);
+      setLoadingInstances(false);
 
       try {
         const data = await callGhl("status");
@@ -268,9 +303,9 @@ const Integrations = () => {
     }
   }, [ghlConnected, fetchGhlFieldsAndStages]);
 
-  // Poll for connecting instances
+  // Poll for connecting Uazap instances only
   useEffect(() => {
-    const connectingInstances = instances.filter(i => i.status === "connecting");
+    const connectingInstances = instances.filter(i => i.status === "connecting" && i.provider === "uazap");
     if (connectingInstances.length === 0) return;
 
     const interval = setInterval(async () => {
@@ -300,8 +335,9 @@ const Integrations = () => {
     setInstances(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
   };
 
-  const handleCreateInstance = async () => {
+  const handleCreateUazapInstance = async () => {
     setCreatingNew(true);
+    setShowProviderPicker(false);
     try {
       const data = await callUazap("create");
       const newId = data.integration_id;
@@ -310,25 +346,21 @@ const Integrations = () => {
       const connectData = await callUazap("connect", { integration_id: newId });
       const qr = connectData?.qrcode || connectData?.instance?.qrcode || connectData?.base64 || null;
 
+      const newInst: WhatsAppInstance = {
+        id: newId,
+        instanceName: data.instanceName || "",
+        label: `Uazap #${instances.filter(i => i.provider === "uazap").length + 1}`,
+        status: "connecting",
+        provider: "uazap",
+        qrCode: qr || null,
+      };
+
       if (!qr) {
         const statusData = await callUazap("status", { integration_id: newId });
-        const statusQr = statusData?.instance?.qrcode || statusData?.qrcode || null;
-        setInstances(prev => [...prev, {
-          id: newId,
-          instanceName: data.instanceName || "",
-          label: `WhatsApp #${prev.length + 1}`,
-          status: "connecting",
-          qrCode: statusQr,
-        }]);
-      } else {
-        setInstances(prev => [...prev, {
-          id: newId,
-          instanceName: data.instanceName || "",
-          label: `WhatsApp #${prev.length + 1}`,
-          status: "connecting",
-          qrCode: qr,
-        }]);
+        newInst.qrCode = statusData?.instance?.qrcode || statusData?.qrcode || null;
       }
+
+      setInstances(prev => [...prev, newInst]);
     } catch (error) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao criar instância", variant: "destructive" });
     } finally {
@@ -336,7 +368,44 @@ const Integrations = () => {
     }
   };
 
+  const handleCreateStevoInstance = async () => {
+    setCreatingNew(true);
+    setShowProviderPicker(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { data: inserted, error } = await supabase.from("integrations").insert({
+        user_id: session.user.id,
+        type: "whatsapp_stevo",
+        config: { label: `Stevo #${instances.filter(i => i.provider === "stevo").length + 1}` },
+        status: "disconnected",
+      }).select().single();
+
+      if (error) throw error;
+
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${inserted.id}`;
+
+      setInstances(prev => [...prev, {
+        id: inserted.id,
+        instanceName: "",
+        label: `Stevo #${prev.filter(i => i.provider === "stevo").length + 1}`,
+        status: "disconnected",
+        provider: "stevo",
+        webhookUrl,
+        lastWebhookAt: null,
+      }]);
+
+      toast({ title: "Instância Stevo criada!", description: "Copie o webhook e cole no Stevo." });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao criar", variant: "destructive" });
+    } finally {
+      setCreatingNew(false);
+    }
+  };
+
   const handleReconnect = async (inst: WhatsAppInstance) => {
+    if (inst.provider !== "uazap") return;
     updateInstance(inst.id, { loading: true });
     try {
       const connectData = await callUazap("connect", { integration_id: inst.id });
@@ -355,6 +424,7 @@ const Integrations = () => {
   };
 
   const handleDisconnect = async (inst: WhatsAppInstance) => {
+    if (inst.provider !== "uazap") return;
     updateInstance(inst.id, { loading: true });
     try {
       await callUazap("disconnect", { integration_id: inst.id });
@@ -367,16 +437,25 @@ const Integrations = () => {
   };
 
   const handleDeleteInstance = async (inst: WhatsAppInstance) => {
-    if (!confirm(`Tem certeza que deseja remover ${inst.label}? A instância será desconectada e removida.`)) return;
+    if (!confirm(`Tem certeza que deseja remover ${inst.label}?`)) return;
     updateInstance(inst.id, { loading: true });
     try {
-      await callUazap("delete", { integration_id: inst.id });
+      if (inst.provider === "uazap") {
+        await callUazap("delete", { integration_id: inst.id });
+      } else {
+        await supabase.from("integrations").delete().eq("id", inst.id);
+      }
       setInstances(prev => prev.filter(i => i.id !== inst.id));
       toast({ title: `${inst.label} removido` });
     } catch (error) {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao remover", variant: "destructive" });
       updateInstance(inst.id, { loading: false });
     }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copiado!", description: "Webhook URL copiado para a área de transferência." });
   };
 
   const toggleField = (id: string) => {
@@ -444,15 +523,35 @@ const Integrations = () => {
               <MessageSquare className="w-5 h-5 text-success" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">WhatsApp (Uazap)</h3>
+              <h3 className="font-semibold text-foreground">WhatsApp</h3>
               <p className="text-sm text-muted-foreground">
                 {instances.length === 0 ? "Nenhum número conectado" : `${instances.length} número${instances.length > 1 ? "s" : ""} configurado${instances.length > 1 ? "s" : ""}`}
               </p>
             </div>
           </div>
-          <Button size="sm" onClick={handleCreateInstance} disabled={creatingNew}>
-            {creatingNew ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Criando...</> : <><Plus className="w-4 h-4 mr-1" /> Adicionar número</>}
-          </Button>
+          <div className="relative">
+            <Button size="sm" onClick={() => setShowProviderPicker(!showProviderPicker)} disabled={creatingNew}>
+              {creatingNew ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Criando...</> : <><Plus className="w-4 h-4 mr-1" /> Adicionar número</>}
+            </Button>
+            {showProviderPicker && (
+              <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-10 w-48">
+                <button
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-t-lg"
+                  onClick={handleCreateUazapInstance}
+                >
+                  <span className="font-medium text-foreground">Uazap</span>
+                  <p className="text-xs text-muted-foreground">Conexão via QR Code</p>
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-b-lg border-t border-border"
+                  onClick={handleCreateStevoInstance}
+                >
+                  <span className="font-medium text-foreground">Stevo</span>
+                  <p className="text-xs text-muted-foreground">Conexão via Webhook</p>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {loadingInstances ? (
@@ -463,9 +562,14 @@ const Integrations = () => {
           <div className="bg-muted rounded-lg p-6 flex flex-col items-center gap-4">
             <Wifi className="w-12 h-12 text-muted-foreground" />
             <p className="text-sm text-muted-foreground text-center">Conecte seu WhatsApp para começar a receber e analisar mensagens automaticamente.</p>
-            <Button onClick={handleCreateInstance} disabled={creatingNew}>
-              {creatingNew ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Criando...</> : <><MessageSquare className="w-4 h-4 mr-2" /> Conectar WhatsApp</>}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleCreateUazapInstance} disabled={creatingNew} variant="outline">
+                Uazap (QR Code)
+              </Button>
+              <Button onClick={handleCreateStevoInstance} disabled={creatingNew} variant="outline">
+                Stevo (Webhook)
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -475,9 +579,17 @@ const Integrations = () => {
                   <div className="flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-success" />
                     <span className="text-sm font-medium text-foreground">{inst.label}</span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                      {inst.provider === "uazap" ? "Uazap" : "Stevo"}
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    {getStatusBadge(inst.status)}
+                    {inst.provider === "uazap" && getStatusBadge(inst.status)}
+                    {inst.provider === "stevo" && (
+                      inst.lastWebhookAt
+                        ? <Badge variant="outline" className="text-success border-success/30"><CheckCircle className="w-3 h-3 mr-1" /> Ativo</Badge>
+                        : <Badge variant="outline" className="text-muted-foreground border-border"><Clock className="w-3 h-3 mr-1" /> Aguardando</Badge>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -490,7 +602,8 @@ const Integrations = () => {
                   </div>
                 </div>
 
-                {inst.status === "connecting" && (
+                {/* Uazap-specific UI */}
+                {inst.provider === "uazap" && inst.status === "connecting" && (
                   <div className="bg-muted rounded-lg p-4 flex flex-col items-center gap-3">
                     {inst.qrCode ? (
                       <>
@@ -514,7 +627,7 @@ const Integrations = () => {
                   </div>
                 )}
 
-                {inst.status === "disconnected" && (
+                {inst.provider === "uazap" && inst.status === "disconnected" && (
                   <div className="bg-muted rounded-lg p-3 flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">Instância desconectada</p>
                     <Button size="sm" variant="outline" onClick={() => handleReconnect(inst)} disabled={inst.loading}>
@@ -524,7 +637,7 @@ const Integrations = () => {
                   </div>
                 )}
 
-                {inst.status === "connected" && (
+                {inst.provider === "uazap" && inst.status === "connected" && (
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleReconnect(inst)} disabled={inst.loading}>
                       <RefreshCw className="w-3 h-3 mr-1" /> Reconectar
@@ -532,6 +645,29 @@ const Integrations = () => {
                     <Button variant="outline" size="sm" onClick={() => handleDisconnect(inst)} disabled={inst.loading}>
                       Desconectar
                     </Button>
+                  </div>
+                )}
+
+                {/* Stevo-specific UI */}
+                {inst.provider === "stevo" && inst.webhookUrl && (
+                  <div className="space-y-3">
+                    <div className="bg-muted rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1.5">Webhook URL — cole no Stevo:</p>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-background border border-border rounded px-2 py-1 flex-1 truncate text-foreground">
+                          {inst.webhookUrl}
+                        </code>
+                        <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => copyToClipboard(inst.webhookUrl!)}>
+                          <Copy className="w-3 h-3 mr-1" /> Copiar
+                        </Button>
+                      </div>
+                    </div>
+                    {inst.lastWebhookAt && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Último webhook recebido: {new Date(inst.lastWebhookAt).toLocaleString("pt-BR")}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
