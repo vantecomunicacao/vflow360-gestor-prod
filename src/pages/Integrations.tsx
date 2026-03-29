@@ -36,20 +36,25 @@ interface GhlPipelineStage {
 }
 
 type WhatsAppStatus = "not_created" | "disconnected" | "connecting" | "connected";
+type WhatsAppProvider = "uazap" | "stevo";
 
 interface WhatsAppInstance {
   id: string;
   instanceName: string;
   label: string;
   status: WhatsAppStatus;
+  provider: WhatsAppProvider;
   qrCode?: string | null;
   loading?: boolean;
+  webhookUrl?: string;
+  lastWebhookAt?: string | null;
 }
 
 const Integrations = () => {
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(true);
   const [creatingNew, setCreatingNew] = useState(false);
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
   const [ghlConnected, setGhlConnected] = useState(false);
   const [ghlLocationName, setGhlLocationName] = useState("");
   const [loadingGhl, setLoadingGhl] = useState(false);
