@@ -94,31 +94,48 @@ serve(async (req) => {
     }
 
     // Try multiple paths for source message data
-    const sourceMsg = payload.SourceWebMsg || payload.sourceWebMsg || payload;
+    const sourceMsg = payload.SourceWebMsg || payload.sourceWebMsg || null;
     const messageData = payload.Message || payload.message || {};
+    const infoData = payload.Info || payload.info || null;
 
-    // Try multiple paths for the key
-    const msgKey = sourceMsg?.key || sourceMsg?.Key || payload?.key || payload?.Key;
-    
-    if (!msgKey) {
-      console.log("Stevo: no key found. sourceMsg keys:", JSON.stringify(Object.keys(sourceMsg || {})));
+    // Determine remoteJID and isFromMe from either SourceWebMsg.key or Info
+    let remoteJID = "";
+    let isFromMe = false;
+
+    if (sourceMsg?.key) {
+      const msgKey = sourceMsg.key;
+      remoteJID = msgKey.remoteJID || msgKey.remoteJid || msgKey.RemoteJID || "";
+      isFromMe = msgKey.fromMe === true || msgKey.FromMe === true;
+    } else if (infoData) {
+      // Alternative Stevo format: Info.Chat contains the JID, Info.IsFromMe
+      remoteJID = infoData.Chat || infoData.chat || "";
+      isFromMe = infoData.IsFromMe === true || infoData.isFromMe === true;
+      console.log("Stevo: using Info path. Chat:", remoteJID, "IsFromMe:", isFromMe);
+    } else {
+      // Last resort: check payload-level key
+      const msgKey = payload?.key || payload?.Key;
+      if (msgKey) {
+        remoteJID = msgKey.remoteJID || msgKey.remoteJid || msgKey.RemoteJID || "";
+        isFromMe = msgKey.fromMe === true || msgKey.FromMe === true;
+      }
+    }
+
+    if (!remoteJID) {
+      console.log("Stevo: no remoteJID found. Keys:", JSON.stringify(Object.keys(payload)));
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const remoteJID = msgKey.remoteJID || msgKey.remoteJid || msgKey.RemoteJID || "";
-    const isFromMe = msgKey.fromMe === true || msgKey.FromMe === true;
 
     // Skip group messages (groups end with @g.us)
-    if (!remoteJID || remoteJID.endsWith("@g.us")) {
-      console.log("Stevo: skipping group or empty remoteJID");
+    if (remoteJID.endsWith("@g.us")) {
+      console.log("Stevo: skipping group message");
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Extract phone/ID - Stevo uses LID format (e.g. 140982486102131@lid) or standard @s.whatsapp.net
+    // Extract phone/ID - Stevo uses LID format or standard @s.whatsapp.net
     const phone = remoteJID.replace("@s.whatsapp.net", "").replace("@lid", "").replace("@g.us", "");
 
     // Extract message content
