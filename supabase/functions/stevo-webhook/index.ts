@@ -130,6 +130,7 @@ serve(async (req) => {
       messageData?.extendedTextMessage?.text ||
       sourceMsg?.message?.conversation ||
       sourceMsg?.message?.extendedTextMessage?.text ||
+      messageData?.messageContextInfo?.quotedMessage?.conversation ||
       "";
 
     // Handle media messages
@@ -166,7 +167,7 @@ serve(async (req) => {
     }
 
     // Use pushName or phone as contact name
-    const contactName = sourceMsg.pushName || payload.senderName || phone;
+    const contactName = sourceMsg?.pushName || sourceMsg?.PushName || payload.senderName || payload.pushName || phone;
 
     console.log("Stevo processing:", { phone, contactName, isFromMe, content: content.slice(0, 80) });
 
@@ -176,13 +177,14 @@ serve(async (req) => {
       .select("id, unread_count")
       .eq("user_id", userId)
       .eq("contact_phone", phone)
-      .single();
+      .maybeSingle();
 
     const displayMessage = content.length > 100 ? content.slice(0, 100) + "..." : content;
 
     // Use messageTimestamp if available
-    const msgTimestamp = sourceMsg.messageTimestamp
-      ? new Date(sourceMsg.messageTimestamp * 1000).toISOString()
+    const rawTs = sourceMsg?.messageTimestamp || payload?.messageTimestamp;
+    const msgTimestamp = rawTs
+      ? new Date(Number(rawTs) * 1000).toISOString()
       : new Date().toISOString();
 
     if (!conversation) {
