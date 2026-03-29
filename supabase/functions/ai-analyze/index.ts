@@ -460,6 +460,7 @@ REGRAS OBRIGATÓRIAS:
             contact_name: conversation?.contact_name || null,
             contact_phone: conversation?.contact_phone || null,
           },
+          ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o"}` : `lovable/${aiModel}`,
         })
         .select()
         .single();

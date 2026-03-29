@@ -27,6 +27,7 @@ interface Suggestion {
   };
   created_at: string;
   conversation_id: string | null;
+  ai_provider: string | null;
 }
 
 interface ContactGroup {
