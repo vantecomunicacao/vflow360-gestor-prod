@@ -232,27 +232,57 @@ const Integrations = () => {
     }
   }, [callGhl]);
 
-  // Fetch all WhatsApp instances on mount
+  // Fetch all WhatsApp instances on mount (Uazap + Stevo)
   useEffect(() => {
     const checkStatus = async () => {
       setLoadingInstances(true);
+      const allInstances: WhatsAppInstance[] = [];
+
+      // Fetch Uazap instances
       try {
         const data = await callUazap("status");
         if (data?.instances && data.instances.length > 0) {
-          setInstances(data.instances.map((inst: any) => ({
-            id: inst.id,
-            instanceName: inst.instanceName || "",
-            label: inst.label || inst.instanceName || "WhatsApp",
-            status: inst.status as WhatsAppStatus,
-          })));
-        } else {
-          setInstances([]);
+          for (const inst of data.instances) {
+            allInstances.push({
+              id: inst.id,
+              instanceName: inst.instanceName || "",
+              label: inst.label || inst.instanceName || "WhatsApp",
+              status: inst.status as WhatsAppStatus,
+              provider: "uazap",
+            });
+          }
         }
-      } catch {
-        setInstances([]);
-      } finally {
-        setLoadingInstances(false);
-      }
+      } catch { /* silent */ }
+
+      // Fetch Stevo instances from DB
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: stevoIntegrations } = await supabase
+            .from("integrations")
+            .select("*")
+            .eq("type", "whatsapp_stevo")
+            .order("created_at", { ascending: true });
+
+          if (stevoIntegrations) {
+            for (const int of stevoIntegrations) {
+              const config = int.config as { label?: string; last_webhook_at?: string } || {};
+              allInstances.push({
+                id: int.id,
+                instanceName: "",
+                label: config.label || "Stevo",
+                status: (int.status as WhatsAppStatus) || "disconnected",
+                provider: "stevo",
+                webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${int.id}`,
+                lastWebhookAt: config.last_webhook_at || null,
+              });
+            }
+          }
+        }
+      } catch { /* silent */ }
+
+      setInstances(allInstances);
+      setLoadingInstances(false);
 
       try {
         const data = await callGhl("status");
