@@ -1,0 +1,1 @@
+ALTER TABLE public.suggestions ADD COLUMN ai_provider text DEFAULT null;
