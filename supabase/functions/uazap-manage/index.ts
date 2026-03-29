@@ -22,14 +22,12 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Verify user auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization header");
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const token = authHeader.replace("Bearer ", "");
-    
-    // Create a client with the user's token to verify identity
+
     const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
@@ -37,28 +35,35 @@ serve(async (req) => {
     if (authError || !user) throw new Error("Unauthorized");
 
     const BASE_URL = `https://${UAZAP_SUBDOMAIN}.uazapi.com`;
-    const { action, instanceName } = await req.json();
+    const { action, instanceName, integration_id, label } = await req.json();
+
+    // Helper to get integration by ID or fallback to first whatsapp
+    async function getIntegration(id?: string) {
+      if (id) {
+        const { data } = await supabase
+          .from("integrations")
+          .select("*")
+          .eq("id", id)
+          .eq("user_id", user!.id)
+          .eq("type", "whatsapp")
+          .single();
+        return data;
+      }
+      // Fallback: get first (for backward compat)
+      const { data } = await supabase
+        .from("integrations")
+        .select("*")
+        .eq("user_id", user!.id)
+        .eq("type", "whatsapp")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .single();
+      return data;
+    }
 
     switch (action) {
       case "create": {
-        // Check if user already has an instance
-        const { data: existingIntegration } = await supabase
-          .from("integrations")
-          .select("config, status")
-          .eq("user_id", user.id)
-          .eq("type", "whatsapp")
-          .single();
-
-        if (existingIntegration) {
-          const existingConfig = existingIntegration.config as { token?: string; instanceName?: string };
-          if (existingConfig?.token) {
-            return new Response(JSON.stringify({ success: true, data: { message: "Instance already exists", instanceName: existingConfig.instanceName } }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-        }
-
-        const name = instanceName || `copiloto-${user.id.slice(0, 8)}`;
+        const name = instanceName || `copiloto-${user.id.slice(0, 8)}-${Date.now().toString(36)}`;
         const response = await fetch(`${BASE_URL}/instance/create`, {
           method: "POST",
           headers: {
@@ -72,38 +77,35 @@ serve(async (req) => {
           throw new Error(`Uazap create failed [${response.status}]: ${JSON.stringify(data)}`);
         }
 
-        await supabase.from("integrations").upsert(
-          {
-            user_id: user.id,
-            type: "whatsapp",
-            config: { instanceName: name, token: data.token || data.instance?.token, instanceId: data.instance?.id || data.id },
-            status: "disconnected",
+        const { data: inserted, error: insertErr } = await supabase.from("integrations").insert({
+          user_id: user.id,
+          type: "whatsapp",
+          config: {
+            instanceName: name,
+            token: data.token || data.instance?.token,
+            instanceId: data.instance?.id || data.id,
+            label: label || `WhatsApp ${name.slice(-4)}`,
           },
-          { onConflict: "user_id,type" }
-        );
+          status: "disconnected",
+        }).select().single();
 
-        return new Response(JSON.stringify({ success: true, data }), {
+        if (insertErr) throw new Error(`Failed to save integration: ${insertErr.message}`);
+
+        return new Response(JSON.stringify({ success: true, data: { ...data, integration_id: inserted.id } }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       case "connect": {
-        // Get the user's integration to find their instance token
-        const { data: integration } = await supabase
-          .from("integrations")
-          .select("config")
-          .eq("user_id", user.id)
-          .eq("type", "whatsapp")
-          .single();
-
+        const integration = await getIntegration(integration_id);
         if (!integration) throw new Error("No WhatsApp instance found. Create one first.");
 
-        const config = integration.config as { token?: string; instanceName?: string };
+        const config = integration.config as { token?: string };
         if (!config.token) throw new Error("Instance token not found");
 
         const response = await fetch(`${BASE_URL}/instance/connect`, {
           method: "POST",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
             token: config.token,
           },
@@ -119,58 +121,98 @@ serve(async (req) => {
       }
 
       case "qrcode":
-      // Fallback: use status endpoint to get QR code
-
       case "status": {
-        const { data: integration } = await supabase
+        // If integration_id provided, get that specific one
+        if (integration_id) {
+          const integration = await getIntegration(integration_id);
+          if (!integration) {
+            return new Response(JSON.stringify({ success: true, data: { status: "not_created" } }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          const config = integration.config as { token?: string };
+          if (!config.token) {
+            return new Response(JSON.stringify({ success: true, data: { status: "not_created" } }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          const response = await fetch(`${BASE_URL}/instance/status`, {
+            method: "GET",
+            headers: { token: config.token },
+          });
+          const data = await response.json();
+
+          const newStatus = data.status === "connected" ? "connected" : "disconnected";
+          if (newStatus !== integration.status) {
+            await supabase.from("integrations").update({ status: newStatus }).eq("id", integration.id);
+          }
+
+          return new Response(JSON.stringify({ success: true, data }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // List all WhatsApp instances for this user
+        const { data: allIntegrations } = await supabase
           .from("integrations")
-          .select("config, status")
+          .select("*")
           .eq("user_id", user.id)
           .eq("type", "whatsapp")
-          .single();
+          .order("created_at", { ascending: true });
 
-        if (!integration) {
-          return new Response(JSON.stringify({ success: true, data: { status: "not_created" } }), {
+        if (!allIntegrations || allIntegrations.length === 0) {
+          return new Response(JSON.stringify({ success: true, data: { status: "not_created", instances: [] } }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        const config = integration.config as { token?: string };
-        if (!config.token) {
-          return new Response(JSON.stringify({ success: true, data: { status: "not_created" } }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        // Check status for each instance
+        const instances = [];
+        for (const int of allIntegrations) {
+          const config = int.config as { token?: string; instanceName?: string; label?: string };
+          let instanceStatus = int.status || "disconnected";
+
+          if (config.token) {
+            try {
+              const resp = await fetch(`${BASE_URL}/instance/status`, {
+                method: "GET",
+                headers: { token: config.token },
+              });
+              const statusData = await resp.json();
+              instanceStatus = statusData.status === "connected" ? "connected" : "disconnected";
+              if (instanceStatus !== int.status) {
+                await supabase.from("integrations").update({ status: instanceStatus }).eq("id", int.id);
+              }
+            } catch {
+              // keep existing status
+            }
+          }
+
+          instances.push({
+            id: int.id,
+            instanceName: config.instanceName,
+            label: config.label || config.instanceName || "WhatsApp",
+            status: instanceStatus,
           });
         }
 
-        const response = await fetch(`${BASE_URL}/instance/status`, {
-          method: "GET",
-          headers: { token: config.token },
-        });
-        const data = await response.json();
-
-        // Update status in DB
-        const newStatus = data.status === "connected" ? "connected" : "disconnected";
-        if (newStatus !== integration.status) {
-          await supabase
-            .from("integrations")
-            .update({ status: newStatus })
-            .eq("user_id", user.id)
-            .eq("type", "whatsapp");
-        }
-
-        return new Response(JSON.stringify({ success: true, data }), {
+        // For backward compat, also return top-level status
+        const anyConnected = instances.some(i => i.status === "connected");
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            status: instances.length === 0 ? "not_created" : anyConnected ? "connected" : "disconnected",
+            instances,
+          },
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       case "disconnect": {
-        const { data: integration } = await supabase
-          .from("integrations")
-          .select("config")
-          .eq("user_id", user.id)
-          .eq("type", "whatsapp")
-          .single();
-
+        const integration = await getIntegration(integration_id);
         if (!integration) throw new Error("No WhatsApp instance found.");
         const config = integration.config as { token?: string };
         if (!config.token) throw new Error("Instance token not found");
@@ -181,13 +223,46 @@ serve(async (req) => {
         });
         const data = await response.json();
 
-        await supabase
-          .from("integrations")
-          .update({ status: "disconnected" })
-          .eq("user_id", user.id)
-          .eq("type", "whatsapp");
+        await supabase.from("integrations").update({ status: "disconnected" }).eq("id", integration.id);
 
         return new Response(JSON.stringify({ success: true, data }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "delete": {
+        const integration = await getIntegration(integration_id);
+        if (!integration) throw new Error("No WhatsApp instance found.");
+        const config = integration.config as { token?: string };
+
+        // Try to disconnect first
+        if (config.token) {
+          try {
+            await fetch(`${BASE_URL}/instance/disconnect`, {
+              method: "POST",
+              headers: { token: config.token },
+            });
+          } catch { /* ignore */ }
+        }
+
+        await supabase.from("integrations").delete().eq("id", integration.id);
+
+        return new Response(JSON.stringify({ success: true, data: { deleted: true } }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "update_label": {
+        if (!integration_id || !label) throw new Error("integration_id and label are required");
+        const integration = await getIntegration(integration_id);
+        if (!integration) throw new Error("No WhatsApp instance found.");
+
+        const config = integration.config as Record<string, unknown>;
+        await supabase.from("integrations").update({
+          config: { ...config, label },
+        }).eq("id", integration.id);
+
+        return new Response(JSON.stringify({ success: true, data: { updated: true } }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

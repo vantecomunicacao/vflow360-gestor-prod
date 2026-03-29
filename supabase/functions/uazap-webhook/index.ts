@@ -415,7 +415,7 @@ serve(async (req) => {
 
     const { data: integrations } = await supabase
       .from("integrations")
-      .select("user_id, config")
+      .select("id, user_id, config")
       .eq("type", "whatsapp");
 
     const integration = integrations?.find((i) => {
@@ -442,8 +442,7 @@ serve(async (req) => {
         await supabase
           .from("integrations")
           .update({ status: status === "connected" ? "connected" : "disconnected" })
-          .eq("user_id", userId)
-          .eq("type", "whatsapp");
+          .eq("id", integration.id);
       }
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
