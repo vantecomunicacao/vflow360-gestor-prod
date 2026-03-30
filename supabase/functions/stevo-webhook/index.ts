@@ -7,6 +7,228 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+// Download media via Stevo API
+async function downloadMediaViaStevo(
+  serverUrl: string,
+  instanceToken: string,
+  messageObj: Record<string, unknown>,
+): Promise<{ base64: string; mimetype: string } | null> {
+  try {
+    if (!serverUrl || !instanceToken || !messageObj) {
+      console.log("Stevo download: missing params");
+      return null;
+    }
+
+    const apiUrl = `${serverUrl}/message/downloadimage`;
+    console.log("Downloading media via Stevo API:", apiUrl);
+
+    const resp = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: instanceToken,
+      },
+      body: JSON.stringify({ message: messageObj }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("Stevo download error:", resp.status, errText.slice(0, 300));
+      return null;
+    }
+
+    const contentType = resp.headers.get("content-type") || "";
+
+    // If JSON response with base64
+    if (contentType.includes("application/json")) {
+      const data = await resp.json();
+      const base64 = data.base64 || data.data || data.file || "";
+      const mime = data.mimetype || data.mimeType || data.contentType || "";
+      if (base64 && base64.length > 100) {
+        console.log("Stevo download success (json):", { mime, len: base64.length });
+        return { base64, mimetype: mime };
+      }
+      // If it returned a URL instead
+      if (data.url || data.fileURL) {
+        const fileUrl = data.url || data.fileURL;
+        try {
+          const fileResp = await fetch(fileUrl);
+          if (fileResp.ok) {
+            const buffer = await fileResp.arrayBuffer();
+            const b64 = arrayBufferToBase64(buffer);
+            const m = fileResp.headers.get("content-type") || mime;
+            console.log("Stevo download success (url):", { m, len: b64.length });
+            return { base64: b64, mimetype: m };
+          }
+        } catch (e) {
+          console.error("Stevo file URL fetch failed:", e);
+        }
+      }
+      console.log("Stevo download: no usable data in JSON response, keys:", Object.keys(data));
+      return null;
+    }
+
+    // Binary response - convert to base64
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength > 100) {
+      const b64 = arrayBufferToBase64(buffer);
+      console.log("Stevo download success (binary):", { contentType, len: b64.length });
+      return { base64: b64, mimetype: contentType };
+    }
+
+    console.log("Stevo download: empty binary response");
+    return null;
+  } catch (e) {
+    console.error("Stevo download failed:", e);
+    return null;
+  }
+}
+
+// Transcribe audio using AI
+async function transcribeAudio(
+  base64Audio: string,
+  apiKey: string,
+  mimetype: string,
+  endpoint: string,
+  model: string,
+): Promise<string> {
+  try {
+    if (!base64Audio || base64Audio.length < 100) {
+      return "[🎵 Áudio recebido]";
+    }
+
+    const contentType = mimetype || "audio/ogg";
+    const isOpenAI = endpoint.includes("api.openai.com");
+
+    const messages: unknown[] = isOpenAI
+      ? [{ role: "user", content: "Este áudio foi recebido pelo WhatsApp. Infelizmente não é possível processar áudio diretamente. Retorne '[🎵 Áudio recebido]'." }]
+      : [{
+          role: "user",
+          content: [
+            { type: "text", text: "Transcreva este áudio em português. Retorne APENAS o texto transcrito, sem explicações adicionais. Se não conseguir entender, diga '[Áudio inaudível]'." },
+            {
+              type: "input_audio",
+              input_audio: {
+                data: base64Audio,
+                format: contentType.includes("ogg") ? "ogg" : contentType.includes("mp4") || contentType.includes("m4a") ? "m4a" : "mp3",
+              },
+            },
+          ],
+        }];
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages }),
+    });
+
+    if (!response.ok) {
+      console.error("AI transcription error:", response.status, await response.text());
+      return "[🎵 Áudio recebido]";
+    }
+
+    const data = await response.json();
+    const transcription = data.choices?.[0]?.message?.content?.trim();
+    return transcription && transcription !== "[Áudio inaudível]"
+      ? `🎵 [Áudio]: ${transcription}`
+      : "[🎵 Áudio recebido]";
+  } catch (e) {
+    console.error("Audio transcription failed:", e);
+    return "[🎵 Áudio recebido]";
+  }
+}
+
+// Describe image using AI
+async function describeImage(
+  base64Image: string,
+  apiKey: string,
+  mimetype: string,
+  endpoint: string,
+  model: string,
+): Promise<string> {
+  try {
+    if (!base64Image || base64Image.length < 100) {
+      return "[📷 Imagem recebida]";
+    }
+
+    const contentType = mimetype || "image/jpeg";
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "Descreva esta imagem de forma objetiva e concisa em português. Se houver texto na imagem, transcreva-o. Se for um documento, descreva o conteúdo. Se for um print de tela, descreva o que aparece. Retorne APENAS a descrição." },
+            { type: "image_url", image_url: { url: `data:${contentType};base64,${base64Image}` } },
+          ],
+        }],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("AI image description error:", response.status, await response.text());
+      return "[📷 Imagem recebida]";
+    }
+
+    const data = await response.json();
+    const description = data.choices?.[0]?.message?.content?.trim();
+    return description ? `📷 [Imagem]: ${description}` : "[📷 Imagem recebida]";
+  } catch (e) {
+    console.error("Image description failed:", e);
+    return "[📷 Imagem recebida]";
+  }
+}
+
+// Detect media type from Stevo Message object
+function detectStevoMedia(messageData: Record<string, unknown>): { type: string; mimetype: string } | null {
+  if (!messageData) return null;
+  if (messageData.imageMessage) {
+    const img = messageData.imageMessage as Record<string, unknown>;
+    return { type: "image", mimetype: (img.mimetype as string) || "image/jpeg" };
+  }
+  if (messageData.audioMessage || messageData.pttMessage) {
+    const audio = (messageData.audioMessage || messageData.pttMessage) as Record<string, unknown>;
+    return { type: "audio", mimetype: (audio.mimetype as string) || "audio/ogg" };
+  }
+  if (messageData.videoMessage) return { type: "video", mimetype: "video/mp4" };
+  if (messageData.documentMessage) return { type: "document", mimetype: "application/octet-stream" };
+  if (messageData.stickerMessage) return { type: "sticker", mimetype: "image/webp" };
+  if (messageData.contactMessage || messageData.contactsArrayMessage) return { type: "contact", mimetype: "" };
+  if (messageData.locationMessage || messageData.liveLocationMessage) return { type: "location", mimetype: "" };
+  return null;
+}
+
+// Parse safe timestamp
+function parseSafeTimestamp(rawTs: unknown): string {
+  try {
+    if (!rawTs) return new Date().toISOString();
+    const asNum = Number(rawTs);
+    if (!isNaN(asNum) && asNum > 1000000000 && asNum < 9999999999) {
+      return new Date(asNum * 1000).toISOString();
+    }
+    if (!isNaN(asNum) && asNum > 1000000000000) {
+      return new Date(asNum).toISOString();
+    }
+    const d = new Date(String(rawTs));
+    return isNaN(d.getTime()) || d.getFullYear() < 2000 ? new Date().toISOString() : d.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -22,13 +244,11 @@ serve(async (req) => {
     const integrationId = url.searchParams.get("id");
 
     if (!integrationId) {
-      console.log("No integration ID in webhook URL");
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Find the integration
     const { data: integration } = await supabase
       .from("integrations")
       .select("id, user_id, config")
@@ -45,23 +265,13 @@ serve(async (req) => {
 
     const userId = integration.user_id;
 
-    // Update last_webhook_at in config
-    const config = (integration.config as Record<string, unknown>) || {};
-    await supabase
-      .from("integrations")
-      .update({
-        config: { ...config, last_webhook_at: new Date().toISOString() },
-        status: "connected",
-      })
-      .eq("id", integration.id);
-
     let payload = await req.json();
-    
-    // Handle array wrapper - some webhook systems wrap in array
+
+    // Handle array wrapper
     if (Array.isArray(payload)) {
       payload = payload[0] || {};
     }
-    
+
     // Handle nested data wrapper
     if (payload.data && typeof payload.data === "object" && !payload.SourceWebMsg) {
       const inner = payload.data;
@@ -69,23 +279,29 @@ serve(async (req) => {
         payload = { ...inner, event: payload.event || inner.event, instanceName: payload.instanceName || inner.instanceName };
       }
     }
-    
-    console.log("Stevo webhook payload keys:", JSON.stringify(Object.keys(payload)));
+
+    // Save serverUrl and instanceToken from payload into config for future API calls
+    const config = (integration.config as Record<string, unknown>) || {};
+    const serverUrl = (payload.serverUrl as string) || (config.serverUrl as string) || "";
+    const instanceToken = (payload.instanceToken as string) || (config.instanceToken as string) || "";
+
+    await supabase
+      .from("integrations")
+      .update({
+        config: {
+          ...config,
+          last_webhook_at: new Date().toISOString(),
+          serverUrl: serverUrl || config.serverUrl,
+          instanceToken: instanceToken || config.instanceToken,
+        },
+        status: "connected",
+      })
+      .eq("id", integration.id);
+
     console.log("Stevo webhook event:", payload.event, "instance:", payload.instanceName);
-    
-    // Log SourceWebMsg structure for debugging
-    if (payload.SourceWebMsg) {
-      console.log("SourceWebMsg keys:", JSON.stringify(Object.keys(payload.SourceWebMsg)));
-      if (payload.SourceWebMsg.key) {
-        console.log("SourceWebMsg.key:", JSON.stringify(payload.SourceWebMsg.key));
-      }
-    } else {
-      console.log("No SourceWebMsg, full payload sample:", JSON.stringify(payload).slice(0, 500));
-    }
 
     const event = payload.event;
 
-    // Only handle Message events
     if (event !== "Message") {
       console.log("Stevo: unhandled event:", event);
       return new Response(JSON.stringify({ ok: true }), {
@@ -93,12 +309,11 @@ serve(async (req) => {
       });
     }
 
-    // Try multiple paths for source message data
     const sourceMsg = payload.SourceWebMsg || payload.sourceWebMsg || null;
-    const messageData = payload.Message || payload.message || {};
+    const messageData = (payload.Message || payload.message || {}) as Record<string, unknown>;
     const infoData = payload.Info || payload.info || null;
 
-    // Determine remoteJID and isFromMe from either SourceWebMsg.key or Info
+    // Determine remoteJID and isFromMe
     let remoteJID = "";
     let isFromMe = false;
 
@@ -107,12 +322,9 @@ serve(async (req) => {
       remoteJID = msgKey.remoteJID || msgKey.remoteJid || msgKey.RemoteJID || "";
       isFromMe = msgKey.fromMe === true || msgKey.FromMe === true;
     } else if (infoData) {
-      // Alternative Stevo format: Info.Chat contains the JID, Info.IsFromMe
       remoteJID = infoData.Chat || infoData.chat || "";
       isFromMe = infoData.IsFromMe === true || infoData.isFromMe === true;
-      console.log("Stevo: using Info path. Chat:", remoteJID, "IsFromMe:", isFromMe);
     } else {
-      // Last resort: check payload-level key
       const msgKey = payload?.key || payload?.Key;
       if (msgKey) {
         remoteJID = msgKey.remoteJID || msgKey.remoteJid || msgKey.RemoteJID || "";
@@ -121,132 +333,156 @@ serve(async (req) => {
     }
 
     if (!remoteJID) {
-      console.log("Stevo: no remoteJID found. Keys:", JSON.stringify(Object.keys(payload)));
+      console.log("Stevo: no remoteJID found");
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Skip group messages (groups end with @g.us)
     if (remoteJID.endsWith("@g.us")) {
-      console.log("Stevo: skipping group message");
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Extract phone/ID - Stevo uses LID format or standard @s.whatsapp.net
     const phone = remoteJID.replace("@s.whatsapp.net", "").replace("@lid", "").replace("@g.us", "");
 
-    // Extract message content
+    // Extract contact name ONLY from inbound messages (pushName = lead's name)
+    // For outbound, pushName would be the owner's name, so we skip it
+    let inboundContactName = "";
+    if (!isFromMe) {
+      inboundContactName =
+        sourceMsg?.pushName || sourceMsg?.PushName ||
+        infoData?.PushName || infoData?.pushName ||
+        payload.senderName || payload.pushName || "";
+    }
+
+    // Detect media
+    const media = detectStevoMedia(messageData);
     let content = "";
 
-    // Try various paths for the text content
-    content =
-      messageData?.conversation ||
-      messageData?.extendedTextMessage?.text ||
-      sourceMsg?.message?.conversation ||
-      sourceMsg?.message?.extendedTextMessage?.text ||
-      messageData?.messageContextInfo?.quotedMessage?.conversation ||
-      "";
+    if (media) {
+      console.log("Stevo media detected:", media.type, media.mimetype);
 
-    // Handle media messages
-    if (!content) {
-      const msg = sourceMsg?.message || messageData || {};
-      if (msg.imageMessage) {
-        content = msg.imageMessage.caption
-          ? `📷 [Imagem]: ${msg.imageMessage.caption}`
-          : "[📷 Imagem recebida]";
-      } else if (msg.audioMessage || msg.pttMessage) {
+      // Get AI config
+      let aiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
+      let aiKey = LOVABLE_API_KEY;
+      let aiModel = "google/gemini-2.5-flash";
+
+      try {
+        const { data: providerCfg } = await supabase
+          .from("ai_provider_config")
+          .select("provider, api_key, model")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (providerCfg?.provider === "openai" && providerCfg?.api_key) {
+          aiEndpoint = "https://api.openai.com/v1/chat/completions";
+          aiKey = providerCfg.api_key;
+          aiModel = providerCfg.model || "gpt-4o";
+        }
+      } catch { /* use defaults */ }
+
+      if ((media.type === "audio" || media.type === "image") && serverUrl && instanceToken && aiKey) {
+        // Download media via Stevo API
+        const downloaded = await downloadMediaViaStevo(serverUrl, instanceToken, messageData);
+        if (downloaded && downloaded.base64.length > 100) {
+          if (media.type === "audio") {
+            content = await transcribeAudio(downloaded.base64, aiKey, downloaded.mimetype || media.mimetype, aiEndpoint, aiModel);
+          } else {
+            content = await describeImage(downloaded.base64, aiKey, downloaded.mimetype || media.mimetype, aiEndpoint, aiModel);
+          }
+        } else {
+          content = media.type === "audio" ? "[🎵 Áudio recebido]" : "[📷 Imagem recebida]";
+        }
+      } else if (media.type === "audio") {
         content = "[🎵 Áudio recebido]";
-      } else if (msg.videoMessage) {
-        content = msg.videoMessage.caption
-          ? `🎬 [Vídeo]: ${msg.videoMessage.caption}`
-          : "[Enviado uma mídia não suportada]";
-      } else if (msg.documentMessage) {
-        content = msg.documentMessage.fileName
-          ? `📎 [Documento]: ${msg.documentMessage.fileName}`
-          : "[Enviado uma mídia não suportada]";
-      } else if (msg.stickerMessage) {
+      } else if (media.type === "image") {
+        const img = messageData.imageMessage as Record<string, unknown> | undefined;
+        content = img?.caption ? `📷 [Imagem]: ${img.caption}` : "[📷 Imagem recebida]";
+      } else if (media.type === "video") {
+        const vid = messageData.videoMessage as Record<string, unknown> | undefined;
+        content = vid?.caption ? `🎬 [Vídeo]: ${vid.caption}` : "[Enviado uma mídia não suportada]";
+      } else if (media.type === "document") {
+        const doc = messageData.documentMessage as Record<string, unknown> | undefined;
+        content = doc?.fileName ? `📎 [Documento]: ${doc.fileName}` : "[Enviado uma mídia não suportada]";
+      } else if (media.type === "sticker") {
         content = "[🎨 Figurinha recebida]";
-      } else if (msg.contactMessage || msg.contactsArrayMessage) {
+      } else if (media.type === "contact") {
         content = "[📇 Contato compartilhado]";
-      } else if (msg.locationMessage || msg.liveLocationMessage) {
+      } else if (media.type === "location") {
         content = "[📍 Localização compartilhada]";
+      } else {
+        content = "[Enviado uma mídia não suportada]";
       }
     }
 
+    // Extract text content if no media
     if (!content) {
-      console.log("Stevo: no content extracted from message");
+      content =
+        (messageData?.conversation as string) ||
+        (messageData?.extendedTextMessage as Record<string, unknown>)?.text as string ||
+        sourceMsg?.message?.conversation ||
+        sourceMsg?.message?.extendedTextMessage?.text ||
+        "";
+    }
+
+    if (!content) {
+      console.log("Stevo: no content extracted");
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Use pushName or phone as contact name
-    const contactName = sourceMsg?.pushName || sourceMsg?.PushName || infoData?.PushName || infoData?.pushName || payload.senderName || payload.pushName || phone;
+    const msgTimestamp = parseSafeTimestamp(
+      sourceMsg?.messageTimestamp || infoData?.Timestamp || payload?.messageTimestamp,
+    );
 
-    console.log("Stevo processing:", { phone, contactName, isFromMe, content: content.slice(0, 80) });
+    console.log("Stevo processing:", { phone, inboundContactName, isFromMe, content: content.slice(0, 80) });
 
     // Find or create conversation
     let { data: conversation } = await supabase
       .from("conversations")
-      .select("id, unread_count")
+      .select("id, unread_count, contact_name")
       .eq("user_id", userId)
       .eq("contact_phone", phone)
       .maybeSingle();
 
     const displayMessage = content.length > 100 ? content.slice(0, 100) + "..." : content;
 
-    // Use messageTimestamp if available, with safe fallback
-    let msgTimestamp: string;
-    try {
-      const rawTs = sourceMsg?.messageTimestamp || infoData?.Timestamp || payload?.messageTimestamp;
-      if (rawTs) {
-        // Try as unix timestamp first (number or numeric string)
-        const asNum = Number(rawTs);
-        if (!isNaN(asNum) && asNum > 1000000000 && asNum < 9999999999) {
-          msgTimestamp = new Date(asNum * 1000).toISOString();
-        } else if (!isNaN(asNum) && asNum > 1000000000000) {
-          msgTimestamp = new Date(asNum).toISOString();
-        } else {
-          // Try as ISO string
-          const d = new Date(String(rawTs));
-          msgTimestamp = isNaN(d.getTime()) || d.getFullYear() < 2000 ? new Date().toISOString() : d.toISOString();
-        }
-      } else {
-        msgTimestamp = new Date().toISOString();
-      }
-    } catch {
-      msgTimestamp = new Date().toISOString();
-    }
+    // Determine the contact name to use:
+    // - For new conversations: use inbound name or phone
+    // - For updates: only change name if we have a valid inbound name
+    const effectiveContactName = inboundContactName || phone;
 
     if (!conversation) {
       const { data: newConv } = await supabase
         .from("conversations")
         .insert({
           user_id: userId,
-          contact_name: contactName,
+          contact_name: effectiveContactName,
           contact_phone: phone,
           last_message: displayMessage,
           last_message_at: msgTimestamp,
           unread_count: isFromMe ? 0 : 1,
           integration_type: "stevo",
         })
-        .select("id, unread_count")
+        .select("id, unread_count, contact_name")
         .single();
       conversation = newConv;
     } else {
-      await supabase
-        .from("conversations")
-        .update({
-          last_message: displayMessage,
-          last_message_at: msgTimestamp,
-          contact_name: contactName,
-          unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
-          integration_type: "stevo",
-        })
-        .eq("id", conversation.id);
+      // Only update contact_name if we have a valid inbound name
+      const updateData: Record<string, unknown> = {
+        last_message: displayMessage,
+        last_message_at: msgTimestamp,
+        unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
+        integration_type: "stevo",
+      };
+
+      if (inboundContactName) {
+        updateData.contact_name = inboundContactName;
+      }
+
+      await supabase.from("conversations").update(updateData).eq("id", conversation.id);
     }
 
     if (conversation) {
@@ -257,7 +493,6 @@ serve(async (req) => {
         created_at: msgTimestamp,
       });
 
-      // Trigger AI analysis for inbound messages (fire-and-forget)
       if (!isFromMe) {
         fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
           method: "POST",
