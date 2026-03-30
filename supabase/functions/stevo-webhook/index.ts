@@ -198,11 +198,28 @@ serve(async (req) => {
 
     const displayMessage = content.length > 100 ? content.slice(0, 100) + "..." : content;
 
-    // Use messageTimestamp if available
-    const rawTs = sourceMsg?.messageTimestamp || infoData?.Timestamp || payload?.messageTimestamp;
-    const msgTimestamp = rawTs
-      ? new Date(Number(rawTs) * 1000).toISOString()
-      : new Date().toISOString();
+    // Use messageTimestamp if available, with safe fallback
+    let msgTimestamp: string;
+    try {
+      const rawTs = sourceMsg?.messageTimestamp || infoData?.Timestamp || payload?.messageTimestamp;
+      if (rawTs) {
+        // Try as unix timestamp first (number or numeric string)
+        const asNum = Number(rawTs);
+        if (!isNaN(asNum) && asNum > 1000000000 && asNum < 9999999999) {
+          msgTimestamp = new Date(asNum * 1000).toISOString();
+        } else if (!isNaN(asNum) && asNum > 1000000000000) {
+          msgTimestamp = new Date(asNum).toISOString();
+        } else {
+          // Try as ISO string
+          const d = new Date(String(rawTs));
+          msgTimestamp = isNaN(d.getTime()) || d.getFullYear() < 2000 ? new Date().toISOString() : d.toISOString();
+        }
+      } else {
+        msgTimestamp = new Date().toISOString();
+      }
+    } catch {
+      msgTimestamp = new Date().toISOString();
+    }
 
     if (!conversation) {
       const { data: newConv } = await supabase
