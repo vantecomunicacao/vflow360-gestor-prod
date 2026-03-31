@@ -7,6 +7,40 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+type ExtractedMedia = {
+  url?: string;
+  base64?: string;
+  mimetype?: string;
+};
+
+function toText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanBase64(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const dataUrlMatch = trimmed.match(/^data:([^;]+);base64,(.+)$/s);
+  if (dataUrlMatch) {
+    return dataUrlMatch[2].replace(/\s/g, "");
+  }
+
+  const normalized = trimmed.replace(/\s/g, "");
+  if (normalized.length < 120) return "";
+  return /^[A-Za-z0-9+/=]+$/.test(normalized) ? normalized : "";
+}
+
+function extractDataUrl(value: string): ExtractedMedia {
+  const match = value.trim().match(/^data:([^;]+);base64,(.+)$/s);
+  if (!match) return {};
+
+  return {
+    mimetype: match[1],
+    base64: match[2].replace(/\s/g, ""),
+  };
+}
+
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
@@ -17,11 +51,136 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+function mergeMedia(primary: ExtractedMedia, fallback: ExtractedMedia): ExtractedMedia {
+  return {
+    url: primary.url || fallback.url,
+    base64: primary.base64 || fallback.base64,
+    mimetype: primary.mimetype || fallback.mimetype,
+  };
+}
+
+function normalizeMimeType(value: string, mediaType: string): string {
+  const normalized = toText(value).split(";")[0].toLowerCase();
+  if (normalized && normalized !== "application/octet-stream") return normalized;
+  if (mediaType === "image") return "image/jpeg";
+  if (mediaType === "audio") return "audio/ogg";
+  if (mediaType === "video") return "video/mp4";
+  return "application/octet-stream";
+}
+
+function normalizeMediaUrl(rawUrl: string): string {
+  const value = toText(rawUrl);
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("//")) return `https:${value}`;
+  if (value.startsWith("/")) return `https://mmg.whatsapp.net${value}`;
+  return "";
+}
+
+function extractMediaData(input: unknown, depth = 0, seen = new WeakSet<object>()): ExtractedMedia {
+  if (depth > 6 || input == null) return {};
+
+  if (typeof input === "string") {
+    const maybeDataUrl = extractDataUrl(input);
+    if (maybeDataUrl.base64) return maybeDataUrl;
+    if (/^https?:\/\//i.test(input.trim()) || input.trim().startsWith("/")) {
+      return { url: normalizeMediaUrl(input.trim()) };
+    }
+    const maybeBase64 = cleanBase64(input);
+    return maybeBase64 ? { base64: maybeBase64 } : {};
+  }
+
+  if (Array.isArray(input)) {
+    let acc: ExtractedMedia = {};
+    for (const item of input) {
+      acc = mergeMedia(acc, extractMediaData(item, depth + 1, seen));
+      if (acc.url && acc.base64 && acc.mimetype) break;
+    }
+    return acc;
+  }
+
+  if (typeof input !== "object") return {};
+  const obj = input as Record<string, unknown>;
+  if (seen.has(obj)) return {};
+  seen.add(obj);
+
+  const directUrl =
+    toText(obj.mediaUrl) ||
+    toText(obj.url) ||
+    toText(obj.URL) ||
+    toText(obj.link) ||
+    toText(obj.downloadUrl) ||
+    toText(obj.fileUrl) ||
+    toText(obj.fileURL) ||
+    toText(obj.directPath) ||
+    toText(obj.DirectPath);
+
+  const directMime =
+    toText(obj.mimetype) ||
+    toText(obj.mimeType) ||
+    toText(obj.contentType) ||
+    toText(obj.fileType) ||
+    toText(obj.mediaType);
+
+  const directBase64 =
+    cleanBase64(toText(obj.base64)) ||
+    cleanBase64(toText(obj.data)) ||
+    cleanBase64(toText(obj.fileData)) ||
+    cleanBase64(toText(obj.body)) ||
+    cleanBase64(toText(obj.mediaBase64));
+
+  let acc: ExtractedMedia = {
+    url: normalizeMediaUrl(directUrl),
+    base64: directBase64,
+    mimetype: directMime,
+  };
+
+  for (const value of Object.values(obj)) {
+    acc = mergeMedia(acc, extractMediaData(value, depth + 1, seen));
+    if (acc.url && acc.base64 && acc.mimetype) break;
+  }
+
+  return acc;
+}
+
+async function fetchMediaFromUrl(
+  fileUrl: string,
+  fallbackMime: string,
+  mediaType: string,
+): Promise<{ base64: string; mimetype: string } | null> {
+  try {
+    const normalizedUrl = normalizeMediaUrl(fileUrl);
+    if (!normalizedUrl) return null;
+
+    console.log(`Stevo: trying direct ${mediaType} URL:`, normalizedUrl.slice(0, 120));
+    const resp = await fetch(normalizedUrl);
+    if (!resp.ok) {
+      console.error(`Stevo direct ${mediaType} URL error:`, resp.status, await resp.text());
+      return null;
+    }
+
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength <= 100) {
+      console.log(`Stevo: empty ${mediaType} response from URL`);
+      return null;
+    }
+
+    const base64 = arrayBufferToBase64(buffer);
+    const mimetype = normalizeMimeType(resp.headers.get("content-type") || fallbackMime, mediaType);
+    return { base64, mimetype };
+  } catch (e) {
+    console.error(`Stevo direct ${mediaType} URL fetch failed:`, e);
+    return null;
+  }
+}
+
 // Download media via Stevo API
 async function downloadMediaViaStevo(
   serverUrl: string,
   instanceToken: string,
   messageObj: Record<string, unknown>,
+  mediaType: string,
+  fallbackMime = "",
 ): Promise<{ base64: string; mimetype: string } | null> {
   try {
     if (!serverUrl || !instanceToken || !messageObj) {
@@ -29,64 +188,77 @@ async function downloadMediaViaStevo(
       return null;
     }
 
-    const apiUrl = `${serverUrl}/message/downloadimage`;
-    console.log("Downloading media via Stevo API:", apiUrl);
+    const candidatePaths = mediaType === "audio"
+      ? ["/message/downloadaudio", "/message/downloadAudio", "/message/downloadvoice", "/message/downloadVoice", "/message/downloadimage"]
+      : ["/message/downloadimage", "/message/downloadImage", "/message/downloadmedia", "/message/downloadMedia"];
 
-    const resp = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: instanceToken,
-      },
-      body: JSON.stringify({ message: messageObj }),
-    });
+    for (const path of candidatePaths) {
+      const apiUrl = `${serverUrl}${path}`;
+      console.log("Downloading media via Stevo API:", apiUrl);
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error("Stevo download error:", resp.status, errText.slice(0, 300));
-      return null;
-    }
+      const resp = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: instanceToken,
+        },
+        body: JSON.stringify({ message: messageObj }),
+      });
 
-    const contentType = resp.headers.get("content-type") || "";
-
-    // If JSON response with base64
-    if (contentType.includes("application/json")) {
-      const data = await resp.json();
-      const base64 = data.base64 || data.data || data.file || "";
-      const mime = data.mimetype || data.mimeType || data.contentType || "";
-      if (base64 && base64.length > 100) {
-        console.log("Stevo download success (json):", { mime, len: base64.length });
-        return { base64, mimetype: mime };
+      if (!resp.ok) {
+        const errText = await resp.text();
+        console.error("Stevo download error:", resp.status, errText.slice(0, 300));
+        continue;
       }
-      // If it returned a URL instead
-      if (data.url || data.fileURL) {
-        const fileUrl = data.url || data.fileURL;
-        try {
-          const fileResp = await fetch(fileUrl);
-          if (fileResp.ok) {
-            const buffer = await fileResp.arrayBuffer();
-            const b64 = arrayBufferToBase64(buffer);
-            const m = fileResp.headers.get("content-type") || mime;
-            console.log("Stevo download success (url):", { m, len: b64.length });
-            return { base64: b64, mimetype: m };
-          }
-        } catch (e) {
-          console.error("Stevo file URL fetch failed:", e);
+
+      const contentType = resp.headers.get("content-type") || "";
+
+      if (contentType.includes("application/json")) {
+        const data = await resp.json();
+        const base64 =
+          cleanBase64(toText(data.base64)) ||
+          cleanBase64(toText(data.data)) ||
+          cleanBase64(toText(data.file)) ||
+          cleanBase64(toText(data.fileData));
+        const mime = normalizeMimeType(
+          toText(data.mimetype) || toText(data.mimeType) || toText(data.contentType) || fallbackMime,
+          mediaType,
+        );
+
+        if (base64.length > 100) {
+          console.log("Stevo download success (json):", { mime, len: base64.length, path });
+          return { base64, mimetype: mime };
         }
+
+        const extracted = extractMediaData(data);
+        if (extracted.base64 && extracted.base64.length > 100) {
+          const extractedMime = normalizeMimeType(extracted.mimetype || mime, mediaType);
+          console.log("Stevo download success (nested json):", { mime: extractedMime, len: extracted.base64.length, path });
+          return { base64: extracted.base64, mimetype: extractedMime };
+        }
+
+        if (extracted.url) {
+          const fromUrl = await fetchMediaFromUrl(extracted.url, extracted.mimetype || mime, mediaType);
+          if (fromUrl) {
+            console.log("Stevo download success (url in json):", { mime: fromUrl.mimetype, len: fromUrl.base64.length, path });
+            return fromUrl;
+          }
+        }
+
+        console.log("Stevo download: no usable data in JSON response, keys:", Object.keys(data));
+        continue;
       }
-      console.log("Stevo download: no usable data in JSON response, keys:", Object.keys(data));
-      return null;
+
+      const buffer = await resp.arrayBuffer();
+      if (buffer.byteLength > 100) {
+        const b64 = arrayBufferToBase64(buffer);
+        const mime = normalizeMimeType(contentType || fallbackMime, mediaType);
+        console.log("Stevo download success (binary):", { mime, len: b64.length, path });
+        return { base64: b64, mimetype: mime };
+      }
     }
 
-    // Binary response - convert to base64
-    const buffer = await resp.arrayBuffer();
-    if (buffer.byteLength > 100) {
-      const b64 = arrayBufferToBase64(buffer);
-      console.log("Stevo download success (binary):", { contentType, len: b64.length });
-      return { base64: b64, mimetype: contentType };
-    }
-
-    console.log("Stevo download: empty binary response");
+    console.log("Stevo download: media not retrieved from API");
     return null;
   } catch (e) {
     console.error("Stevo download failed:", e);
@@ -383,56 +555,49 @@ serve(async (req) => {
       } catch { /* use defaults */ }
 
       if ((media.type === "audio" || media.type === "image") && aiKey) {
-        // First try to get base64 directly from the webhook payload
         let mediaBase64 = "";
-        let mediaMime = media.mimetype;
+        let mediaMime = normalizeMimeType(media.mimetype, media.type);
 
-        if (media.type === "image") {
-          const img = messageData.imageMessage as Record<string, unknown> | undefined;
-          if (img?.base64 && typeof img.base64 === "string" && (img.base64 as string).length > 100) {
-            mediaBase64 = img.base64 as string;
-            mediaMime = (img.mimetype as string) || "image/jpeg";
-            console.log("Stevo: using base64 from imageMessage payload, len:", mediaBase64.length);
-          }
-        } else if (media.type === "audio") {
-          const aud = (messageData.audioMessage || messageData.pttMessage) as Record<string, unknown> | undefined;
-          if (aud?.base64 && typeof aud.base64 === "string" && (aud.base64 as string).length > 100) {
-            mediaBase64 = aud.base64 as string;
-            mediaMime = (aud.mimetype as string) || "audio/ogg";
-            console.log("Stevo: using base64 from audioMessage payload, len:", mediaBase64.length);
-          }
+        const primaryMediaNode = media.type === "image"
+          ? messageData.imageMessage
+          : (messageData.audioMessage || messageData.pttMessage);
+
+        const extractedMedia = mergeMedia(
+          extractMediaData(primaryMediaNode),
+          extractMediaData({
+            payload,
+            messageData,
+            sourceMsg,
+            infoData,
+          }),
+        );
+
+        if (extractedMedia.base64 && extractedMedia.base64.length > 100) {
+          mediaBase64 = extractedMedia.base64;
+          mediaMime = normalizeMimeType(extractedMedia.mimetype || mediaMime, media.type);
+          console.log(`Stevo: using base64 from payload for ${media.type}, len:`, mediaBase64.length);
         }
 
-        // If no base64 in payload, try downloading via Stevo API
         if (!mediaBase64 && serverUrl && instanceToken) {
-          const downloaded = await downloadMediaViaStevo(serverUrl, instanceToken, messageData);
+          const downloaded = await downloadMediaViaStevo(
+            serverUrl,
+            instanceToken,
+            messageData,
+            media.type,
+            extractedMedia.mimetype || mediaMime,
+          );
           if (downloaded && downloaded.base64.length > 100) {
             mediaBase64 = downloaded.base64;
-            mediaMime = downloaded.mimetype || mediaMime;
+            mediaMime = normalizeMimeType(downloaded.mimetype || mediaMime, media.type);
           }
         }
 
-        // If we also have a direct URL, try fetching it as last resort
-        if (!mediaBase64 && media.type === "image") {
-          const img = messageData.imageMessage as Record<string, unknown> | undefined;
-          const imgUrl = (img?.URL || img?.url || img?.directPath) as string;
-          if (imgUrl && imgUrl.startsWith("http")) {
-            try {
-              console.log("Stevo: trying direct image URL:", imgUrl.slice(0, 100));
-              const imgResp = await fetch(imgUrl);
-              if (imgResp.ok) {
-                const buf = await imgResp.arrayBuffer();
-                if (buf.byteLength > 100) {
-                  mediaBase64 = arrayBufferToBase64(buf);
-                  const respCt = imgResp.headers.get("content-type") || "";
-                  // Use payload mimetype if response is generic octet-stream
-                  mediaMime = (respCt && !respCt.includes("octet-stream")) ? respCt : mediaMime;
-                  console.log("Stevo: got image from direct URL, len:", mediaBase64.length);
-                }
-              }
-            } catch (e) {
-              console.error("Stevo: direct URL fetch failed:", e);
-            }
+        if (!mediaBase64 && extractedMedia.url) {
+          const fromUrl = await fetchMediaFromUrl(extractedMedia.url, extractedMedia.mimetype || mediaMime, media.type);
+          if (fromUrl) {
+            mediaBase64 = fromUrl.base64;
+            mediaMime = normalizeMimeType(fromUrl.mimetype || mediaMime, media.type);
+            console.log(`Stevo: got ${media.type} from extracted URL, len:`, mediaBase64.length);
           }
         }
 
@@ -443,6 +608,7 @@ serve(async (req) => {
             content = await describeImage(mediaBase64, aiKey, mediaMime, aiEndpoint, aiModel);
           }
         } else {
+          console.log(`Stevo: no usable ${media.type} media extracted`);
           content = media.type === "audio" ? "[🎵 Áudio recebido]" : "[📷 Imagem recebida]";
         }
       } else if (media.type === "audio") {
