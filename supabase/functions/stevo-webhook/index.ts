@@ -424,7 +424,9 @@ serve(async (req) => {
                 const buf = await imgResp.arrayBuffer();
                 if (buf.byteLength > 100) {
                   mediaBase64 = arrayBufferToBase64(buf);
-                  mediaMime = imgResp.headers.get("content-type") || mediaMime;
+                  const respCt = imgResp.headers.get("content-type") || "";
+                  // Use payload mimetype if response is generic octet-stream
+                  mediaMime = (respCt && !respCt.includes("octet-stream")) ? respCt : mediaMime;
                   console.log("Stevo: got image from direct URL, len:", mediaBase64.length);
                 }
               }
