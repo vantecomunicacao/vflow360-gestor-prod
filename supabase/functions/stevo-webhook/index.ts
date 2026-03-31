@@ -382,14 +382,63 @@ serve(async (req) => {
         }
       } catch { /* use defaults */ }
 
-      if ((media.type === "audio" || media.type === "image") && serverUrl && instanceToken && aiKey) {
-        // Download media via Stevo API
-        const downloaded = await downloadMediaViaStevo(serverUrl, instanceToken, messageData);
-        if (downloaded && downloaded.base64.length > 100) {
+      if ((media.type === "audio" || media.type === "image") && aiKey) {
+        // First try to get base64 directly from the webhook payload
+        let mediaBase64 = "";
+        let mediaMime = media.mimetype;
+
+        if (media.type === "image") {
+          const img = messageData.imageMessage as Record<string, unknown> | undefined;
+          if (img?.base64 && typeof img.base64 === "string" && (img.base64 as string).length > 100) {
+            mediaBase64 = img.base64 as string;
+            mediaMime = (img.mimetype as string) || "image/jpeg";
+            console.log("Stevo: using base64 from imageMessage payload, len:", mediaBase64.length);
+          }
+        } else if (media.type === "audio") {
+          const aud = (messageData.audioMessage || messageData.pttMessage) as Record<string, unknown> | undefined;
+          if (aud?.base64 && typeof aud.base64 === "string" && (aud.base64 as string).length > 100) {
+            mediaBase64 = aud.base64 as string;
+            mediaMime = (aud.mimetype as string) || "audio/ogg";
+            console.log("Stevo: using base64 from audioMessage payload, len:", mediaBase64.length);
+          }
+        }
+
+        // If no base64 in payload, try downloading via Stevo API
+        if (!mediaBase64 && serverUrl && instanceToken) {
+          const downloaded = await downloadMediaViaStevo(serverUrl, instanceToken, messageData);
+          if (downloaded && downloaded.base64.length > 100) {
+            mediaBase64 = downloaded.base64;
+            mediaMime = downloaded.mimetype || mediaMime;
+          }
+        }
+
+        // If we also have a direct URL, try fetching it as last resort
+        if (!mediaBase64 && media.type === "image") {
+          const img = messageData.imageMessage as Record<string, unknown> | undefined;
+          const imgUrl = (img?.URL || img?.url || img?.directPath) as string;
+          if (imgUrl && imgUrl.startsWith("http")) {
+            try {
+              console.log("Stevo: trying direct image URL:", imgUrl.slice(0, 100));
+              const imgResp = await fetch(imgUrl);
+              if (imgResp.ok) {
+                const buf = await imgResp.arrayBuffer();
+                if (buf.byteLength > 100) {
+                  mediaBase64 = arrayBufferToBase64(buf);
+                  mediaMime = imgResp.headers.get("content-type") || mediaMime;
+                  console.log("Stevo: got image from direct URL, len:", mediaBase64.length);
+                }
+              }
+            } catch (e) {
+              console.error("Stevo: direct URL fetch failed:", e);
+            }
+          }
+        }
+
+        if (mediaBase64 && mediaBase64.length > 100) {
           if (media.type === "audio") {
-            content = await transcribeAudio(downloaded.base64, aiKey, downloaded.mimetype || media.mimetype, aiEndpoint, aiModel);
+            content = await transcribeAudio(mediaBase64, aiKey, mediaMime, aiEndpoint, aiModel);
           } else {
-            content = await describeImage(downloaded.base64, aiKey, downloaded.mimetype || media.mimetype, aiEndpoint, aiModel);
+            content = await describeImage(mediaBase64, aiKey, mediaMime, aiEndpoint, aiModel);
           }
         } else {
           content = media.type === "audio" ? "[🎵 Áudio recebido]" : "[📷 Imagem recebida]";
