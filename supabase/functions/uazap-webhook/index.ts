@@ -247,30 +247,59 @@ async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: st
     const contentType = mimetype || "audio/ogg";
     const isOpenAI = endpoint.includes("api.openai.com");
 
-    // OpenAI doesn't support input_audio in chat completions the same way
-    // For OpenAI, we use a text-based approach with audio description
-    const messages: any[] = isOpenAI
-      ? [
+    if (isOpenAI) {
+      // Use OpenAI Whisper API for audio transcription
+      try {
+        const binaryStr = atob(base64Audio);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+
+        const ext = contentType.includes("ogg") ? "ogg" : contentType.includes("mp4") || contentType.includes("m4a") ? "m4a" : "mp3";
+        const blob = new Blob([bytes], { type: contentType });
+        const formData = new FormData();
+        formData.append("file", blob, `audio.${ext}`);
+        formData.append("model", "whisper-1");
+        formData.append("language", "pt");
+
+        const whisperResp = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}` },
+          body: formData,
+        });
+
+        if (!whisperResp.ok) {
+          console.error("Whisper API error:", whisperResp.status, await whisperResp.text());
+          return "[🎵 Áudio recebido - não foi possível transcrever]";
+        }
+
+        const whisperData = await whisperResp.json();
+        const text = whisperData.text?.trim();
+        console.log("Whisper transcription result:", text?.slice(0, 100));
+        return text ? `🎵 [Áudio]: ${text}` : "[🎵 Áudio recebido - não foi possível transcrever]";
+      } catch (e) {
+        console.error("Whisper transcription failed:", e);
+        return "[🎵 Áudio recebido - não foi possível transcrever]";
+      }
+    }
+
+    // Lovable AI: use input_audio in chat completions
+    const messages: any[] = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Transcreva este áudio em português. Retorne APENAS o texto transcrito, sem explicações adicionais. Se não conseguir entender, diga '[Áudio inaudível]'." },
           {
-            role: "user",
-            content: "Este áudio foi recebido pelo WhatsApp. Infelizmente não é possível processar áudio diretamente. Retorne '[🎵 Áudio recebido]'.",
+            type: "input_audio",
+            input_audio: {
+              data: base64Audio,
+              format: contentType.includes("ogg") ? "ogg" : contentType.includes("mp4") || contentType.includes("m4a") ? "m4a" : "mp3",
+            },
           },
-        ]
-      : [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Transcreva este áudio em português. Retorne APENAS o texto transcrito, sem explicações adicionais. Se não conseguir entender, diga '[Áudio inaudível]'." },
-              {
-                type: "input_audio",
-                input_audio: {
-                  data: base64Audio,
-                  format: contentType.includes("ogg") ? "ogg" : contentType.includes("mp4") || contentType.includes("m4a") ? "m4a" : "mp3",
-                },
-              },
-            ],
-          },
-        ];
+        ],
+      },
+    ];
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -307,6 +336,9 @@ async function describeImage(base64Image: string, apiKey: string, mimetype: stri
     }
 
     const contentType = mimetype || "image/jpeg";
+    const isOpenAI = endpoint.includes("api.openai.com");
+    // Ensure vision-capable model for OpenAI
+    const effectiveModel = isOpenAI ? (model.includes("gpt-4") || model.includes("gpt-5") ? model : "gpt-4o") : model;
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -315,7 +347,7 @@ async function describeImage(base64Image: string, apiKey: string, mimetype: stri
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model,
+        model: effectiveModel,
         messages: [
           {
             role: "user",
