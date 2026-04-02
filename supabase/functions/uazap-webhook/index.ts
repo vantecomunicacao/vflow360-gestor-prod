@@ -336,6 +336,9 @@ async function describeImage(base64Image: string, apiKey: string, mimetype: stri
     }
 
     const contentType = mimetype || "image/jpeg";
+    const isOpenAI = endpoint.includes("api.openai.com");
+    // Ensure vision-capable model for OpenAI
+    const effectiveModel = isOpenAI ? (model.includes("gpt-4") || model.includes("gpt-5") ? model : "gpt-4o") : model;
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -344,7 +347,7 @@ async function describeImage(base64Image: string, apiKey: string, mimetype: stri
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model,
+        model: effectiveModel,
         messages: [
           {
             role: "user",
