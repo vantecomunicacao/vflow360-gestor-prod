@@ -195,7 +195,7 @@ REGRAS SOBRE SUGESTÕES ANTERIORES:
 ${filteredActionTypes.includes("mover_funil") ? "- mover_funil: Sugerir mover o lead para outra etapa do funil" : ""}
 ${filteredActionTypes.includes("campo_personalizado") ? "- campo_personalizado: Sugerir preencher/atualizar um campo personalizado" : ""}
 ${filteredActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
-${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor da negociação" : ""}
+${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor monetário da oportunidade/negociação no CRM. SEMPRE que o lead mencionar preço, orçamento, valor, custo ou qualquer quantia monetária, use ESTE tipo (NÃO use campo_personalizado para valores monetários). O campo 'value' deve conter APENAS o número (ex: '1500' ou '1500.00'), sem 'R$' ou texto." : ""}
 ${filteredActionTypes.includes("agendar_lembrete") ? "- agendar_lembrete: Sugerir agendar um lembrete/follow-up" : ""}
 ${filteredActionTypes.includes("ganho_perdido") ? "- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida" : ""}`.replace(/\n\n+/g, "\n");
 
