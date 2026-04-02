@@ -195,7 +195,7 @@ REGRAS SOBRE SUGESTÕES ANTERIORES:
 ${filteredActionTypes.includes("mover_funil") ? "- mover_funil: Sugerir mover o lead para outra etapa do funil" : ""}
 ${filteredActionTypes.includes("campo_personalizado") ? "- campo_personalizado: Sugerir preencher/atualizar um campo personalizado" : ""}
 ${filteredActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
-${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor da negociação" : ""}
+${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor monetário da oportunidade/negociação no CRM. SEMPRE que o lead mencionar preço, orçamento, valor, custo ou qualquer quantia monetária, use ESTE tipo (NÃO use campo_personalizado para valores monetários). O campo 'value' deve conter APENAS o número (ex: '1500' ou '1500.00'), sem 'R$' ou texto." : ""}
 ${filteredActionTypes.includes("agendar_lembrete") ? "- agendar_lembrete: Sugerir agendar um lembrete/follow-up" : ""}
 ${filteredActionTypes.includes("ganho_perdido") ? "- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida" : ""}`.replace(/\n\n+/g, "\n");
 
@@ -223,6 +223,7 @@ REGRAS OBRIGATÓRIAS:
 - Se o campo tem OPÇÕES VÁLIDAS listadas, use APENAS um valor dessa lista. NUNCA invente opções.
 - No campo "field" da sugestão, use a CHAVE do campo (fieldKey), não o nome amigável.
 - No campo "value", use o valor exato (nome da etapa para funil, opção para dropdowns, texto para campos livres).
+- Para "valor_negociacao": SEMPRE que houver menção de preço, valor, orçamento ou quantia monetária na conversa, use o tipo "valor_negociacao". NÃO coloque valores monetários em campos personalizados. O "value" deve ser APENAS o número (ex: "1500", "2300.50"), sem "R$", sem texto.
 - NUNCA gere sugestões contraditórias no mesmo lote (ex: ganho E perdido ao mesmo tempo)
 - Analise a conversa INTEIRA para entender a conclusão final do lead antes de sugerir ganho/perdido
 - Retorne as sugestões usando a tool fornecida`;
