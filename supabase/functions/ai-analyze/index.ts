@@ -187,8 +187,8 @@ REGRAS SOBRE SUGESTÕES ANTERIORES:
     const stageNames = selectedStages.map((s: any) => s.name);
     const stagesDescription = selectedStages.length > 0
       ? `\n\nEtapas do funil disponíveis (use EXATAMENTE estes nomes, APENAS estas etapas podem ser sugeridas):\n${selectedStages
-          .map((s: any) => `- "${s.name}" (pipeline: ${s.pipelineName})${s.description ? `: ${s.description}` : ""}`)
-          .join("\n")}`
+          .map((s: any) => `- "${s.name}" (pipeline: "${s.pipelineName}", ID: ${s.pipelineId})${s.description ? `: ${s.description}` : ""}`)
+          .join("\n")}\n\nATENÇÃO: Cada etapa pertence a um pipeline específico. Use a etapa correta para o contexto da conversa. Pipelines de "vendas" são para conversas comerciais. Pipelines de "organização interna" são para conversas internas.`
       : "";
 
     const actionTypesDescription = `\n\nTipos de ação que você pode sugerir:
@@ -345,13 +345,13 @@ REGRAS OBRIGATÓRIAS:
       if (s.type === "mover_funil") {
         const stageValue = s.value || s.field;
         if (!stageValue || !validStageNames.has(stageValue)) {
-          console.log(`Filtered out mover_funil suggestion with invalid stage: ${stageValue}`);
+          console.log(`Filtered out mover_funil suggestion with invalid stage: ${stageValue}. Valid: ${[...validStageNames].join(", ")}`);
           return false;
         }
       }
       if (s.type === "campo_personalizado") {
         if (!s.field || !validFieldKeys.has(s.field)) {
-          console.log(`Filtered out campo_personalizado suggestion with invalid field: ${s.field}`);
+          console.log(`Filtered out campo_personalizado suggestion with invalid field: ${s.field}. Valid: ${[...validFieldKeys].join(", ")}`);
           return false;
         }
       }
