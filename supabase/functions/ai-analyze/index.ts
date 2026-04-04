@@ -187,8 +187,8 @@ REGRAS SOBRE SUGESTÕES ANTERIORES:
     const stageNames = selectedStages.map((s: any) => s.name);
     const stagesDescription = selectedStages.length > 0
       ? `\n\nEtapas do funil disponíveis (use EXATAMENTE estes nomes, APENAS estas etapas podem ser sugeridas):\n${selectedStages
-          .map((s: any) => `- "${s.name}" (pipeline: ${s.pipelineName})${s.description ? `: ${s.description}` : ""}`)
-          .join("\n")}`
+          .map((s: any) => `- "${s.name}" (pipeline: "${s.pipelineName}", ID: ${s.pipelineId})${s.description ? `: ${s.description}` : ""}`)
+          .join("\n")}\n\nATENÇÃO: Cada etapa pertence a um pipeline específico. Use a etapa correta para o contexto da conversa. Pipelines de "vendas" são para conversas comerciais. Pipelines de "organização interna" são para conversas internas.`
       : "";
 
     const actionTypesDescription = `\n\nTipos de ação que você pode sugerir:
