@@ -345,13 +345,13 @@ REGRAS OBRIGATÓRIAS:
       if (s.type === "mover_funil") {
         const stageValue = s.value || s.field;
         if (!stageValue || !validStageNames.has(stageValue)) {
-          console.log(`Filtered out mover_funil suggestion with invalid stage: ${stageValue}`);
+          console.log(`Filtered out mover_funil suggestion with invalid stage: ${stageValue}. Valid: ${[...validStageNames].join(", ")}`);
           return false;
         }
       }
       if (s.type === "campo_personalizado") {
         if (!s.field || !validFieldKeys.has(s.field)) {
-          console.log(`Filtered out campo_personalizado suggestion with invalid field: ${s.field}`);
+          console.log(`Filtered out campo_personalizado suggestion with invalid field: ${s.field}. Valid: ${[...validFieldKeys].join(", ")}`);
           return false;
         }
       }
