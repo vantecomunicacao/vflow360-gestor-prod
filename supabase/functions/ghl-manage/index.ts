@@ -461,63 +461,73 @@ serve(async (req) => {
             const targetStageName = actionData?.value;
             if (!targetStageName) throw new Error("Etapa de destino não especificada na sugestão.");
             
-            // Find the stage (exact, then partial/fuzzy match)
-            const pipelinesData = await callGhl("/opportunities/pipelines") as any;
-            let targetStage: any = null;
-            let targetPipelineId = "";
-            const allStages: string[] = [];
-            const searchName = targetStageName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            // Get selected stages from user config to restrict to allowed pipelines
+            const { data: ghlIntConfig } = await supabase
+              .from("integrations")
+              .select("config")
+              .eq("user_id", user.id)
+              .eq("type", "ghl")
+              .single();
+            const ghlCfg = (ghlIntConfig?.config || {}) as Record<string, any>;
+            const configSelectedStages = (ghlCfg.selectedStages || []) as Array<{ id: string; name: string; pipelineId: string; pipelineName: string }>;
             
-            for (const p of (pipelinesData?.pipelines || [])) {
-              for (const s of (p.stages || [])) {
-                allStages.push(s.name);
-                const stageName = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                // Exact match or partial/contains match
-                if (stageName === searchName || stageName.includes(searchName) || searchName.includes(stageName)) {
-                  targetStage = s;
-                  targetPipelineId = p.id;
-                  break;
-                }
-              }
-              if (targetStage) break;
+            // Build set of allowed pipeline IDs from selected stages
+            const allowedPipelineIds = new Set(configSelectedStages.map(s => s.pipelineId));
+            const allowedStageIds = new Set(configSelectedStages.map(s => s.id));
+            
+            // First try to find among selected stages directly (best match)
+            const searchName = targetStageName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            let matchedConfigStage = configSelectedStages.find(s => {
+              const sn = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              return sn === searchName;
+            });
+            if (!matchedConfigStage) {
+              matchedConfigStage = configSelectedStages.find(s => {
+                const sn = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return sn.includes(searchName) || searchName.includes(sn);
+              });
             }
-            if (!targetStage) {
-              // Keyword-based similarity as last resort
-              const keywordMap: Record<string, string[]> = {
-                "orcamento": ["proposta"],
-                "proposta": ["proposta"],
-                "qualificacao": ["qualificando"],
-                "reuniao": ["reuniao"],
-                "fechamento": ["fechamento"],
-                "ganho": ["ganha", "ganhos"],
-                "perdido": ["perdido", "abandonado"],
-              };
-              for (const [keyword, targets] of Object.entries(keywordMap)) {
-                if (searchName.includes(keyword) || keyword.includes(searchName)) {
-                  for (const p of (pipelinesData?.pipelines || [])) {
-                    for (const s of (p.stages || [])) {
-                      const sn = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                      if (targets.some((t: string) => sn.includes(t))) {
-                        targetStage = s;
-                        targetPipelineId = p.id;
-                        console.log(`Fuzzy match: "${targetStageName}" -> "${s.name}"`);
-                        break;
-                      }
-                    }
-                    if (targetStage) break;
+            
+            let targetStageId: string;
+            let targetPipelineId: string;
+            
+            if (matchedConfigStage) {
+              targetStageId = matchedConfigStage.id;
+              targetPipelineId = matchedConfigStage.pipelineId;
+              console.log(`Matched configured stage: "${matchedConfigStage.name}" in pipeline "${matchedConfigStage.pipelineName}"`);
+            } else {
+              // Fallback: search GHL pipelines but ONLY within allowed pipelines
+              const pipelinesData = await callGhl("/opportunities/pipelines") as any;
+              let targetStage: any = null;
+              const allowedStages: string[] = [];
+              
+              for (const p of (pipelinesData?.pipelines || [])) {
+                if (!allowedPipelineIds.has(p.id)) continue; // Skip non-allowed pipelines
+                for (const s of (p.stages || [])) {
+                  allowedStages.push(`${s.name} (${p.name})`);
+                  const stageName = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                  if (stageName === searchName || stageName.includes(searchName) || searchName.includes(stageName)) {
+                    targetStage = s;
+                    targetPipelineId = p.id;
+                    break;
                   }
-                  if (targetStage) break;
                 }
+                if (targetStage) break;
               }
-            }
-            if (!targetStage) {
-              console.error(`Etapas disponíveis: ${allStages.join(", ")}`);
-              throw new Error(`Etapa "${targetStageName}" não encontrada. Etapas disponíveis: ${allStages.join(", ")}`);
+              
+              if (!targetStage) {
+                const configStageNames = configSelectedStages.map(s => `"${s.name}" (${s.pipelineName})`).join(", ");
+                console.error(`Stage "${targetStageName}" not found in allowed pipelines. Allowed: ${configStageNames}`);
+                throw new Error(`Etapa "${targetStageName}" não encontrada nos funis configurados. Etapas permitidas: ${configStageNames}`);
+              }
+              
+              targetStageId = targetStage.id;
+              targetPipelineId = targetPipelineId!;
             }
             
             await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
               pipelineId: targetPipelineId,
-              pipelineStageId: targetStage.id,
+              pipelineStageId: targetStageId,
             }, true);
             executionResult = `Lead movido para a etapa "${targetStageName}"`;
             break;
