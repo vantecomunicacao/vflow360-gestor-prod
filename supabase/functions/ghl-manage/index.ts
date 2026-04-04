@@ -550,10 +550,11 @@ serve(async (req) => {
               }, true);
               console.log(`Updated opportunity custom field: ${fieldKey} = ${fieldValue}`);
             } else {
-              // Update on contact
+              // Update on contact - GHL v2 API requires 'field_value' not 'value'
               await callGhl(`/contacts/${contactId}`, "PUT", {
-                customFields: [{ key: fieldKey, value: fieldValue }],
+                customFields: [{ key: fieldKey, field_value: fieldValue }],
               }, true);
+              console.log(`Updated contact custom field: ${fieldKey} = ${fieldValue}`);
             }
             executionResult = `Campo "${fieldKey}" atualizado para "${fieldValue}"`;
             break;
