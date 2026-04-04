@@ -528,9 +528,23 @@ serve(async (req) => {
             const fieldValue = actionData?.value;
             if (!fieldKey || !fieldValue) throw new Error("Campo ou valor não especificado na sugestão.");
             
-            await callGhl(`/contacts/${contactId}`, "PUT", {
-              customFields: [{ key: fieldKey, value: fieldValue }],
-            }, true);
+            // Determine if the field is an opportunity-level or contact-level field
+            const isOpportunityField = fieldKey.startsWith("opportunity.") || fieldKey.startsWith("opportunity_");
+            
+            if (isOpportunityField) {
+              // Update on opportunity using customFields
+              const cleanKey = fieldKey.replace(/^opportunity[._]/, "");
+              // Try updating on opportunity first
+              await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+                customFields: [{ key: fieldKey, field_value: fieldValue }],
+              }, true);
+              console.log(`Updated opportunity custom field: ${fieldKey} = ${fieldValue}`);
+            } else {
+              // Update on contact
+              await callGhl(`/contacts/${contactId}`, "PUT", {
+                customFields: [{ key: fieldKey, value: fieldValue }],
+              }, true);
+            }
             executionResult = `Campo "${fieldKey}" atualizado para "${fieldValue}"`;
             break;
           }
