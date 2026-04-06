@@ -54,7 +54,7 @@ const Conversations = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeWorkspace]);
 
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
