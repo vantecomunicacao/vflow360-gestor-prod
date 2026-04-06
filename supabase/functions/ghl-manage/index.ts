@@ -555,7 +555,8 @@ serve(async (req) => {
               }, true);
               console.log(`Updated contact custom field: ${fieldKey} = ${fieldValue}`);
             }
-            executionResult = `Campo "${fieldKey}" atualizado para "${fieldValue}"`;
+            const displayKey = isOpportunityField ? fieldKey.replace(/^opportunity[._]/, "") : fieldKey;
+            executionResult = `Campo "${displayKey}" atualizado para "${fieldValue}"`;
             break;
           }
 
