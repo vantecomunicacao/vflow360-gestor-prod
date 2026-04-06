@@ -263,28 +263,18 @@ serve(async (req) => {
         const prompt = typeof payload.aiPrompt === "string" ? payload.aiPrompt : "";
         
         // Get current config to preserve apiKey/locationId
-        const { data: currentIntegration } = await supabase
-          .from("integrations")
-          .select("config")
-          .eq("user_id", user.id)
-          .eq("type", "ghl")
-          .single();
+        let smq = supabase.from("integrations").select("config").eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) smq = smq.eq("workspace_id", workspaceId);
+        const { data: currentIntegration } = await smq.single();
         
         if (!currentIntegration) throw new Error("GHL not connected");
         const currentConfig = currentIntegration.config as Record<string, unknown>;
         
-        await supabase
-          .from("integrations")
-          .update({
-            config: {
-              ...currentConfig,
-              selectedFields,
-              selectedStages,
-              aiPrompt: prompt,
-            },
-          })
-          .eq("user_id", user.id)
-          .eq("type", "ghl");
+        let umq = supabase.from("integrations").update({
+          config: { ...currentConfig, selectedFields, selectedStages, aiPrompt: prompt },
+        }).eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) umq = umq.eq("workspace_id", workspaceId);
+        await umq;
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -292,12 +282,9 @@ serve(async (req) => {
       }
 
       case "get_mappings": {
-        const { data: integration } = await supabase
-          .from("integrations")
-          .select("config")
-          .eq("user_id", user.id)
-          .eq("type", "ghl")
-          .single();
+        let gmq = supabase.from("integrations").select("config").eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) gmq = gmq.eq("workspace_id", workspaceId);
+        const { data: integration } = await gmq.single();
         
         if (!integration) {
           return new Response(JSON.stringify({ success: true, data: { selectedFields: [], selectedStages: [], aiPrompt: "" } }), {
