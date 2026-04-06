@@ -145,15 +145,14 @@ serve(async (req) => {
         }
 
         // Save credentials
-        await supabase.from("integrations").upsert(
-          {
-            user_id: user.id,
-            type: "ghl",
-            config: { apiKey, locationId, locationName: locationData.location?.name || locationData.name || locationId },
-            status: "connected",
-          },
-          { onConflict: "user_id,type" }
-        );
+        const upsertData: Record<string, unknown> = {
+          user_id: user.id,
+          type: "ghl",
+          config: { apiKey, locationId, locationName: locationData.location?.name || locationData.name || locationId },
+          status: "connected",
+        };
+        if (workspaceId) upsertData.workspace_id = workspaceId;
+        await supabase.from("integrations").upsert(upsertData, { onConflict: "user_id,type" });
 
         return new Response(
           JSON.stringify({
