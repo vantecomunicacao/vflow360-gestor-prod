@@ -78,12 +78,9 @@ serve(async (req) => {
 
     // Helper to get stored GHL credentials
     const getGhlCredentials = async () => {
-      const { data: integration } = await supabase
-        .from("integrations")
-        .select("config, status")
-        .eq("user_id", user.id)
-        .eq("type", "ghl")
-        .single();
+      let q = supabase.from("integrations").select("config, status").eq("user_id", user.id).eq("type", "ghl");
+      if (workspaceId) q = q.eq("workspace_id", workspaceId);
+      const { data: integration } = await q.single();
       if (!integration || integration.status !== "connected") {
         throw new Error("GHL not connected. Please add your credentials first.");
       }
