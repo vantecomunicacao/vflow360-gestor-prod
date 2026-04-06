@@ -542,13 +542,12 @@ serve(async (req) => {
             const isOpportunityField = fieldKey.startsWith("opportunity.") || fieldKey.startsWith("opportunity_");
             
             if (isOpportunityField) {
-              // Update on opportunity using customFields
+              // Update on opportunity using customFields - strip the opportunity. prefix
               const cleanKey = fieldKey.replace(/^opportunity[._]/, "");
-              // Try updating on opportunity first
               await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
-                customFields: [{ key: fieldKey, field_value: fieldValue }],
+                customFields: [{ key: cleanKey, field_value: fieldValue }],
               }, true);
-              console.log(`Updated opportunity custom field: ${fieldKey} = ${fieldValue}`);
+              console.log(`Updated opportunity custom field: ${cleanKey} = ${fieldValue}`);
             } else {
               // Update on contact - GHL v2 API requires 'field_value' not 'value'
               await callGhl(`/contacts/${contactId}`, "PUT", {
@@ -556,7 +555,8 @@ serve(async (req) => {
               }, true);
               console.log(`Updated contact custom field: ${fieldKey} = ${fieldValue}`);
             }
-            executionResult = `Campo "${fieldKey}" atualizado para "${fieldValue}"`;
+            const displayKey = isOpportunityField ? fieldKey.replace(/^opportunity[._]/, "") : fieldKey;
+            executionResult = `Campo "${displayKey}" atualizado para "${fieldValue}"`;
             break;
           }
 
