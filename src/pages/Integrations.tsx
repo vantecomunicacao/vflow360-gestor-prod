@@ -110,12 +110,13 @@ const Integrations = () => {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ action, ...extra }),
+        body: JSON.stringify({ action, workspace_id: activeWorkspace?.id, ...extra }),
       }
     );
     const result = await response.json();
     if (!result.success) throw new Error(result.error || "Unknown error");
     return result.data;
+  }, [activeWorkspace]);
   }, []);
 
   const GHL_STANDARD_FIELDS: GhlCustomField[] = [
