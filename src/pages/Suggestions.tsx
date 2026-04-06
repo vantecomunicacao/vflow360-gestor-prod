@@ -113,11 +113,13 @@ const Suggestions = () => {
   };
 
   const fetchSuggestions = useCallback(async () => {
+    if (!activeWorkspace) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("suggestions")
         .select("*")
+        .eq("workspace_id", activeWorkspace.id)
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -128,7 +130,7 @@ const Suggestions = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeWorkspace]);
 
   const fetchAiConfig = useCallback(async () => {
     try {
