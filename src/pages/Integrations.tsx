@@ -117,7 +117,6 @@ const Integrations = () => {
     if (!result.success) throw new Error(result.error || "Unknown error");
     return result.data;
   }, [activeWorkspace]);
-  }, []);
 
   const GHL_STANDARD_FIELDS: GhlCustomField[] = [
     { id: "std_firstName", name: "Nome", fieldKey: "firstName", dataType: "text", selected: false, description: "" },
