@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 type SuggestionStatus = "pending" | "approved" | "rejected";
 
@@ -77,6 +78,7 @@ const Suggestions = () => {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const { activeWorkspace } = useWorkspace();
 
   const fetchDisabledContacts = useCallback(async () => {
     try {
