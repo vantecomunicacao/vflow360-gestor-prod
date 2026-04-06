@@ -634,6 +634,7 @@ serve(async (req) => {
           .from("conversations")
           .insert({
             user_id: userId,
+            workspace_id: workspaceId,
             contact_name: contactName,
             contact_phone: phone,
             last_message: displayMessage,
