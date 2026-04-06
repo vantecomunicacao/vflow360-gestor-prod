@@ -447,7 +447,7 @@ serve(async (req) => {
 
     const { data: integrations } = await supabase
       .from("integrations")
-      .select("id, user_id, config")
+      .select("id, user_id, config, workspace_id")
       .eq("type", "whatsapp");
 
     const integration = integrations?.find((i) => {
@@ -465,6 +465,7 @@ serve(async (req) => {
     }
 
     const userId = integration.user_id;
+    const workspaceId = integration.workspace_id;
     const integrationConfig = integration.config as { token?: string; instanceName?: string };
     const instToken = integrationConfig.token || instanceToken || "";
     // Handle connection status changes
@@ -633,6 +634,7 @@ serve(async (req) => {
           .from("conversations")
           .insert({
             user_id: userId,
+            workspace_id: workspaceId,
             contact_name: contactName,
             contact_phone: phone,
             last_message: displayMessage,

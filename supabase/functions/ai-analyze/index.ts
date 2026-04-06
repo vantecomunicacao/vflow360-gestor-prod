@@ -58,7 +58,7 @@ serve(async (req) => {
     // 2. Fetch conversation info
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("contact_name, contact_phone")
+      .select("contact_name, contact_phone, workspace_id")
       .eq("id", conversationId)
       .single();
 
@@ -450,6 +450,7 @@ REGRAS OBRIGATÓRIAS:
         .from("suggestions")
         .insert({
           user_id: resolvedUserId,
+          workspace_id: conversation?.workspace_id || null,
           conversation_id: conversationId,
           type: s.type,
           title: s.title,

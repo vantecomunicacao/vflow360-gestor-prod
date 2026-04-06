@@ -34,17 +34,24 @@ serve(async (req) => {
     const action = typeof payload.action === "string" ? payload.action : "";
     const apiKey = typeof payload.apiKey === "string" ? payload.apiKey.trim() : "";
     const locationId = typeof payload.locationId === "string" ? payload.locationId.trim() : "";
+    const workspaceId = typeof payload.workspace_id === "string" ? payload.workspace_id : null;
+
+    // Build base query for GHL integration
+    const ghlQuery = () => {
+      let q = supabase.from("integrations").select("*").eq("user_id", user.id).eq("type", "ghl");
+      if (workspaceId) q = q.eq("workspace_id", workspaceId);
+      return q;
+    };
 
     const clearGhlConnection = async () => {
-      await supabase.from("integrations").upsert(
-        {
-          user_id: user.id,
-          type: "ghl",
-          status: "disconnected",
-          config: {},
-        },
-        { onConflict: "user_id,type" }
-      );
+      const upsertData: Record<string, unknown> = {
+        user_id: user.id,
+        type: "ghl",
+        status: "disconnected",
+        config: {},
+      };
+      if (workspaceId) upsertData.workspace_id = workspaceId;
+      await supabase.from("integrations").upsert(upsertData, { onConflict: "user_id,type" });
     };
 
     const validateGhlCredentials = async (candidateApiKey: string, candidateLocationId: string) => {
@@ -71,12 +78,9 @@ serve(async (req) => {
 
     // Helper to get stored GHL credentials
     const getGhlCredentials = async () => {
-      const { data: integration } = await supabase
-        .from("integrations")
-        .select("config, status")
-        .eq("user_id", user.id)
-        .eq("type", "ghl")
-        .single();
+      let q = supabase.from("integrations").select("config, status").eq("user_id", user.id).eq("type", "ghl");
+      if (workspaceId) q = q.eq("workspace_id", workspaceId);
+      const { data: integration } = await q.single();
       if (!integration || integration.status !== "connected") {
         throw new Error("GHL not connected. Please add your credentials first.");
       }
@@ -141,15 +145,14 @@ serve(async (req) => {
         }
 
         // Save credentials
-        await supabase.from("integrations").upsert(
-          {
-            user_id: user.id,
-            type: "ghl",
-            config: { apiKey, locationId, locationName: locationData.location?.name || locationData.name || locationId },
-            status: "connected",
-          },
-          { onConflict: "user_id,type" }
-        );
+        const upsertData: Record<string, unknown> = {
+          user_id: user.id,
+          type: "ghl",
+          config: { apiKey, locationId, locationName: locationData.location?.name || locationData.name || locationId },
+          status: "connected",
+        };
+        if (workspaceId) upsertData.workspace_id = workspaceId;
+        await supabase.from("integrations").upsert(upsertData, { onConflict: "user_id,type" });
 
         return new Response(
           JSON.stringify({
@@ -164,11 +167,9 @@ serve(async (req) => {
       }
 
       case "disconnect": {
-        await supabase
-          .from("integrations")
-          .update({ status: "disconnected", config: {} })
-          .eq("user_id", user.id)
-          .eq("type", "ghl");
+        let dq = supabase.from("integrations").update({ status: "disconnected", config: {} }).eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) dq = dq.eq("workspace_id", workspaceId);
+        await dq;
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -176,12 +177,9 @@ serve(async (req) => {
       }
 
       case "status": {
-        const { data: integration } = await supabase
-          .from("integrations")
-          .select("config, status")
-          .eq("user_id", user.id)
-          .eq("type", "ghl")
-          .single();
+        let sq = supabase.from("integrations").select("config, status").eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) sq = sq.eq("workspace_id", workspaceId);
+        const { data: integration } = await sq.single();
 
         if (!integration) {
           return new Response(
@@ -265,28 +263,18 @@ serve(async (req) => {
         const prompt = typeof payload.aiPrompt === "string" ? payload.aiPrompt : "";
         
         // Get current config to preserve apiKey/locationId
-        const { data: currentIntegration } = await supabase
-          .from("integrations")
-          .select("config")
-          .eq("user_id", user.id)
-          .eq("type", "ghl")
-          .single();
+        let smq = supabase.from("integrations").select("config").eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) smq = smq.eq("workspace_id", workspaceId);
+        const { data: currentIntegration } = await smq.single();
         
         if (!currentIntegration) throw new Error("GHL not connected");
         const currentConfig = currentIntegration.config as Record<string, unknown>;
         
-        await supabase
-          .from("integrations")
-          .update({
-            config: {
-              ...currentConfig,
-              selectedFields,
-              selectedStages,
-              aiPrompt: prompt,
-            },
-          })
-          .eq("user_id", user.id)
-          .eq("type", "ghl");
+        let umq = supabase.from("integrations").update({
+          config: { ...currentConfig, selectedFields, selectedStages, aiPrompt: prompt },
+        }).eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) umq = umq.eq("workspace_id", workspaceId);
+        await umq;
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -294,12 +282,9 @@ serve(async (req) => {
       }
 
       case "get_mappings": {
-        const { data: integration } = await supabase
-          .from("integrations")
-          .select("config")
-          .eq("user_id", user.id)
-          .eq("type", "ghl")
-          .single();
+        let gmq = supabase.from("integrations").select("config").eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) gmq = gmq.eq("workspace_id", workspaceId);
+        const { data: integration } = await gmq.single();
         
         if (!integration) {
           return new Response(JSON.stringify({ success: true, data: { selectedFields: [], selectedStages: [], aiPrompt: "" } }), {

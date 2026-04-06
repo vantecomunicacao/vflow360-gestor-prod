@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 interface FieldOption {
   value: string;
@@ -68,6 +69,7 @@ const Integrations = () => {
     "Você é um assistente de CRM. Ao analisar conversas, leve em conta os campos personalizados e etapas do funil mapeados abaixo para gerar sugestões precisas."
   );
   const { toast } = useToast();
+  const { activeWorkspace } = useWorkspace();
 
   const resetGhlState = useCallback(() => {
     setGhlConnected(false);
@@ -108,13 +110,13 @@ const Integrations = () => {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ action, ...extra }),
+        body: JSON.stringify({ action, workspace_id: activeWorkspace?.id, ...extra }),
       }
     );
     const result = await response.json();
     if (!result.success) throw new Error(result.error || "Unknown error");
     return result.data;
-  }, []);
+  }, [activeWorkspace]);
 
   const GHL_STANDARD_FIELDS: GhlCustomField[] = [
     { id: "std_firstName", name: "Nome", fieldKey: "firstName", dataType: "text", selected: false, description: "" },
@@ -234,13 +236,14 @@ const Integrations = () => {
 
   // Fetch all WhatsApp instances on mount (Uazap + Stevo)
   useEffect(() => {
+    if (!activeWorkspace) return;
     const checkStatus = async () => {
       setLoadingInstances(true);
       const allInstances: WhatsAppInstance[] = [];
 
       // Fetch Uazap instances
       try {
-        const data = await callUazap("status");
+        const data = await callUazap("status", { workspace_id: activeWorkspace.id });
         if (data?.instances && data.instances.length > 0) {
           for (const inst of data.instances) {
             allInstances.push({
@@ -256,27 +259,25 @@ const Integrations = () => {
 
       // Fetch Stevo instances from DB
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data: stevoIntegrations } = await supabase
-            .from("integrations")
-            .select("*")
-            .eq("type", "whatsapp_stevo")
-            .order("created_at", { ascending: true });
+        const { data: stevoIntegrations } = await supabase
+          .from("integrations")
+          .select("*")
+          .eq("type", "whatsapp_stevo")
+          .eq("workspace_id", activeWorkspace.id)
+          .order("created_at", { ascending: true });
 
-          if (stevoIntegrations) {
-            for (const int of stevoIntegrations) {
-              const config = int.config as { label?: string; last_webhook_at?: string } || {};
-              allInstances.push({
-                id: int.id,
-                instanceName: "",
-                label: config.label || "Stevo",
-                status: (int.status as WhatsAppStatus) || "disconnected",
-                provider: "stevo",
-                webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${int.id}`,
-                lastWebhookAt: config.last_webhook_at || null,
-              });
-            }
+        if (stevoIntegrations) {
+          for (const int of stevoIntegrations) {
+            const config = int.config as { label?: string; last_webhook_at?: string } || {};
+            allInstances.push({
+              id: int.id,
+              instanceName: "",
+              label: config.label || "Stevo",
+              status: (int.status as WhatsAppStatus) || "disconnected",
+              provider: "stevo",
+              webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${int.id}`,
+              lastWebhookAt: config.last_webhook_at || null,
+            });
           }
         }
       } catch { /* silent */ }
@@ -285,7 +286,7 @@ const Integrations = () => {
       setLoadingInstances(false);
 
       try {
-        const data = await callGhl("status");
+        const data = await callGhl("status", { workspace_id: activeWorkspace.id });
         if (data?.status === "connected") {
           setGhlConnected(true);
           setGhlLocationName(data.locationName || "");
@@ -295,7 +296,7 @@ const Integrations = () => {
       } catch { /* silent */ }
     };
     checkStatus();
-  }, [callUazap, callGhl, resetGhlState]);
+  }, [activeWorkspace, callUazap, callGhl, resetGhlState]);
 
   useEffect(() => {
     if (ghlConnected) {
@@ -374,9 +375,11 @@ const Integrations = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
+      if (!activeWorkspace) throw new Error("No active workspace");
 
       const { data: inserted, error } = await supabase.from("integrations").insert({
         user_id: session.user.id,
+        workspace_id: activeWorkspace.id,
         type: "whatsapp_stevo",
         config: { label: `Stevo #${instances.filter(i => i.provider === "stevo").length + 1}` },
         status: "disconnected",

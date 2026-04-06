@@ -1,6 +1,7 @@
 import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { WorkspaceSelector } from "@/components/WorkspaceSelector";
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +32,11 @@ export function AppSidebar() {
       <div className="p-4 flex items-center gap-2">
         <Bot className="w-7 h-7 text-sidebar-primary shrink-0" />
         {!collapsed && <span className="text-lg font-bold text-sidebar-accent-foreground">Copiloto GHL</span>}
+      </div>
+
+      {/* Workspace Selector */}
+      <div className="px-3 pb-3">
+        <WorkspaceSelector collapsed={collapsed} />
       </div>
 
       <SidebarContent>

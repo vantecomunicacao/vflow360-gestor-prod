@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 interface Message {
   id: string;
@@ -32,12 +33,15 @@ const Conversations = () => {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const { toast } = useToast();
+  const { activeWorkspace } = useWorkspace();
 
   const fetchConversations = useCallback(async () => {
+    if (!activeWorkspace) return;
     try {
       const { data, error } = await supabase
         .from("conversations")
         .select("*")
+        .eq("workspace_id", activeWorkspace.id)
         .order("last_message_at", { ascending: false });
 
       if (error) throw error;
@@ -50,7 +54,7 @@ const Conversations = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeWorkspace]);
 
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
@@ -68,6 +72,9 @@ const Conversations = () => {
   }, []);
 
   useEffect(() => {
+    setSelected(null);
+    setMessages([]);
+    setLoading(true);
     fetchConversations();
   }, [fetchConversations]);
 

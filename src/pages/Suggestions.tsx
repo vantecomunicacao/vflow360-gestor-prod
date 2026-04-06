@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 type SuggestionStatus = "pending" | "approved" | "rejected";
 
@@ -77,6 +78,7 @@ const Suggestions = () => {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const { activeWorkspace } = useWorkspace();
 
   const fetchDisabledContacts = useCallback(async () => {
     try {
@@ -111,11 +113,13 @@ const Suggestions = () => {
   };
 
   const fetchSuggestions = useCallback(async () => {
+    if (!activeWorkspace) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("suggestions")
         .select("*")
+        .eq("workspace_id", activeWorkspace.id)
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -126,7 +130,7 @@ const Suggestions = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeWorkspace]);
 
   const fetchAiConfig = useCallback(async () => {
     try {

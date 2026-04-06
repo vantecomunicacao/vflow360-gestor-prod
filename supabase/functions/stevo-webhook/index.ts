@@ -461,7 +461,7 @@ serve(async (req) => {
 
     const { data: integration } = await supabase
       .from("integrations")
-      .select("id, user_id, config")
+      .select("id, user_id, config, workspace_id")
       .eq("id", integrationId)
       .eq("type", "whatsapp_stevo")
       .single();
@@ -474,6 +474,7 @@ serve(async (req) => {
     }
 
     const userId = integration.user_id;
+    const workspaceId = integration.workspace_id;
 
     let payload = await req.json();
 
@@ -714,6 +715,7 @@ serve(async (req) => {
         .from("conversations")
         .insert({
           user_id: userId,
+          workspace_id: workspaceId,
           contact_name: effectiveContactName,
           contact_phone: phone,
           last_message: displayMessage,
