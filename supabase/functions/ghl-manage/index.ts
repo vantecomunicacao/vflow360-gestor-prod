@@ -167,11 +167,9 @@ serve(async (req) => {
       }
 
       case "disconnect": {
-        await supabase
-          .from("integrations")
-          .update({ status: "disconnected", config: {} })
-          .eq("user_id", user.id)
-          .eq("type", "ghl");
+        let dq = supabase.from("integrations").update({ status: "disconnected", config: {} }).eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) dq = dq.eq("workspace_id", workspaceId);
+        await dq;
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -179,12 +177,9 @@ serve(async (req) => {
       }
 
       case "status": {
-        const { data: integration } = await supabase
-          .from("integrations")
-          .select("config, status")
-          .eq("user_id", user.id)
-          .eq("type", "ghl")
-          .single();
+        let sq = supabase.from("integrations").select("config, status").eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) sq = sq.eq("workspace_id", workspaceId);
+        const { data: integration } = await sq.single();
 
         if (!integration) {
           return new Response(
