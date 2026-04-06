@@ -34,17 +34,24 @@ serve(async (req) => {
     const action = typeof payload.action === "string" ? payload.action : "";
     const apiKey = typeof payload.apiKey === "string" ? payload.apiKey.trim() : "";
     const locationId = typeof payload.locationId === "string" ? payload.locationId.trim() : "";
+    const workspaceId = typeof payload.workspace_id === "string" ? payload.workspace_id : null;
+
+    // Build base query for GHL integration
+    const ghlQuery = () => {
+      let q = supabase.from("integrations").select("*").eq("user_id", user.id).eq("type", "ghl");
+      if (workspaceId) q = q.eq("workspace_id", workspaceId);
+      return q;
+    };
 
     const clearGhlConnection = async () => {
-      await supabase.from("integrations").upsert(
-        {
-          user_id: user.id,
-          type: "ghl",
-          status: "disconnected",
-          config: {},
-        },
-        { onConflict: "user_id,type" }
-      );
+      const upsertData: Record<string, unknown> = {
+        user_id: user.id,
+        type: "ghl",
+        status: "disconnected",
+        config: {},
+      };
+      if (workspaceId) upsertData.workspace_id = workspaceId;
+      await supabase.from("integrations").upsert(upsertData, { onConflict: "user_id,type" });
     };
 
     const validateGhlCredentials = async (candidateApiKey: string, candidateLocationId: string) => {
