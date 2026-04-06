@@ -375,9 +375,11 @@ const Integrations = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
+      if (!activeWorkspace) throw new Error("No active workspace");
 
       const { data: inserted, error } = await supabase.from("integrations").insert({
         user_id: session.user.id,
+        workspace_id: activeWorkspace.id,
         type: "whatsapp_stevo",
         config: { label: `Stevo #${instances.filter(i => i.provider === "stevo").length + 1}` },
         status: "disconnected",
