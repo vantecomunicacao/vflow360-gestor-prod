@@ -470,6 +470,34 @@ REGRAS OBRIGATÓRIAS:
         console.error("Error inserting suggestion:", insertErr);
       } else if (inserted) {
         insertedSuggestions.push(inserted);
+
+        // Auto-execute if auto-approve is enabled
+        if (autoApprove) {
+          try {
+            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+            const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+            const execResp = await fetch(`${supabaseUrl}/functions/v1/ghl-manage`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({
+                action: "execute_suggestion",
+                userId: resolvedUserId,
+                suggestionId: inserted.id,
+              }),
+            });
+            const execResult = await execResp.json();
+            if (execResult.success) {
+              console.log(`Auto-executed suggestion ${inserted.id} (${s.type})`);
+            } else {
+              console.error(`Auto-execute failed for ${inserted.id}:`, execResult.error);
+            }
+          } catch (execErr) {
+            console.error(`Auto-execute error for ${inserted.id}:`, execErr);
+          }
+        }
       }
     }
 
