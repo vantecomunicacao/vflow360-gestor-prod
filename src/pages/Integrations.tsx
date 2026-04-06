@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 interface FieldOption {
   value: string;
@@ -68,6 +69,7 @@ const Integrations = () => {
     "Você é um assistente de CRM. Ao analisar conversas, leve em conta os campos personalizados e etapas do funil mapeados abaixo para gerar sugestões precisas."
   );
   const { toast } = useToast();
+  const { activeWorkspace } = useWorkspace();
 
   const resetGhlState = useCallback(() => {
     setGhlConnected(false);
