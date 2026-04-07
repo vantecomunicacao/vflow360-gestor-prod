@@ -133,20 +133,29 @@ const Suggestions = () => {
   }, [activeWorkspace]);
 
   const fetchAiConfig = useCallback(async () => {
+    if (!activeWorkspace) return;
     try {
       const { data } = await supabase
         .from("ai_config")
-        .select("action_type, enabled, auto_approve");
+        .select("action_type, enabled, auto_approve")
+        .eq("workspace_id", activeWorkspace.id);
 
       if (data) {
-        const config = { ...aiConfig };
+        const config: typeof aiConfig = {
+          mover_funil: { enabled: true, autoApprove: false },
+          campo_personalizado: { enabled: true, autoApprove: false },
+          adicionar_nota: { enabled: true, autoApprove: false },
+          valor_negociacao: { enabled: true, autoApprove: false },
+          agendar_lembrete: { enabled: true, autoApprove: false },
+          ganho_perdido: { enabled: true, autoApprove: false },
+        };
         for (const c of data) {
           config[c.action_type] = { enabled: c.enabled, autoApprove: c.auto_approve };
         }
         setAiConfig(config);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [activeWorkspace]);
 
   useEffect(() => {
     fetchSuggestions();
