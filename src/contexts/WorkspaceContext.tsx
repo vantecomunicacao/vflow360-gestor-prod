@@ -81,19 +81,20 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const createWorkspace = async (name: string): Promise<Workspace> => {
     if (!user) throw new Error("Not authenticated");
+    
+    const { data: workspaceId, error: rpcError } = await supabase
+      .rpc("create_workspace", { _name: name });
+    
+    if (rpcError) throw rpcError;
+
+    // Fetch the created workspace
     const { data, error } = await supabase
       .from("workspaces")
-      .insert({ name, owner_id: user.id })
-      .select()
+      .select("*")
+      .eq("id", workspaceId)
       .single();
+    
     if (error) throw error;
-
-    // Add user as owner member
-    await supabase.from("workspace_members").insert({
-      workspace_id: data.id,
-      user_id: user.id,
-      role: "owner",
-    });
 
     const ws = data as Workspace;
     setWorkspaces(prev => [...prev, ws]);
