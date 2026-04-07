@@ -34,7 +34,7 @@ serve(async (req) => {
     const action = typeof payload.action === "string" ? payload.action : "";
     const apiKey = typeof payload.apiKey === "string" ? payload.apiKey.trim() : "";
     const locationId = typeof payload.locationId === "string" ? payload.locationId.trim() : "";
-    const workspaceId = typeof payload.workspace_id === "string" ? payload.workspace_id : null;
+    let workspaceId = typeof payload.workspace_id === "string" ? payload.workspace_id : null;
 
     // Build base query for GHL integration
     const ghlQuery = () => {
@@ -44,14 +44,12 @@ serve(async (req) => {
     };
 
     const clearGhlConnection = async () => {
-      const upsertData: Record<string, unknown> = {
-        user_id: user.id,
-        type: "ghl",
+      let q = supabase.from("integrations").update({
         status: "disconnected",
         config: {},
-      };
-      if (workspaceId) upsertData.workspace_id = workspaceId;
-      await supabase.from("integrations").upsert(upsertData, { onConflict: "user_id,type" });
+      }).eq("user_id", user.id).eq("type", "ghl");
+      if (workspaceId) q = q.eq("workspace_id", workspaceId);
+      await q;
     };
 
     const validateGhlCredentials = async (candidateApiKey: string, candidateLocationId: string) => {
@@ -317,6 +315,11 @@ serve(async (req) => {
           .eq("user_id", user.id)
           .single();
         if (sugErr || !suggestion) throw new Error("Sugestão não encontrada");
+
+        // Resolve workspace_id from suggestion if not provided in payload
+        if (!workspaceId && suggestion.workspace_id) {
+          workspaceId = suggestion.workspace_id;
+        }
 
         const actionData = suggestion.action_data as Record<string, any>;
         const contactPhone = actionData?.contact_phone;
