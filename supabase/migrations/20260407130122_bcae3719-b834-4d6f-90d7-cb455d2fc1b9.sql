@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.integrations_user_id_type_unique;
