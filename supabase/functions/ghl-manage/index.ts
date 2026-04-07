@@ -162,7 +162,7 @@ serve(async (req) => {
 
         // Save credentials - check if integration exists first
         const connectConfig = { apiKey, locationId, locationName: locationData.location?.name || locationData.name || locationId };
-        let existQ = supabase.from("integrations").select("id").eq("user_id", user.id).eq("type", "ghl");
+        let existQ = supabase.from("integrations").select("id").eq("user_id", resolvedUserId!).eq("type", "ghl");
         if (workspaceId) existQ = existQ.eq("workspace_id", workspaceId);
         const { data: existing } = await existQ.maybeSingle();
         
@@ -170,7 +170,7 @@ serve(async (req) => {
           let upQ = supabase.from("integrations").update({ config: connectConfig, status: "connected" }).eq("id", existing.id);
           await upQ;
         } else {
-          const insertData: Record<string, unknown> = { user_id: user.id, type: "ghl", config: connectConfig, status: "connected" };
+          const insertData: Record<string, unknown> = { user_id: resolvedUserId!, type: "ghl", config: connectConfig, status: "connected" };
           if (workspaceId) insertData.workspace_id = workspaceId;
           await supabase.from("integrations").insert(insertData);
         }
@@ -188,7 +188,7 @@ serve(async (req) => {
       }
 
       case "disconnect": {
-        let dq = supabase.from("integrations").update({ status: "disconnected", config: {} }).eq("user_id", user.id).eq("type", "ghl");
+        let dq = supabase.from("integrations").update({ status: "disconnected", config: {} }).eq("user_id", resolvedUserId!).eq("type", "ghl");
         if (workspaceId) dq = dq.eq("workspace_id", workspaceId);
         await dq;
 
@@ -198,7 +198,7 @@ serve(async (req) => {
       }
 
       case "status": {
-        let sq = supabase.from("integrations").select("config, status").eq("user_id", user.id).eq("type", "ghl");
+        let sq = supabase.from("integrations").select("config, status").eq("user_id", resolvedUserId!).eq("type", "ghl");
         if (workspaceId) sq = sq.eq("workspace_id", workspaceId);
         const { data: integration } = await sq.single();
 
@@ -284,7 +284,7 @@ serve(async (req) => {
         const prompt = typeof payload.aiPrompt === "string" ? payload.aiPrompt : "";
         
         // Get current config to preserve apiKey/locationId
-        let smq = supabase.from("integrations").select("config").eq("user_id", user.id).eq("type", "ghl");
+        let smq = supabase.from("integrations").select("config").eq("user_id", resolvedUserId!).eq("type", "ghl");
         if (workspaceId) smq = smq.eq("workspace_id", workspaceId);
         const { data: currentIntegration } = await smq.single();
         
@@ -293,7 +293,7 @@ serve(async (req) => {
         
         let umq = supabase.from("integrations").update({
           config: { ...currentConfig, selectedFields, selectedStages, aiPrompt: prompt },
-        }).eq("user_id", user.id).eq("type", "ghl");
+        }).eq("user_id", resolvedUserId!).eq("type", "ghl");
         if (workspaceId) umq = umq.eq("workspace_id", workspaceId);
         await umq;
 
@@ -303,7 +303,7 @@ serve(async (req) => {
       }
 
       case "get_mappings": {
-        let gmq = supabase.from("integrations").select("config").eq("user_id", user.id).eq("type", "ghl");
+        let gmq = supabase.from("integrations").select("config").eq("user_id", resolvedUserId!).eq("type", "ghl");
         if (workspaceId) gmq = gmq.eq("workspace_id", workspaceId);
         const { data: integration } = await gmq.single();
         
@@ -335,7 +335,7 @@ serve(async (req) => {
           .from("suggestions")
           .select("*")
           .eq("id", suggestionId)
-          .eq("user_id", user.id)
+          .eq("user_id", resolvedUserId!)
           .single();
         if (sugErr || !suggestion) throw new Error("Sugestão não encontrada");
 
@@ -476,7 +476,7 @@ serve(async (req) => {
             const { data: ghlIntConfig } = await supabase
               .from("integrations")
               .select("config")
-              .eq("user_id", user.id)
+              .eq("user_id", resolvedUserId!)
               .eq("type", "ghl")
               .single();
             const ghlCfg = (ghlIntConfig?.config || {}) as Record<string, any>;
