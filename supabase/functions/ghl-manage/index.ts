@@ -318,6 +318,11 @@ serve(async (req) => {
           .single();
         if (sugErr || !suggestion) throw new Error("Sugestão não encontrada");
 
+        // Resolve workspace_id from suggestion if not provided in payload
+        if (!workspaceId && suggestion.workspace_id) {
+          workspaceId = suggestion.workspace_id;
+        }
+
         const actionData = suggestion.action_data as Record<string, any>;
         const contactPhone = actionData?.contact_phone;
         if (!contactPhone) throw new Error("Sugestão sem telefone de contato associado.");
