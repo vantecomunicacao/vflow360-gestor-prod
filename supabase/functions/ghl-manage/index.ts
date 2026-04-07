@@ -34,7 +34,7 @@ serve(async (req) => {
     const action = typeof payload.action === "string" ? payload.action : "";
     const apiKey = typeof payload.apiKey === "string" ? payload.apiKey.trim() : "";
     const locationId = typeof payload.locationId === "string" ? payload.locationId.trim() : "";
-    const workspaceId = typeof payload.workspace_id === "string" ? payload.workspace_id : null;
+    let workspaceId = typeof payload.workspace_id === "string" ? payload.workspace_id : null;
 
     // Build base query for GHL integration
     const ghlQuery = () => {
