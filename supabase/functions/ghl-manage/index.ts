@@ -473,12 +473,13 @@ serve(async (req) => {
             if (!targetStageName) throw new Error("Etapa de destino não especificada na sugestão.");
             
             // Get selected stages from user config to restrict to allowed pipelines
-            const { data: ghlIntConfig } = await supabase
+            let stageQ = supabase
               .from("integrations")
               .select("config")
               .eq("user_id", resolvedUserId!)
-              .eq("type", "ghl")
-              .single();
+              .eq("type", "ghl");
+            if (workspaceId) stageQ = stageQ.eq("workspace_id", workspaceId);
+            const { data: ghlIntConfig } = await stageQ.single();
             const ghlCfg = (ghlIntConfig?.config || {}) as Record<string, any>;
             const configSelectedStages = (ghlCfg.selectedStages || []) as Array<{ id: string; name: string; pipelineId: string; pipelineName: string }>;
             
