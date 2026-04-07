@@ -79,12 +79,13 @@ serve(async (req) => {
     }
 
     // 3. Fetch GHL integration config (mappings)
-    const { data: ghlIntegration } = await supabase
+    let ghlQuery = supabase
       .from("integrations")
       .select("config, status")
       .eq("user_id", resolvedUserId)
-      .eq("type", "ghl")
-      .single();
+      .eq("type", "ghl");
+    if (conversation?.workspace_id) ghlQuery = ghlQuery.eq("workspace_id", conversation.workspace_id);
+    const { data: ghlIntegration } = await ghlQuery.single();
 
     const ghlConfig = (ghlIntegration?.config || {}) as Record<string, any>;
     const selectedFields = ghlConfig.selectedFields || [];
@@ -92,10 +93,12 @@ serve(async (req) => {
     const aiPrompt = ghlConfig.aiPrompt || "";
 
     // 4. Fetch AI config (which actions are enabled)
-    const { data: aiConfigs } = await supabase
+    let aiConfigQuery = supabase
       .from("ai_config")
       .select("action_type, enabled, auto_approve")
       .eq("user_id", resolvedUserId);
+    if (conversation?.workspace_id) aiConfigQuery = aiConfigQuery.eq("workspace_id", conversation.workspace_id);
+    const { data: aiConfigs } = await aiConfigQuery;
 
     const enabledActions = new Map<string, { enabled: boolean; autoApprove: boolean }>();
     const defaultActions = [

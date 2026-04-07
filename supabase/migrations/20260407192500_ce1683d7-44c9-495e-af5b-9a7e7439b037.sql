@@ -1,0 +1,2 @@
+ALTER TABLE public.ai_config DROP CONSTRAINT IF EXISTS ai_config_user_id_action_type_key;
+ALTER TABLE public.ai_config ADD CONSTRAINT ai_config_user_workspace_action_key UNIQUE (user_id, workspace_id, action_type);
