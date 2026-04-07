@@ -142,15 +142,20 @@ serve(async (req) => {
           throw validationError;
         }
 
-        // Save credentials
-        const upsertData: Record<string, unknown> = {
-          user_id: user.id,
-          type: "ghl",
-          config: { apiKey, locationId, locationName: locationData.location?.name || locationData.name || locationId },
-          status: "connected",
-        };
-        if (workspaceId) upsertData.workspace_id = workspaceId;
-        await supabase.from("integrations").upsert(upsertData, { onConflict: "user_id,type" });
+        // Save credentials - check if integration exists first
+        const connectConfig = { apiKey, locationId, locationName: locationData.location?.name || locationData.name || locationId };
+        let existQ = supabase.from("integrations").select("id").eq("user_id", user.id).eq("type", "ghl");
+        if (workspaceId) existQ = existQ.eq("workspace_id", workspaceId);
+        const { data: existing } = await existQ.maybeSingle();
+        
+        if (existing) {
+          let upQ = supabase.from("integrations").update({ config: connectConfig, status: "connected" }).eq("id", existing.id);
+          await upQ;
+        } else {
+          const insertData: Record<string, unknown> = { user_id: user.id, type: "ghl", config: connectConfig, status: "connected" };
+          if (workspaceId) insertData.workspace_id = workspaceId;
+          await supabase.from("integrations").insert(insertData);
+        }
 
         return new Response(
           JSON.stringify({
