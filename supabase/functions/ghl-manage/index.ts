@@ -44,14 +44,12 @@ serve(async (req) => {
     };
 
     const clearGhlConnection = async () => {
-      const upsertData: Record<string, unknown> = {
-        user_id: user.id,
-        type: "ghl",
+      let q = supabase.from("integrations").update({
         status: "disconnected",
         config: {},
-      };
-      if (workspaceId) upsertData.workspace_id = workspaceId;
-      await supabase.from("integrations").upsert(upsertData, { onConflict: "user_id,type" });
+      }).eq("user_id", user.id).eq("type", "ghl");
+      if (workspaceId) q = q.eq("workspace_id", workspaceId);
+      await q;
     };
 
     const validateGhlCredentials = async (candidateApiKey: string, candidateLocationId: string) => {

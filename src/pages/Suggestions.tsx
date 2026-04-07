@@ -188,7 +188,7 @@ const Suggestions = () => {
       setExecutingId(id);
       try {
         const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", {
-          body: { action: "execute_suggestion", suggestionId: id },
+          body: { action: "execute_suggestion", suggestionId: id, workspace_id: activeWorkspace?.id },
         });
 
         if (fnError || !result?.success) {
