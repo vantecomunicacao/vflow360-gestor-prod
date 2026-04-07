@@ -178,12 +178,31 @@ const Suggestions = () => {
   const saveConfigItem = async (actionType: string, config: { enabled: boolean; autoApprove: boolean }) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !activeWorkspace) return;
 
-      await supabase.from("ai_config").upsert(
-        { user_id: user.id, action_type: actionType, enabled: config.enabled, auto_approve: config.autoApprove },
-        { onConflict: "user_id,action_type" }
-      );
+      // Check if record exists for this workspace
+      const { data: existing } = await supabase
+        .from("ai_config")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("action_type", actionType)
+        .eq("workspace_id", activeWorkspace.id)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from("ai_config")
+          .update({ enabled: config.enabled, auto_approve: config.autoApprove })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("ai_config")
+          .insert({
+            user_id: user.id,
+            action_type: actionType,
+            enabled: config.enabled,
+            auto_approve: config.autoApprove,
+            workspace_id: activeWorkspace.id,
+          });
+      }
     } catch (error) {
       console.error("Error saving ai config:", error);
     }
