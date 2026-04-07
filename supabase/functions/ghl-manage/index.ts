@@ -65,7 +65,7 @@ serve(async (req) => {
       let q = supabase.from("integrations").update({
         status: "disconnected",
         config: {},
-      }).eq("user_id", user.id).eq("type", "ghl");
+      }).eq("user_id", resolvedUserId!).eq("type", "ghl");
       if (workspaceId) q = q.eq("workspace_id", workspaceId);
       await q;
     };
@@ -94,7 +94,7 @@ serve(async (req) => {
 
     // Helper to get stored GHL credentials
     const getGhlCredentials = async () => {
-      let q = supabase.from("integrations").select("config, status").eq("user_id", user.id).eq("type", "ghl");
+      let q = supabase.from("integrations").select("config, status").eq("user_id", resolvedUserId!).eq("type", "ghl");
       if (workspaceId) q = q.eq("workspace_id", workspaceId);
       const { data: integration } = await q.single();
       if (!integration || integration.status !== "connected") {
