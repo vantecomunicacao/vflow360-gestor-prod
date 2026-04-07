@@ -18,17 +18,28 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Verify user auth
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Verify user auth - support service role calls (from ai-analyze auto-execute)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization header");
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const token = authHeader.replace("Bearer ", "");
-    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) throw new Error("Unauthorized");
+    const isServiceRole = token === SUPABASE_SERVICE_ROLE_KEY;
+
+    let resolvedUserId: string | null = null;
+
+    if (isServiceRole) {
+      // Called internally by another edge function with service role key
+      // userId will come from the payload
+    } else {
+      const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) throw new Error("Unauthorized");
+      resolvedUserId = user.id;
+    }
 
     const payload = await req.json().catch(() => ({} as Record<string, unknown>));
     const action = typeof payload.action === "string" ? payload.action : "";
@@ -36,9 +47,16 @@ serve(async (req) => {
     const locationId = typeof payload.locationId === "string" ? payload.locationId.trim() : "";
     let workspaceId = typeof payload.workspace_id === "string" ? payload.workspace_id : null;
 
+    // For service role calls, get userId from payload
+    if (isServiceRole && payload.userId) {
+      resolvedUserId = payload.userId as string;
+    }
+
+    if (!resolvedUserId) throw new Error("Unauthorized: no user identified");
+
     // Build base query for GHL integration
     const ghlQuery = () => {
-      let q = supabase.from("integrations").select("*").eq("user_id", user.id).eq("type", "ghl");
+      let q = supabase.from("integrations").select("*").eq("user_id", resolvedUserId!).eq("type", "ghl");
       if (workspaceId) q = q.eq("workspace_id", workspaceId);
       return q;
     };
