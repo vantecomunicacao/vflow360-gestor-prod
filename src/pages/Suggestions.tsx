@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useSuggestions, useAiConfig, useDisabledContacts } from "@/hooks/use-suggestions";
 
 type SuggestionStatus = "pending" | "approved" | "rejected";
 
