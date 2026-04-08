@@ -157,6 +157,11 @@ const Conversations = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground">{contact.contact_name || contact.contact_phone}</span>
+                      {contact.integration_label && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+                          {contact.integration_label}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{contact.last_message}</p>
                   </div>
