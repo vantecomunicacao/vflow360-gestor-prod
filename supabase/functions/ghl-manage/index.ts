@@ -565,12 +565,26 @@ serve(async (req) => {
           }
 
           case "campo_personalizado": {
-            const fieldKey = actionData?.field;
+            let fieldKey = actionData?.field;
             const fieldValue = actionData?.value;
             if (!fieldKey || !fieldValue) throw new Error("Campo ou valor não especificado na sugestão.");
             
+            // Strip "contact." prefix if present
+            const isContactPrefixed = fieldKey.startsWith("contact.");
+            if (isContactPrefixed) {
+              fieldKey = fieldKey.replace(/^contact\./, "");
+            }
+            
             // Determine if the field is an opportunity-level or contact-level field
             const isOpportunityField = fieldKey.startsWith("opportunity.") || fieldKey.startsWith("opportunity_");
+            
+            // Standard GHL contact fields that are top-level properties (not customFields)
+            const standardContactFields = new Set([
+              "firstName", "lastName", "name", "email", "phone",
+              "address1", "city", "state", "country", "postalCode",
+              "website", "timezone", "dnd", "source", "companyName",
+              "dateOfBirth", "gender",
+            ]);
             
             if (isOpportunityField) {
               // Update on opportunity using customFields - strip the opportunity. prefix
@@ -579,8 +593,14 @@ serve(async (req) => {
                 customFields: [{ key: cleanKey, field_value: fieldValue }],
               }, true);
               console.log(`Updated opportunity custom field: ${cleanKey} = ${fieldValue}`);
+            } else if (standardContactFields.has(fieldKey)) {
+              // Standard contact field - update as top-level property
+              await callGhl(`/contacts/${contactId}`, "PUT", {
+                [fieldKey]: fieldValue,
+              }, true);
+              console.log(`Updated standard contact field: ${fieldKey} = ${fieldValue}`);
             } else {
-              // Update on contact - GHL v2 API requires 'field_value' not 'value'
+              // Custom contact field - use customFields array
               await callGhl(`/contacts/${contactId}`, "PUT", {
                 customFields: [{ key: fieldKey, field_value: fieldValue }],
               }, true);
