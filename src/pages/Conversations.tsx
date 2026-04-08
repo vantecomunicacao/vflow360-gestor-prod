@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,8 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useConversations, useMessages, type Conversation } from "@/hooks/use-conversations";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Message {
   id: string;
@@ -15,74 +17,28 @@ interface Message {
   created_at: string;
 }
 
-interface Conversation {
-  id: string;
-  contact_name: string | null;
-  contact_phone: string | null;
-  last_message: string | null;
-  last_message_at: string | null;
-  unread_count: number;
-  integration_type: string | null;
-}
-
 const Conversations = () => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
+  const queryClient = useQueryClient();
+  
+  const { data: conversations = [], isLoading: loading } = useConversations();
+  const { data: messages = [] } = useMessages(selected?.id ?? null);
 
-  const fetchConversations = useCallback(async () => {
-    if (!activeWorkspace) return;
-    try {
-      const { data, error } = await supabase
-        .from("conversations")
-        .select("*")
-        .eq("workspace_id", activeWorkspace.id)
-        .order("last_message_at", { ascending: false });
-
-      if (error) throw error;
-      setConversations(data || []);
-      if (!selected && data && data.length > 0) {
-        setSelected(data[0]);
-      }
-    } catch (error) {
-      console.error("Error fetching conversations:", error);
-    } finally {
-      setLoading(false);
+  // Auto-select first conversation when data loads
+  useEffect(() => {
+    if (!selected && conversations.length > 0) {
+      setSelected(conversations[0]);
     }
-  }, [activeWorkspace]);
+  }, [conversations]);
 
-  const fetchMessages = useCallback(async (conversationId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-    }
-  }, []);
-
+  // Reset selection when workspace changes
   useEffect(() => {
     setSelected(null);
-    setMessages([]);
-    setLoading(true);
-    fetchConversations();
-  }, [fetchConversations]);
-
-  useEffect(() => {
-    if (selected) {
-      fetchMessages(selected.id);
-    }
-  }, [selected, fetchMessages]);
+  }, [activeWorkspace?.id]);
 
   const handleDelete = async (conversation: Conversation) => {
     if (!confirm(`Tem certeza que deseja apagar a conversa com ${conversation.contact_name || conversation.contact_phone}? Todas as mensagens e sugestões serão removidas.`)) return;
@@ -94,10 +50,9 @@ const Conversations = () => {
       const { error } = await supabase.from("conversations").delete().eq("id", conversation.id);
       if (error) throw error;
 
-      setConversations(prev => prev.filter(c => c.id !== conversation.id));
+      queryClient.invalidateQueries({ queryKey: ["conversations", activeWorkspace?.id] });
       if (selected?.id === conversation.id) {
         setSelected(null);
-        setMessages([]);
       }
       toast({ title: "Conversa apagada com sucesso" });
     } catch (error) {
