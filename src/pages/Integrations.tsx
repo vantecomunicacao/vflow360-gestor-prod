@@ -463,6 +463,39 @@ const Integrations = () => {
     toast({ title: "Copiado!", description: "Webhook URL copiado para a área de transferência." });
   };
 
+  const handleRenameInstance = async (inst: WhatsAppInstance) => {
+    const newLabel = editLabelValue.trim();
+    if (!newLabel || newLabel === inst.label) {
+      setEditingLabel(null);
+      return;
+    }
+    try {
+      if (inst.provider === "uazap") {
+        // Update label in integration config via uazap-manage or directly
+        const { data: integration } = await supabase
+          .from("integrations")
+          .select("config")
+          .eq("id", inst.id)
+          .single();
+        const config = (integration?.config as Record<string, unknown>) || {};
+        await supabase.from("integrations").update({ config: { ...config, label: newLabel } }).eq("id", inst.id);
+      } else {
+        const { data: integration } = await supabase
+          .from("integrations")
+          .select("config")
+          .eq("id", inst.id)
+          .single();
+        const config = (integration?.config as Record<string, unknown>) || {};
+        await supabase.from("integrations").update({ config: { ...config, label: newLabel } }).eq("id", inst.id);
+      }
+      updateInstance(inst.id, { label: newLabel });
+      setEditingLabel(null);
+      toast({ title: "Nome atualizado!" });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao renomear", variant: "destructive" });
+    }
+  };
+
   const toggleField = (id: string) => {
     setGhlFields(prev => prev.map(f => f.id === id ? { ...f, selected: !f.selected } : f));
   };
