@@ -50,10 +50,9 @@ const Conversations = () => {
       const { error } = await supabase.from("conversations").delete().eq("id", conversation.id);
       if (error) throw error;
 
-      setConversations(prev => prev.filter(c => c.id !== conversation.id));
+      queryClient.invalidateQueries({ queryKey: ["conversations", activeWorkspace?.id] });
       if (selected?.id === conversation.id) {
         setSelected(null);
-        setMessages([]);
       }
       toast({ title: "Conversa apagada com sucesso" });
     } catch (error) {
