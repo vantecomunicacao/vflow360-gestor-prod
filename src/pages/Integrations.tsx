@@ -616,7 +616,26 @@ const Integrations = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-success" />
-                    <span className="text-sm font-medium text-foreground">{inst.label}</span>
+                    {editingLabel === inst.id ? (
+                      <Input
+                        className="h-7 w-40 text-sm"
+                        value={editLabelValue}
+                        onChange={(e) => setEditLabelValue(e.target.value)}
+                        onBlur={() => handleRenameInstance(inst)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleRenameInstance(inst); if (e.key === "Escape") setEditingLabel(null); }}
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium text-foreground">{inst.label}</span>
+                        <button
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => { setEditingLabel(inst.id); setEditLabelValue(inst.label); }}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
                       {inst.provider === "uazap" ? "Uazap" : "Stevo"}
                     </Badge>
