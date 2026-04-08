@@ -56,6 +56,8 @@ const Integrations = () => {
   const [loadingInstances, setLoadingInstances] = useState(true);
   const [creatingNew, setCreatingNew] = useState(false);
   const [showProviderPicker, setShowProviderPicker] = useState(false);
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = useState("");
   const [ghlConnected, setGhlConnected] = useState(false);
   const [ghlLocationName, setGhlLocationName] = useState("");
   const [loadingGhl, setLoadingGhl] = useState(false);
