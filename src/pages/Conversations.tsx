@@ -190,7 +190,12 @@ const Conversations = () => {
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Phone className="w-3 h-3" /> {selected.contact_phone}
                   </p>
-                  {selected.integration_type && (
+                  {selected.integration_label && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                      {selected.integration_label}
+                    </Badge>
+                  )}
+                  {!selected.integration_label && selected.integration_type && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
                       {selected.integration_type === "stevo" ? "Stevo" : "Uazap"}
                     </Badge>
