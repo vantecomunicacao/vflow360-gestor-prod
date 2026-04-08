@@ -293,6 +293,14 @@ REGRAS OBRIGATÓRIAS:
                           ? `Para mover_funil: DEVE ser um destes valores exatos: ${stageNames.map((n: string) => `"${n}"`).join(", ")}. Para campo_personalizado com opções: use apenas valores da lista de opções válidas. Para outros: valor livre.`
                           : "Valor sugerido para o campo ou nome da etapa destino",
                       },
+                      task_title: {
+                        type: "string",
+                        description: "Apenas para agendar_lembrete: título da tarefa (ex: 'Retornar ligação', 'Enviar proposta'). Padrão: 'Entrar em contato'.",
+                      },
+                      due_date: {
+                        type: "string",
+                        description: "Apenas para agendar_lembrete: data/hora de vencimento em ISO 8601 (ex: '2026-04-10T14:00:00'). Se não mencionada na conversa, omitir (será 24h a partir de agora).",
+                      },
                     },
                     required: ["type", "title", "description"],
                     additionalProperties: false,
