@@ -1,0 +1,1 @@
+ALTER TABLE public.conversations ADD COLUMN integration_label text;
