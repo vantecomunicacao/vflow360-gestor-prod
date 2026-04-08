@@ -404,20 +404,39 @@ serve(async (req) => {
           const formattedPhone = baseNumber.length >= 10 ? `+55${baseNumber}` : contactPhone;
           const contactName = actionData?.contact_name || `Lead ${formattedPhone}`;
 
-          const newContact = await callGhl("/contacts/", "POST", {
-            locationId: creds.locationId,
-            phone: formattedPhone,
-            name: contactName,
-            firstName: contactName.split(" ")[0],
-            lastName: contactName.split(" ").slice(1).join(" ") || "",
-            ...(contactEmail ? { email: contactEmail } : {}),
-          }, true) as any;
+          try {
+            const newContact = await callGhl("/contacts/", "POST", {
+              locationId: creds.locationId,
+              phone: formattedPhone,
+              name: contactName,
+              firstName: contactName.split(" ")[0],
+              lastName: contactName.split(" ").slice(1).join(" ") || "",
+              ...(contactEmail ? { email: contactEmail } : {}),
+            }, true) as any;
 
-          contact = newContact?.contact || newContact;
-          if (!contact?.id) throw new Error("Falha ao criar contato no CRM.");
-          contactId = contact.id;
-          contactCreated = true;
-          console.log(`Created new GHL contact: ${contactId}`);
+            contact = newContact?.contact || newContact;
+            if (!contact?.id) throw new Error("Falha ao criar contato no CRM.");
+            contactId = contact.id;
+            contactCreated = true;
+            console.log(`Created new GHL contact: ${contactId}`);
+          } catch (createErr: any) {
+            // Handle duplicate contact error - extract existing contactId from error
+            const errMsg = createErr?.message || "";
+            const dupMatch = errMsg.match(/"contactId"\s*:\s*"([^"]+)"/);
+            if (dupMatch && dupMatch[1]) {
+              contactId = dupMatch[1];
+              console.log(`Duplicate contact detected, using existing contactId: ${contactId}`);
+              // Fetch the existing contact details
+              try {
+                const existingContact = await callGhl(`/contacts/${contactId}`, "GET", undefined, true) as any;
+                contact = existingContact?.contact || existingContact || { id: contactId };
+              } catch {
+                contact = { id: contactId };
+              }
+            } else {
+              throw createErr;
+            }
+          }
         } else {
           contact = contacts[0];
           contactId = contact.id;
