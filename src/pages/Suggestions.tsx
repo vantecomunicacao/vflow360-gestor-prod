@@ -185,7 +185,7 @@ const Suggestions = () => {
         if (fnError || !result?.success) {
           const errorMsg = result?.error || fnError?.message || "Erro ao executar a sugestão no CRM.";
           toast({ title: "Erro ao executar", description: errorMsg, variant: "destructive" });
-          setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: "approved" as SuggestionStatus } : s));
+          // Keep status as pending so user can retry
           return;
         }
 
