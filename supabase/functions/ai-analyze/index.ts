@@ -510,9 +510,14 @@ REGRAS OBRIGATÓRIAS:
               console.log(`Auto-executed suggestion ${inserted.id} (${s.type})`);
             } else {
               console.error(`Auto-execute failed for ${inserted.id}:`, execResult.error);
+              // Revert status to pending so user can retry manually
+              await supabase.from("suggestions").update({ status: "pending" }).eq("id", inserted.id);
+              console.log(`Reverted suggestion ${inserted.id} to pending after failed auto-execute`);
             }
           } catch (execErr) {
             console.error(`Auto-execute error for ${inserted.id}:`, execErr);
+            // Revert status to pending so user can retry manually
+            await supabase.from("suggestions").update({ status: "pending" }).eq("id", inserted.id);
           }
         }
       }
