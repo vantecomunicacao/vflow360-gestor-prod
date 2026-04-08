@@ -1,4 +1,4 @@
-import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Sparkles, Loader2, Wifi, WifiOff, Download, Plus, Trash2, Copy, Clock } from "lucide-react";
+import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Sparkles, Loader2, Wifi, WifiOff, Download, Plus, Trash2, Copy, Clock, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,8 @@ const Integrations = () => {
   const [loadingInstances, setLoadingInstances] = useState(true);
   const [creatingNew, setCreatingNew] = useState(false);
   const [showProviderPicker, setShowProviderPicker] = useState(false);
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = useState("");
   const [ghlConnected, setGhlConnected] = useState(false);
   const [ghlLocationName, setGhlLocationName] = useState("");
   const [loadingGhl, setLoadingGhl] = useState(false);
@@ -461,6 +463,39 @@ const Integrations = () => {
     toast({ title: "Copiado!", description: "Webhook URL copiado para a área de transferência." });
   };
 
+  const handleRenameInstance = async (inst: WhatsAppInstance) => {
+    const newLabel = editLabelValue.trim();
+    if (!newLabel || newLabel === inst.label) {
+      setEditingLabel(null);
+      return;
+    }
+    try {
+      if (inst.provider === "uazap") {
+        // Update label in integration config via uazap-manage or directly
+        const { data: integration } = await supabase
+          .from("integrations")
+          .select("config")
+          .eq("id", inst.id)
+          .single();
+        const config = (integration?.config as Record<string, unknown>) || {};
+        await supabase.from("integrations").update({ config: { ...config, label: newLabel } }).eq("id", inst.id);
+      } else {
+        const { data: integration } = await supabase
+          .from("integrations")
+          .select("config")
+          .eq("id", inst.id)
+          .single();
+        const config = (integration?.config as Record<string, unknown>) || {};
+        await supabase.from("integrations").update({ config: { ...config, label: newLabel } }).eq("id", inst.id);
+      }
+      updateInstance(inst.id, { label: newLabel });
+      setEditingLabel(null);
+      toast({ title: "Nome atualizado!" });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao renomear", variant: "destructive" });
+    }
+  };
+
   const toggleField = (id: string) => {
     setGhlFields(prev => prev.map(f => f.id === id ? { ...f, selected: !f.selected } : f));
   };
@@ -581,7 +616,26 @@ const Integrations = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-success" />
-                    <span className="text-sm font-medium text-foreground">{inst.label}</span>
+                    {editingLabel === inst.id ? (
+                      <Input
+                        className="h-7 w-40 text-sm"
+                        value={editLabelValue}
+                        onChange={(e) => setEditLabelValue(e.target.value)}
+                        onBlur={() => handleRenameInstance(inst)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleRenameInstance(inst); if (e.key === "Escape") setEditingLabel(null); }}
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium text-foreground">{inst.label}</span>
+                        <button
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => { setEditingLabel(inst.id); setEditLabelValue(inst.label); }}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
                       {inst.provider === "uazap" ? "Uazap" : "Stevo"}
                     </Badge>

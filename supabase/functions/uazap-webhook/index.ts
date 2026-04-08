@@ -466,7 +466,8 @@ serve(async (req) => {
 
     const userId = integration.user_id;
     const workspaceId = integration.workspace_id;
-    const integrationConfig = integration.config as { token?: string; instanceName?: string };
+    const integrationConfig = integration.config as { token?: string; instanceName?: string; label?: string };
+    const integrationLabel = integrationConfig.label || "Uazap";
     const instToken = integrationConfig.token || instanceToken || "";
     // Handle connection status changes
     if (event === "status" || event === "connection.update" || event === "status_instance") {
@@ -641,6 +642,7 @@ serve(async (req) => {
             last_message_at: new Date().toISOString(),
             unread_count: isFromMe ? 0 : 1,
             integration_type: "uazap",
+            integration_label: integrationLabel,
           })
           .select("id, unread_count")
           .single();
@@ -654,6 +656,7 @@ serve(async (req) => {
             contact_name: contactName,
             unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
             integration_type: "uazap",
+            integration_label: integrationLabel,
           })
           .eq("id", conversation.id);
       }

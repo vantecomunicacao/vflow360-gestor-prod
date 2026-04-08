@@ -475,6 +475,8 @@ serve(async (req) => {
 
     const userId = integration.user_id;
     const workspaceId = integration.workspace_id;
+    const integrationConfig = integration.config as { label?: string; last_webhook_at?: string; serverUrl?: string; instanceToken?: string } || {};
+    const integrationLabel = integrationConfig.label || "Stevo";
 
     let payload = await req.json();
 
@@ -722,6 +724,7 @@ serve(async (req) => {
           last_message_at: msgTimestamp,
           unread_count: isFromMe ? 0 : 1,
           integration_type: "stevo",
+          integration_label: integrationLabel,
         })
         .select("id, unread_count, contact_name")
         .single();
@@ -733,6 +736,7 @@ serve(async (req) => {
         last_message_at: msgTimestamp,
         unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
         integration_type: "stevo",
+        integration_label: integrationLabel,
       };
 
       if (inboundContactName) {

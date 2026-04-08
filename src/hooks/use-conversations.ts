@@ -10,6 +10,7 @@ export interface Conversation {
   last_message_at: string | null;
   unread_count: number;
   integration_type: string | null;
+  integration_label: string | null;
 }
 
 export function useConversations() {

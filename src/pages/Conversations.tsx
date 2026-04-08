@@ -157,6 +157,11 @@ const Conversations = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground">{contact.contact_name || contact.contact_phone}</span>
+                      {contact.integration_label && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+                          {contact.integration_label}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{contact.last_message}</p>
                   </div>
@@ -185,7 +190,12 @@ const Conversations = () => {
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Phone className="w-3 h-3" /> {selected.contact_phone}
                   </p>
-                  {selected.integration_type && (
+                  {selected.integration_label && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                      {selected.integration_label}
+                    </Badge>
+                  )}
+                  {!selected.integration_label && selected.integration_type && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
                       {selected.integration_type === "stevo" ? "Stevo" : "Uazap"}
                     </Badge>
@@ -221,26 +231,40 @@ const Conversations = () => {
                   Nenhuma mensagem nesta conversa
                 </div>
               ) : (
-                messages.map((msg, i) => (
-                  <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.02 }}
-                    className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div className={`max-w-[70%] rounded-xl px-4 py-2.5 ${
-                      msg.direction === "outbound"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground"
-                    }`}>
-                      <p className="text-sm">{msg.content}</p>
-                      <p className={`text-xs mt-1 ${msg.direction === "outbound" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                        {new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                      </p>
+                messages.map((msg, i) => {
+                  const msgDate = new Date(msg.created_at).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+                  const prevDate = i > 0 ? new Date(messages[i - 1].created_at).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : null;
+                  const showDateSeparator = i === 0 || msgDate !== prevDate;
+
+                  return (
+                    <div key={msg.id}>
+                      {showDateSeparator && (
+                        <div className="flex items-center justify-center my-4">
+                          <div className="bg-muted text-muted-foreground text-xs px-3 py-1 rounded-full capitalize">
+                            {msgDate}
+                          </div>
+                        </div>
+                      )}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.02 }}
+                        className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div className={`max-w-[70%] rounded-xl px-4 py-2.5 ${
+                          msg.direction === "outbound"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground"
+                        }`}>
+                          <p className="text-sm">{msg.content}</p>
+                          <p className={`text-xs mt-1 ${msg.direction === "outbound" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                            {new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                      </motion.div>
                     </div>
-                  </motion.div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
