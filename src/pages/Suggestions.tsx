@@ -70,7 +70,6 @@ const suggestionTypeOptions = [
 
 const Suggestions = () => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<SuggestionStatus | "all">("all");
   const [aiConfig, setAiConfig] = useState<Record<string, { enabled: boolean; autoApprove: boolean }>>(
     Object.fromEntries(suggestionTypeOptions.map(o => [o.key, { enabled: true, autoApprove: false }]))
@@ -81,17 +80,29 @@ const Suggestions = () => {
   const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
+  const queryClient = useQueryClient();
 
-  const fetchDisabledContacts = useCallback(async () => {
-    try {
-      const { data } = await supabase
-        .from("disabled_contacts")
-        .select("contact_phone");
-      if (data) {
-        setDisabledContacts(new Set(data.map((d: any) => d.contact_phone)));
-      }
-    } catch { /* ignore */ }
-  }, []);
+  // React Query cached fetches
+  const { data: suggestionsData, isLoading: loading, refetch: refetchSuggestions } = useSuggestions();
+  const { data: aiConfigData } = useAiConfig();
+  const { data: disabledContactsData } = useDisabledContacts();
+
+  // Sync React Query data to local state for optimistic updates
+  useEffect(() => {
+    if (suggestionsData) setSuggestions(suggestionsData as unknown as Suggestion[]);
+  }, [suggestionsData]);
+
+  useEffect(() => {
+    if (aiConfigData) setAiConfig(aiConfigData);
+  }, [aiConfigData]);
+
+  useEffect(() => {
+    if (disabledContactsData) setDisabledContacts(disabledContactsData);
+  }, [disabledContactsData]);
+
+  const fetchSuggestions = useCallback(() => {
+    refetchSuggestions();
+  }, [refetchSuggestions]);
 
   const toggleContactAI = async (phone: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -109,61 +120,11 @@ const Suggestions = () => {
         setDisabledContacts(prev => new Set(prev).add(phone));
         toast({ title: "IA desativada", description: "A IA não analisará mais este contato." });
       }
+      queryClient.invalidateQueries({ queryKey: ["disabled_contacts", activeWorkspace?.id] });
     } catch {
       toast({ title: "Erro", description: "Não foi possível alterar a configuração.", variant: "destructive" });
     }
   };
-
-  const fetchSuggestions = useCallback(async () => {
-    if (!activeWorkspace) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("suggestions")
-        .select("*")
-        .eq("workspace_id", activeWorkspace.id)
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-      setSuggestions((data || []) as unknown as Suggestion[]);
-    } catch (error) {
-      console.error("Error fetching suggestions:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeWorkspace]);
-
-  const fetchAiConfig = useCallback(async () => {
-    if (!activeWorkspace) return;
-    try {
-      const { data } = await supabase
-        .from("ai_config")
-        .select("action_type, enabled, auto_approve")
-        .eq("workspace_id", activeWorkspace.id);
-
-      if (data) {
-        const config: typeof aiConfig = {
-          mover_funil: { enabled: true, autoApprove: false },
-          campo_personalizado: { enabled: true, autoApprove: false },
-          adicionar_nota: { enabled: true, autoApprove: false },
-          valor_negociacao: { enabled: true, autoApprove: false },
-          agendar_lembrete: { enabled: true, autoApprove: false },
-          ganho_perdido: { enabled: true, autoApprove: false },
-        };
-        for (const c of data) {
-          config[c.action_type] = { enabled: c.enabled, autoApprove: c.auto_approve };
-        }
-        setAiConfig(config);
-      }
-    } catch { /* ignore */ }
-  }, [activeWorkspace]);
-
-  useEffect(() => {
-    fetchSuggestions();
-    fetchAiConfig();
-    fetchDisabledContacts();
-  }, [fetchSuggestions, fetchAiConfig, fetchDisabledContacts]);
 
   const toggleEnabled = async (key: string) => {
     const newConfig = { ...aiConfig, [key]: { ...aiConfig[key], enabled: !aiConfig[key].enabled } };
