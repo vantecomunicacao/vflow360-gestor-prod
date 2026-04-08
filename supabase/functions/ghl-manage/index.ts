@@ -600,12 +600,28 @@ serve(async (req) => {
           }
 
           case "agendar_lembrete": {
-            // Add as a note with reminder tag since GHL tasks API may vary
-            const reminderText = actionData?.value || suggestion.title;
-            await callGhl(`/contacts/${contactId}/notes`, "POST", {
-              body: `⏰ LEMBRETE: ${reminderText}`,
+            const taskTitle = actionData?.task_title || actionData?.value || suggestion.title || "Entrar em contato";
+            const taskDescription = actionData?.task_description || suggestion.description || "";
+            
+            // Calculate due date: use provided date or default to 24h from now
+            let dueDate: string;
+            if (actionData?.due_date) {
+              dueDate = new Date(actionData.due_date).toISOString();
+            } else {
+              const tomorrow = new Date();
+              tomorrow.setHours(tomorrow.getHours() + 24);
+              dueDate = tomorrow.toISOString();
+            }
+
+            await callGhl(`/contacts/${contactId}/tasks`, "POST", {
+              title: taskTitle,
+              body: taskDescription,
+              dueDate: dueDate,
+              completed: false,
             }, true);
-            executionResult = `Lembrete adicionado como nota no contato`;
+            
+            const formattedDate = new Date(dueDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+            executionResult = `Tarefa "${taskTitle}" criada com vencimento em ${formattedDate}`;
             break;
           }
 

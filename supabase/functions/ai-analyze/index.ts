@@ -199,7 +199,7 @@ ${filteredActionTypes.includes("mover_funil") ? "- mover_funil: Sugerir mover o 
 ${filteredActionTypes.includes("campo_personalizado") ? "- campo_personalizado: Sugerir preencher/atualizar um campo personalizado" : ""}
 ${filteredActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
 ${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor monetário da oportunidade/negociação no CRM. SEMPRE que o lead mencionar preço, orçamento, valor, custo ou qualquer quantia monetária, use ESTE tipo (NÃO use campo_personalizado para valores monetários). O campo 'value' deve conter APENAS o número (ex: '1500' ou '1500.00'), sem 'R$' ou texto." : ""}
-${filteredActionTypes.includes("agendar_lembrete") ? "- agendar_lembrete: Sugerir agendar um lembrete/follow-up" : ""}
+${filteredActionTypes.includes("agendar_lembrete") ? "- agendar_lembrete: Criar uma TAREFA no CRM com data de vencimento. Use 'task_title' para o título (ex: 'Retornar ligação', 'Enviar proposta') e 'due_date' no formato ISO 8601 (ex: '2026-04-10T14:00:00'). Se a mensagem mencionar uma data/hora específica, use essa. Caso contrário, defina para 24 horas a partir de agora. O título deve refletir a ação mencionada na conversa ou 'Entrar em contato' como padrão." : ""}
 ${filteredActionTypes.includes("ganho_perdido") ? "- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida" : ""}`.replace(/\n\n+/g, "\n");
 
     // Build valid field keys set for validation
@@ -292,6 +292,14 @@ REGRAS OBRIGATÓRIAS:
                         description: stageNames.length > 0
                           ? `Para mover_funil: DEVE ser um destes valores exatos: ${stageNames.map((n: string) => `"${n}"`).join(", ")}. Para campo_personalizado com opções: use apenas valores da lista de opções válidas. Para outros: valor livre.`
                           : "Valor sugerido para o campo ou nome da etapa destino",
+                      },
+                      task_title: {
+                        type: "string",
+                        description: "Apenas para agendar_lembrete: título da tarefa (ex: 'Retornar ligação', 'Enviar proposta'). Padrão: 'Entrar em contato'.",
+                      },
+                      due_date: {
+                        type: "string",
+                        description: "Apenas para agendar_lembrete: data/hora de vencimento em ISO 8601 (ex: '2026-04-10T14:00:00'). Se não mencionada na conversa, omitir (será 24h a partir de agora).",
                       },
                     },
                     required: ["type", "title", "description"],
@@ -464,6 +472,11 @@ REGRAS OBRIGATÓRIAS:
             value: s.value || null,
             contact_name: conversation?.contact_name || null,
             contact_phone: conversation?.contact_phone || null,
+            ...(s.type === "agendar_lembrete" ? {
+              task_title: s.task_title || s.value || "Entrar em contato",
+              due_date: s.due_date || null,
+              task_description: s.description || null,
+            } : {}),
           },
           ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o"}` : `lovable/${aiModel}`,
         })
