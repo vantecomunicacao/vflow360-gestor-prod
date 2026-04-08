@@ -472,6 +472,11 @@ REGRAS OBRIGATÓRIAS:
             value: s.value || null,
             contact_name: conversation?.contact_name || null,
             contact_phone: conversation?.contact_phone || null,
+            ...(s.type === "agendar_lembrete" ? {
+              task_title: s.task_title || s.value || "Entrar em contato",
+              due_date: s.due_date || null,
+              task_description: s.description || null,
+            } : {}),
           },
           ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o"}` : `lovable/${aiModel}`,
         })
