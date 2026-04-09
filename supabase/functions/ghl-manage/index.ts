@@ -584,14 +584,35 @@ serve(async (req) => {
               pipelineId: targetPipelineId,
               pipelineStageId: targetStageId,
             }, true) as any;
-            if (moveResult?.__duplicateError) {
-              // If moving to a different pipeline causes duplicate, try updating only the stage
-              console.log("Duplicate error on move, retrying with stageId only...");
-              const retryResult = await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
-                pipelineStageId: targetStageId,
-              }, true) as any;
-              if (retryResult?.__duplicateError) {
-                throw new Error("Não foi possível mover o lead: oportunidade duplicada no CRM.");
+
+            if (moveResult?.__duplicateError || moveResult?.__invalidStageError) {
+              // The contact likely has another opportunity in the target pipeline
+              // Search for it and update that one instead
+              console.log("Move failed (duplicate/invalid stage), searching for opportunity in target pipeline...");
+              const searchOpps = await callGhl(`/opportunities/search?location_id=${creds.locationId}&contact_id=${contactId}&pipeline_id=${targetPipelineId}`, "GET", undefined, true) as any;
+              const targetOpps = (searchOpps?.opportunities || []).filter((o: any) => o.pipelineId === targetPipelineId);
+              
+              if (targetOpps.length > 0) {
+                const targetOpp = targetOpps.sort((a: any, b: any) =>
+                  new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+                )[0];
+                console.log(`Found opportunity ${targetOpp.id} in target pipeline, updating stage...`);
+                const stageUpdate = await callGhl(`/opportunities/${targetOpp.id}`, "PUT", {
+                  pipelineStageId: targetStageId,
+                }, true) as any;
+                if (stageUpdate?.__invalidStageError || stageUpdate?.__duplicateError) {
+                  throw new Error(`Não foi possível mover o lead para "${targetStageName}". Verifique se a etapa existe no funil correto.`);
+                }
+                // Update the opportunity reference for the result
+                opportunity = targetOpp;
+              } else {
+                // No opportunity in target pipeline, try just stageId on current opportunity
+                const retryResult = await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+                  pipelineStageId: targetStageId,
+                }, true) as any;
+                if (retryResult?.__duplicateError || retryResult?.__invalidStageError) {
+                  throw new Error(`Não foi possível mover o lead para "${targetStageName}". A etapa pode não pertencer ao funil atual.`);
+                }
               }
             }
             executionResult = `Lead movido para a etapa "${targetStageName}"`;
