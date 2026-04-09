@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut } from "lucide-react";
+import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
@@ -20,6 +20,7 @@ const navItems = [
   { title: "Sugestões IA", url: "/suggestions", icon: Sparkles },
   { title: "Integrações", url: "/integrations", icon: Plug },
   { title: "Configurações", url: "/settings", icon: Settings },
+  { title: "Documentação", url: "/docs", icon: BookOpen },
 ];
 
 export function AppSidebar() {

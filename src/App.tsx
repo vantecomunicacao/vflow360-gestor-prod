@@ -17,6 +17,7 @@ import Conversations from "./pages/Conversations";
 import Suggestions from "./pages/Suggestions";
 import Integrations from "./pages/Integrations";
 import SettingsPage from "./pages/SettingsPage";
+import Documentation from "./pages/Documentation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -49,6 +50,7 @@ const App = () => (
                 <Route path="/suggestions" element={<Suggestions />} />
                 <Route path="/integrations" element={<Integrations />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/docs" element={<Documentation />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
