@@ -134,6 +134,11 @@ serve(async (req) => {
           await clearGhlConnection();
           throw new Error("Credenciais GHL inválidas ou expiradas. Reconecte sua conta.");
         }
+        // Return error info instead of throwing for duplicate opportunity errors
+        if (response.status === 400 && responseText.includes("duplicate opportunity")) {
+          console.warn("Duplicate opportunity error - will handle gracefully");
+          return { __duplicateError: true, status: response.status, body: responseText };
+        }
         throw new Error(`GHL API error [${response.status}]: ${responseText}`);
       }
 
@@ -474,10 +479,25 @@ serve(async (req) => {
             name: `Oportunidade - ${contact.name || contact.firstName || contactPhone}`,
             status: "open",
           }, true) as any;
-          
-          opportunity = newOpp?.opportunity || newOpp;
-          opportunityCreated = true;
-          console.log(`Created new opportunity: ${opportunity?.id}`);
+
+          if (newOpp?.__duplicateError) {
+            // Duplicate - re-search opportunities (may have been created concurrently)
+            console.log("Duplicate on create, re-searching opportunities...");
+            const retryOpps = await callGhl(`/opportunities/search?location_id=${creds.locationId}&contact_id=${contactId}`, "GET", undefined, true) as any;
+            const retryList = retryOpps?.opportunities || [];
+            if (retryList.length > 0) {
+              opportunity = retryList.sort((a: any, b: any) =>
+                new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+              )[0];
+              console.log(`Found existing opportunity after duplicate: ${opportunity.id}`);
+            } else {
+              throw new Error("Não foi possível criar oportunidade: duplicata detectada mas nenhuma oportunidade encontrada.");
+            }
+          } else {
+            opportunity = newOpp?.opportunity || newOpp;
+            opportunityCreated = true;
+            console.log(`Created new opportunity: ${opportunity?.id}`);
+          }
         }
 
         if (!opportunity?.id) throw new Error("Falha ao obter oportunidade.");
@@ -556,10 +576,20 @@ serve(async (req) => {
               targetPipelineId = targetPipelineId!;
             }
             
-            await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+            const moveResult = await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
               pipelineId: targetPipelineId,
               pipelineStageId: targetStageId,
-            }, true);
+            }, true) as any;
+            if (moveResult?.__duplicateError) {
+              // If moving to a different pipeline causes duplicate, try updating only the stage
+              console.log("Duplicate error on move, retrying with stageId only...");
+              const retryResult = await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+                pipelineStageId: targetStageId,
+              }, true) as any;
+              if (retryResult?.__duplicateError) {
+                throw new Error("Não foi possível mover o lead: oportunidade duplicada no CRM.");
+              }
+            }
             executionResult = `Lead movido para a etapa "${targetStageName}"`;
             break;
           }
