@@ -134,10 +134,14 @@ serve(async (req) => {
           await clearGhlConnection();
           throw new Error("Credenciais GHL inválidas ou expiradas. Reconecte sua conta.");
         }
-        // Return error info instead of throwing for duplicate opportunity errors
+        // Return error info instead of throwing for recoverable 400 errors
         if (response.status === 400 && responseText.includes("duplicate opportunity")) {
           console.warn("Duplicate opportunity error - will handle gracefully");
           return { __duplicateError: true, status: response.status, body: responseText };
+        }
+        if (response.status === 400 && responseText.includes("stageId must be one of")) {
+          console.warn("Invalid stageId error - will handle gracefully");
+          return { __invalidStageError: true, status: response.status, body: responseText };
         }
         throw new Error(`GHL API error [${response.status}]: ${responseText}`);
       }
