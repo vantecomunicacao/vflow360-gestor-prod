@@ -479,10 +479,25 @@ serve(async (req) => {
             name: `Oportunidade - ${contact.name || contact.firstName || contactPhone}`,
             status: "open",
           }, true) as any;
-          
-          opportunity = newOpp?.opportunity || newOpp;
-          opportunityCreated = true;
-          console.log(`Created new opportunity: ${opportunity?.id}`);
+
+          if (newOpp?.__duplicateError) {
+            // Duplicate - re-search opportunities (may have been created concurrently)
+            console.log("Duplicate on create, re-searching opportunities...");
+            const retryOpps = await callGhl(`/opportunities/search?location_id=${creds.locationId}&contact_id=${contactId}`, "GET", undefined, true) as any;
+            const retryList = retryOpps?.opportunities || [];
+            if (retryList.length > 0) {
+              opportunity = retryList.sort((a: any, b: any) =>
+                new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+              )[0];
+              console.log(`Found existing opportunity after duplicate: ${opportunity.id}`);
+            } else {
+              throw new Error("Não foi possível criar oportunidade: duplicata detectada mas nenhuma oportunidade encontrada.");
+            }
+          } else {
+            opportunity = newOpp?.opportunity || newOpp;
+            opportunityCreated = true;
+            console.log(`Created new opportunity: ${opportunity?.id}`);
+          }
         }
 
         if (!opportunity?.id) throw new Error("Falha ao obter oportunidade.");
