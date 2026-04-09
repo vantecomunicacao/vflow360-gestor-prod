@@ -561,10 +561,20 @@ serve(async (req) => {
               targetPipelineId = targetPipelineId!;
             }
             
-            await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+            const moveResult = await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
               pipelineId: targetPipelineId,
               pipelineStageId: targetStageId,
-            }, true);
+            }, true) as any;
+            if (moveResult?.__duplicateError) {
+              // If moving to a different pipeline causes duplicate, try updating only the stage
+              console.log("Duplicate error on move, retrying with stageId only...");
+              const retryResult = await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
+                pipelineStageId: targetStageId,
+              }, true) as any;
+              if (retryResult?.__duplicateError) {
+                throw new Error("Não foi possível mover o lead: oportunidade duplicada no CRM.");
+              }
+            }
             executionResult = `Lead movido para a etapa "${targetStageName}"`;
             break;
           }
