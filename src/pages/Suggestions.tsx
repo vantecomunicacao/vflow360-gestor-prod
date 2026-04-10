@@ -37,6 +37,8 @@ interface Suggestion {
     ghl_stage_name?: string;
     ghl_monetary_value?: number;
     ghl_opportunity_status?: string;
+    ghl_opportunity_id?: string;
+    ghl_location_id?: string;
     opportunity_created?: boolean;
     contact_created?: boolean;
     executed_at?: string;
