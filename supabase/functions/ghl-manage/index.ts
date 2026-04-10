@@ -766,6 +766,7 @@ serve(async (req) => {
             ghl_stage_name: stageName,
             ghl_monetary_value: monetaryValue,
             ghl_opportunity_status: opportunityStatus,
+            ghl_location_id: locationId,
             executed_at: new Date().toISOString(),
           },
         }).eq("id", suggestionId);
