@@ -803,17 +803,7 @@ serve(async (req) => {
 
           console.log(`Debounce set for ${conversation.id}: analyze_after=${analyzeAfter}`);
 
-          // Schedule delayed analysis (4 min + 10s margin)
-          setTimeout(() => {
-            fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-              },
-              body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
-            }).catch((e) => console.error("AI analyze delayed trigger failed:", e));
-          }, DEBOUNCE_MS + 10000);
+          // Analysis will be triggered by the analyze-scheduler cron
         }
       }
 
