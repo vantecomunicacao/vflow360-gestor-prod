@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -29,6 +29,17 @@ interface Suggestion {
     contact_phone?: string;
     auto_approve_error?: string;
     auto_approve_failed_at?: string;
+    executed?: boolean;
+    execution_result?: string;
+    ghl_assigned_to?: string;
+    ghl_opportunity_name?: string;
+    ghl_pipeline_name?: string;
+    ghl_stage_name?: string;
+    ghl_monetary_value?: number;
+    ghl_opportunity_status?: string;
+    opportunity_created?: boolean;
+    contact_created?: boolean;
+    executed_at?: string;
   };
   created_at: string;
   conversation_id: string | null;
