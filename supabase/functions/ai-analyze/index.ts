@@ -58,9 +58,20 @@ serve(async (req) => {
     // 2. Fetch conversation info
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("contact_name, contact_phone, workspace_id")
+      .select("contact_name, contact_phone, workspace_id, analyze_after, analyze_started_at")
       .eq("id", conversationId)
       .single();
+
+    // Debounce guard: skip if a newer message pushed analyze_after into the future
+    if (conversation?.analyze_after) {
+      const analyzeAfterTime = new Date(conversation.analyze_after).getTime();
+      if (analyzeAfterTime > Date.now()) {
+        console.log(`Debounce: skipping analysis for ${conversationId}, analyze_after=${conversation.analyze_after} is in the future`);
+        return new Response(JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason: "debounce" } }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     // 2b. Check if this contact is disabled for AI analysis
     if (conversation?.contact_phone) {
