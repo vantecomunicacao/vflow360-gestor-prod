@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -27,6 +27,8 @@ interface Suggestion {
     value?: string;
     contact_name?: string;
     contact_phone?: string;
+    auto_approve_error?: string;
+    auto_approve_failed_at?: string;
   };
   created_at: string;
   conversation_id: string | null;
@@ -508,6 +510,11 @@ const Suggestions = () => {
                                   {suggestion.status === "approved" ? "Aprovada" : "Rejeitada"}
                                 </Badge>
                               )}
+                              {suggestion.status === "pending" && suggestion.action_data?.auto_approve_error && (
+                                <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                                  <AlertTriangle className="w-3 h-3 mr-1" /> Auto-aprovação falhou
+                                </Badge>
+                              )}
                               {suggestion.status === "approved" && executionResults[suggestion.id] && (
                                 <>
                                   {executionResults[suggestion.id].contactCreated && (
@@ -551,6 +558,23 @@ const Suggestions = () => {
                                 <div className="flex items-start gap-2">
                                   <MessageSquare className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                                   <p className="text-sm text-foreground">{suggestion.description}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {suggestion.action_data?.auto_approve_error && suggestion.status === "pending" && (
+                              <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 mb-2">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-destructive mb-0.5">Erro na auto-aprovação</p>
+                                    <p className="text-xs text-destructive/80">{suggestion.action_data.auto_approve_error}</p>
+                                    {suggestion.action_data.auto_approve_failed_at && (
+                                      <p className="text-[10px] text-muted-foreground mt-1">
+                                        {new Date(suggestion.action_data.auto_approve_failed_at).toLocaleString("pt-BR")}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             )}
