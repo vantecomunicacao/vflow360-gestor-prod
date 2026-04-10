@@ -755,14 +755,66 @@ serve(async (req) => {
       });
 
       if (!isFromMe) {
-        fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          },
-          body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
-        }).catch((e) => console.error("AI analyze trigger failed:", e));
+        // Debounce: wait 4 minutes without new messages before analyzing (10 min ceiling)
+        const DEBOUNCE_MS = 4 * 60 * 1000; // 4 minutes
+        const CEILING_MS = 10 * 60 * 1000; // 10 minutes
+        const now = new Date();
+
+        // Check current analyze_started_at for ceiling calculation
+        const { data: convDebounce } = await supabase
+          .from("conversations")
+          .select("analyze_started_at")
+          .eq("id", conversation.id)
+          .single();
+
+        const analyzeStartedAt = convDebounce?.analyze_started_at
+          ? new Date(convDebounce.analyze_started_at)
+          : null;
+
+        const ceilingReached = analyzeStartedAt && (now.getTime() - analyzeStartedAt.getTime() >= CEILING_MS);
+
+        if (ceilingReached) {
+          // Ceiling reached: trigger analysis immediately
+          console.log(`Debounce ceiling reached for ${conversation.id}, triggering analysis now`);
+          await supabase
+            .from("conversations")
+            .update({ analyze_after: null, analyze_started_at: null })
+            .eq("id", conversation.id);
+
+          fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
+          }).catch((e) => console.error("AI analyze trigger failed:", e));
+        } else {
+          // Set/reset debounce timer
+          const analyzeAfter = new Date(now.getTime() + DEBOUNCE_MS).toISOString();
+          const updateData: Record<string, unknown> = { analyze_after: analyzeAfter };
+          if (!analyzeStartedAt) {
+            updateData.analyze_started_at = now.toISOString();
+          }
+          await supabase
+            .from("conversations")
+            .update(updateData)
+            .eq("id", conversation.id);
+
+          console.log(`Debounce set for ${conversation.id}: analyze_after=${analyzeAfter}`);
+
+          // Schedule delayed analysis (4 min + 10s margin)
+          setTimeout(() => {
+            fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              },
+              body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
+            }).catch((e) => console.error("AI analyze delayed trigger failed:", e));
+          }, DEBOUNCE_MS + 10000);
+        }
       }
 
       console.log("Stevo message saved:", conversation.id);
