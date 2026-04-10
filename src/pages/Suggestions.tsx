@@ -526,18 +526,19 @@ const Suggestions = () => {
                                   <AlertTriangle className="w-3 h-3 mr-1" /> Auto-aprovação falhou
                                 </Badge>
                               )}
-                              {suggestion.status === "approved" && executionResults[suggestion.id] && (
+                              {suggestion.status === "approved" && (executionResults[suggestion.id] || suggestion.action_data?.executed) && (
                                 <>
-                                  {executionResults[suggestion.id].contactCreated && (
+                                  {(executionResults[suggestion.id]?.contactCreated || suggestion.action_data?.contact_created) && (
                                     <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
                                       👤 Contato criado
                                     </Badge>
                                   )}
-                                  <Badge variant="outline" className={executionResults[suggestion.id].opportunityCreated
-                                    ? "bg-success/10 text-success border-success/20"
-                                    : "bg-info/10 text-info border-info/20"
+                                  <Badge variant="outline" className={
+                                    (executionResults[suggestion.id]?.opportunityCreated || suggestion.action_data?.opportunity_created)
+                                      ? "bg-success/10 text-success border-success/20"
+                                      : "bg-info/10 text-info border-info/20"
                                   }>
-                                    {executionResults[suggestion.id].opportunityCreated ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
+                                    {(executionResults[suggestion.id]?.opportunityCreated || suggestion.action_data?.opportunity_created) ? "🆕 Oportunidade criada" : "📌 Oportunidade existente"}
                                   </Badge>
                                 </>
                               )}
@@ -587,6 +588,54 @@ const Suggestions = () => {
                                     )}
                                   </div>
                                 </div>
+                              </div>
+                            )}
+
+                            {suggestion.status === "approved" && suggestion.action_data?.executed && (
+                              <div className="bg-muted/30 border border-border rounded-lg p-3 mb-2">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                                  {suggestion.action_data.ghl_assigned_to && (
+                                    <span className="flex items-center gap-1 text-foreground">
+                                      <UserCheck className="w-3.5 h-3.5 text-primary" />
+                                      <span className="text-muted-foreground">Responsável:</span>
+                                      <span className="font-medium">{suggestion.action_data.ghl_assigned_to}</span>
+                                    </span>
+                                  )}
+                                  {suggestion.action_data.ghl_pipeline_name && (
+                                    <span className="flex items-center gap-1 text-foreground">
+                                      <GitBranch className="w-3.5 h-3.5 text-primary" />
+                                      <span className="text-muted-foreground">Funil:</span>
+                                      <span className="font-medium">{suggestion.action_data.ghl_pipeline_name}</span>
+                                      {suggestion.action_data.ghl_stage_name && (
+                                        <span className="text-muted-foreground">→ {suggestion.action_data.ghl_stage_name}</span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {suggestion.action_data.ghl_monetary_value != null && suggestion.action_data.ghl_monetary_value > 0 && (
+                                    <span className="flex items-center gap-1 text-foreground">
+                                      <DollarSign className="w-3.5 h-3.5 text-primary" />
+                                      <span className="text-muted-foreground">Valor:</span>
+                                      <span className="font-medium">R$ {Number(suggestion.action_data.ghl_monetary_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                                    </span>
+                                  )}
+                                  {suggestion.action_data.ghl_opportunity_name && (
+                                    <span className="flex items-center gap-1 text-foreground">
+                                      <span className="text-muted-foreground">Oportunidade:</span>
+                                      <span className="font-medium">{suggestion.action_data.ghl_opportunity_name}</span>
+                                    </span>
+                                  )}
+                                  {suggestion.action_data.executed_at && (
+                                    <span className="flex items-center gap-1 text-muted-foreground ml-auto">
+                                      <Clock className="w-3 h-3" />
+                                      {new Date(suggestion.action_data.executed_at).toLocaleString("pt-BR")}
+                                    </span>
+                                  )}
+                                </div>
+                                {suggestion.action_data.execution_result && (
+                                  <p className="text-xs text-muted-foreground mt-1.5 pt-1.5 border-t border-border">
+                                    ✅ {suggestion.action_data.execution_result}
+                                  </p>
+                                )}
                               </div>
                             )}
 
