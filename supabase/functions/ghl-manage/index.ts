@@ -723,7 +723,29 @@ serve(async (req) => {
             executionResult = `Tipo de ação "${suggestionType}" não suportado para execução automática.`;
         }
 
-        // 4. Update suggestion with execution result
+        // 4. Gather rich context from opportunity and contact
+        const assignedTo = opportunity.assignedTo || opportunity.assigned_to || null;
+        const opportunityName = opportunity.name || null;
+        const pipelineName = opportunity.pipelineName || opportunity.pipeline_name || null;
+        const stageName = opportunity.pipelineStageName || opportunity.stageName || opportunity.stage_name || null;
+        const monetaryValue = opportunity.monetaryValue ?? opportunity.monetary_value ?? null;
+        const opportunityStatus = opportunity.status || null;
+        const contactName = contact?.name || contact?.firstName || null;
+
+        // Try to resolve assignedTo name from GHL users
+        let assignedToName: string | null = null;
+        if (assignedTo) {
+          try {
+            const userResult = await callGhl(`/users/${assignedTo}`, "GET", undefined, true) as any;
+            assignedToName = userResult?.name || userResult?.firstName 
+              ? `${userResult.firstName || ""} ${userResult.lastName || ""}`.trim() 
+              : assignedTo;
+          } catch {
+            assignedToName = assignedTo; // fallback to ID
+          }
+        }
+
+        // 5. Update suggestion with execution result
         const creationNotes: string[] = [];
         if (contactCreated) creationNotes.push("Novo contato criado no CRM");
         if (opportunityCreated) creationNotes.push("Nova oportunidade criada");
@@ -738,6 +760,13 @@ serve(async (req) => {
             ghl_opportunity_id: opportunity.id,
             opportunity_created: opportunityCreated,
             contact_created: contactCreated,
+            ghl_assigned_to: assignedToName,
+            ghl_opportunity_name: opportunityName,
+            ghl_pipeline_name: pipelineName,
+            ghl_stage_name: stageName,
+            ghl_monetary_value: monetaryValue,
+            ghl_opportunity_status: opportunityStatus,
+            executed_at: new Date().toISOString(),
           },
         }).eq("id", suggestionId);
 
@@ -751,6 +780,10 @@ serve(async (req) => {
             contactCreated,
             contactId,
             opportunityId: opportunity.id,
+            assignedTo: assignedToName,
+            pipelineName,
+            stageName,
+            opportunityName,
           } 
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
