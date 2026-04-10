@@ -520,15 +520,24 @@ REGRAS OBRIGATÓRIAS:
             if (execResult.success) {
               console.log(`Auto-executed suggestion ${inserted.id} (${s.type})`);
             } else {
-              console.error(`Auto-execute failed for ${inserted.id}:`, execResult.error);
-              // Revert status to pending so user can retry manually
-              await supabase.from("suggestions").update({ status: "pending" }).eq("id", inserted.id);
+              const errorMsg = execResult.error || "Erro desconhecido ao executar no CRM";
+              console.error(`Auto-execute failed for ${inserted.id}:`, errorMsg);
+              // Revert status to pending and store error details
+              const currentData = inserted.action_data as Record<string, any> || {};
+              await supabase.from("suggestions").update({ 
+                status: "pending",
+                action_data: { ...currentData, auto_approve_error: errorMsg, auto_approve_failed_at: new Date().toISOString() },
+              }).eq("id", inserted.id);
               console.log(`Reverted suggestion ${inserted.id} to pending after failed auto-execute`);
             }
           } catch (execErr) {
+            const errorMsg = execErr instanceof Error ? execErr.message : "Falha de conexão com o CRM";
             console.error(`Auto-execute error for ${inserted.id}:`, execErr);
-            // Revert status to pending so user can retry manually
-            await supabase.from("suggestions").update({ status: "pending" }).eq("id", inserted.id);
+            const currentData = inserted.action_data as Record<string, any> || {};
+            await supabase.from("suggestions").update({ 
+              status: "pending",
+              action_data: { ...currentData, auto_approve_error: errorMsg, auto_approve_failed_at: new Date().toISOString() },
+            }).eq("id", inserted.id);
           }
         }
       }
