@@ -1,0 +1,3 @@
+ALTER TABLE public.conversations
+  ADD COLUMN analyze_after TIMESTAMPTZ DEFAULT NULL,
+  ADD COLUMN analyze_started_at TIMESTAMPTZ DEFAULT NULL;

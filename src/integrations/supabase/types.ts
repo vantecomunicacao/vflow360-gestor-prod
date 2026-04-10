@@ -98,6 +98,8 @@ export type Database = {
       }
       conversations: {
         Row: {
+          analyze_after: string | null
+          analyze_started_at: string | null
           contact_name: string | null
           contact_phone: string | null
           created_at: string
@@ -112,6 +114,8 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          analyze_after?: string | null
+          analyze_started_at?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -126,6 +130,8 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          analyze_after?: string | null
+          analyze_started_at?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
