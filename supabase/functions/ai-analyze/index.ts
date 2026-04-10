@@ -534,6 +534,12 @@ REGRAS OBRIGATÓRIAS:
       }
     }
 
+    // Clear debounce fields after successful analysis
+    await supabase
+      .from("conversations")
+      .update({ analyze_after: null, analyze_started_at: null })
+      .eq("id", conversationId);
+
     console.log(`Generated ${insertedSuggestions.length} suggestions for conversation ${conversationId}`);
 
     return new Response(
