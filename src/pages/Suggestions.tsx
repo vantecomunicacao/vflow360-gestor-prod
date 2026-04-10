@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -37,6 +37,8 @@ interface Suggestion {
     ghl_stage_name?: string;
     ghl_monetary_value?: number;
     ghl_opportunity_status?: string;
+    ghl_opportunity_id?: string;
+    ghl_location_id?: string;
     opportunity_created?: boolean;
     contact_created?: boolean;
     executed_at?: string;
@@ -618,7 +620,19 @@ const Suggestions = () => {
                                       <span className="font-medium">R$ {Number(suggestion.action_data.ghl_monetary_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
                                     </span>
                                   )}
-                                  {suggestion.action_data.ghl_opportunity_name && (
+                                  {(suggestion.action_data.ghl_opportunity_name || suggestion.action_data.contact_name) && suggestion.action_data.ghl_opportunity_id && suggestion.action_data.ghl_location_id ? (
+                                    <a
+                                      href={`https://app.gohighlevel.com/v2/location/${suggestion.action_data.ghl_location_id}/opportunities/list?opportunityId=${suggestion.action_data.ghl_opportunity_id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-foreground hover:text-primary transition-colors"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <span className="text-muted-foreground">Oportunidade:</span>
+                                      <span className="font-medium underline underline-offset-2">{suggestion.action_data.ghl_opportunity_name || suggestion.action_data.contact_name}</span>
+                                      <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                                    </a>
+                                  ) : suggestion.action_data.ghl_opportunity_name && (
                                     <span className="flex items-center gap-1 text-foreground">
                                       <span className="text-muted-foreground">Oportunidade:</span>
                                       <span className="font-medium">{suggestion.action_data.ghl_opportunity_name}</span>
