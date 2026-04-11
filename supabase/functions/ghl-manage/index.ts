@@ -272,6 +272,25 @@ serve(async (req) => {
         });
       }
 
+      case "lost_reasons": {
+        // Fetch pipelines and extract lostReasons from all of them
+        const pipelinesResult = await callGhl("/opportunities/pipelines") as any;
+        const allLostReasons: { id: string; name: string; pipelineId: string; pipelineName: string }[] = [];
+        for (const pipeline of (pipelinesResult?.pipelines || [])) {
+          for (const reason of (pipeline.lostReasons || [])) {
+            allLostReasons.push({
+              id: reason.id || reason._id,
+              name: reason.name,
+              pipelineId: pipeline.id,
+              pipelineName: pipeline.name,
+            });
+          }
+        }
+        return new Response(JSON.stringify({ success: true, data: allLostReasons }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       case "opportunities": {
         const data = await callGhl("/opportunities/search");
         return new Response(JSON.stringify({ success: true, data }), {
