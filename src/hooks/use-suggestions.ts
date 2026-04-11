@@ -11,7 +11,7 @@ export function useSuggestions() {
       if (!activeWorkspace) return [];
       const { data, error } = await supabase
         .from("suggestions")
-        .select("*")
+        .select("*, conversations:conversation_id(integration_label)")
         .eq("workspace_id", activeWorkspace.id)
         .order("created_at", { ascending: false })
         .limit(100);
