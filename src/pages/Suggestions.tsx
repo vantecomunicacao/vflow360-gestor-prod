@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock, ExternalLink } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock, ExternalLink, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -9,6 +9,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -46,6 +48,7 @@ interface Suggestion {
   created_at: string;
   conversation_id: string | null;
   ai_provider: string | null;
+  conversations?: { integration_label: string | null } | null;
 }
 
 interface ContactGroup {
@@ -54,6 +57,10 @@ interface ContactGroup {
   contactPhone: string;
   suggestions: Suggestion[];
   pendingCount: number;
+  integrationLabel: string | null;
+  lastApprovedAt: string | null;
+  lastAssignedTo: string | null;
+  actionSummary: { type: string; count: number }[];
 }
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
