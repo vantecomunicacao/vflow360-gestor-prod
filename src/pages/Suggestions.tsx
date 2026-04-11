@@ -44,6 +44,8 @@ interface Suggestion {
     opportunity_created?: boolean;
     contact_created?: boolean;
     executed_at?: string;
+    not_found_contact?: boolean;
+    not_found_opportunity?: boolean;
   };
   created_at: string;
   conversation_id: string | null;
@@ -100,6 +102,8 @@ const Suggestions = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
+  const [creationConfig, setCreationConfig] = useState({ allowCreateContact: true, allowCreateOpportunity: true });
+  const [savingCreationConfig, setSavingCreationConfig] = useState(false);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
@@ -121,6 +125,37 @@ const Suggestions = () => {
   useEffect(() => {
     if (disabledContactsData) setDisabledContacts(disabledContactsData);
   }, [disabledContactsData]);
+
+  // Fetch creation config
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    const fetchCreationConfig = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("ghl-manage", {
+          body: { action: "get_creation_config", workspace_id: activeWorkspace.id },
+        });
+        if (!error && data?.success) {
+          setCreationConfig(data.data);
+        }
+      } catch {}
+    };
+    fetchCreationConfig();
+  }, [activeWorkspace]);
+
+  const saveCreationConfig = async (newConfig: { allowCreateContact: boolean; allowCreateOpportunity: boolean }) => {
+    setSavingCreationConfig(true);
+    try {
+      await supabase.functions.invoke("ghl-manage", {
+        body: { action: "save_creation_config", workspace_id: activeWorkspace?.id, ...newConfig },
+      });
+      setCreationConfig(newConfig);
+      toast({ title: "Configuração salva", description: "Preferências de criação atualizadas." });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível salvar.", variant: "destructive" });
+    } finally {
+      setSavingCreationConfig(false);
+    }
+  };
 
   const fetchSuggestions = useCallback(() => {
     refetchSuggestions();
@@ -403,6 +438,31 @@ const Suggestions = () => {
                     )}
                   </div>
                 ))}
+                <div className="border-t border-border pt-3 mt-3 space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Criação automática no CRM</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm text-foreground">Criar contato</span>
+                      <p className="text-[10px] text-muted-foreground">Se não encontrar o contato no CRM</p>
+                    </div>
+                    <Switch
+                      checked={creationConfig.allowCreateContact}
+                      disabled={savingCreationConfig}
+                      onCheckedChange={(v) => saveCreationConfig({ ...creationConfig, allowCreateContact: v })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm text-foreground">Criar oportunidade</span>
+                      <p className="text-[10px] text-muted-foreground">Se não encontrar oportunidade no CRM</p>
+                    </div>
+                    <Switch
+                      checked={creationConfig.allowCreateOpportunity}
+                      disabled={savingCreationConfig}
+                      onCheckedChange={(v) => saveCreationConfig({ ...creationConfig, allowCreateOpportunity: v })}
+                    />
+                  </div>
+                </div>
               </div>
             </PopoverContent>
           </Popover>
@@ -597,7 +657,17 @@ const Suggestions = () => {
                                   <AlertTriangle className="w-3 h-3 mr-1" /> Auto-aprovação falhou
                                 </Badge>
                               )}
-                              {suggestion.status === "approved" && (executionResults[suggestion.id] || suggestion.action_data?.executed) && (
+                              {suggestion.status === "approved" && suggestion.action_data?.not_found_contact && (
+                                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                                  <AlertTriangle className="w-3 h-3 mr-1" /> Contato não encontrado
+                                </Badge>
+                              )}
+                              {suggestion.status === "approved" && suggestion.action_data?.not_found_opportunity && (
+                                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                                  <AlertTriangle className="w-3 h-3 mr-1" /> Oportunidade não encontrada
+                                </Badge>
+                              )}
+                              {suggestion.status === "approved" && (executionResults[suggestion.id] || suggestion.action_data?.executed) && !suggestion.action_data?.not_found_contact && !suggestion.action_data?.not_found_opportunity && (
                                 <>
                                   {(executionResults[suggestion.id]?.contactCreated || suggestion.action_data?.contact_created) && (
                                     <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
@@ -657,6 +727,24 @@ const Suggestions = () => {
                                         {new Date(suggestion.action_data.auto_approve_failed_at).toLocaleString("pt-BR")}
                                       </p>
                                     )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {suggestion.status === "approved" && (suggestion.action_data?.not_found_contact || suggestion.action_data?.not_found_opportunity) && (
+                              <div className="bg-warning/5 border border-warning/20 rounded-lg p-3 mb-2">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-warning mb-0.5">
+                                      {suggestion.action_data.not_found_contact ? "Contato não encontrado no CRM" : "Oportunidade não encontrada no CRM"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {suggestion.action_data.not_found_contact
+                                        ? "A criação automática de contatos está desativada. Crie o contato manualmente ou ative a criação em Configurar IA."
+                                        : "A criação automática de oportunidades está desativada. Crie a oportunidade manualmente ou ative a criação em Configurar IA."}
+                                    </p>
                                   </div>
                                 </div>
                               </div>

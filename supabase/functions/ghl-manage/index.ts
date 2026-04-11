@@ -335,6 +335,40 @@ serve(async (req) => {
         });
       }
 
+      case "save_creation_config": {
+        const allowCreateContact = payload.allowCreateContact !== false;
+        const allowCreateOpportunity = payload.allowCreateOpportunity !== false;
+        
+        let scq = supabase.from("integrations").select("config, id").eq("user_id", resolvedUserId!).eq("type", "ghl");
+        if (workspaceId) scq = scq.eq("workspace_id", workspaceId);
+        const { data: scInt } = await scq.single();
+        if (!scInt) throw new Error("GHL not connected");
+        
+        const currentCfg = scInt.config as Record<string, unknown>;
+        await supabase.from("integrations").update({
+          config: { ...currentCfg, allowCreateContact, allowCreateOpportunity },
+        }).eq("id", scInt.id);
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "get_creation_config": {
+        let gcq = supabase.from("integrations").select("config").eq("user_id", resolvedUserId!).eq("type", "ghl");
+        if (workspaceId) gcq = gcq.eq("workspace_id", workspaceId);
+        const { data: gcInt } = await gcq.single();
+        const cfg = (gcInt?.config || {}) as Record<string, any>;
+        
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            allowCreateContact: cfg.allowCreateContact !== false,
+            allowCreateOpportunity: cfg.allowCreateOpportunity !== false,
+          },
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       case "execute_suggestion": {
         const suggestionId = payload.suggestionId as string;
         if (!suggestionId) throw new Error("suggestionId is required");
@@ -407,7 +441,38 @@ serve(async (req) => {
         let contact: any;
         const creds = await getGhlCredentials();
 
+        // Check creation permissions from integration config
+        let cfgQ = supabase.from("integrations").select("config").eq("user_id", resolvedUserId!).eq("type", "ghl");
+        if (workspaceId) cfgQ = cfgQ.eq("workspace_id", workspaceId);
+        const { data: cfgData } = await cfgQ.single();
+        const ghlConfig = (cfgData?.config || {}) as Record<string, any>;
+        const allowCreateContact = ghlConfig.allowCreateContact !== false; // default true
+        const allowCreateOpportunity = ghlConfig.allowCreateOpportunity !== false; // default true
+
         if (contacts.length === 0) {
+          if (!allowCreateContact) {
+            // Don't create - save alert and return
+            console.log("Contact not found and creation disabled by user config");
+            await supabase.from("suggestions").update({
+              status: "approved",
+              action_data: {
+                ...actionData,
+                executed: false,
+                execution_result: "Contato não encontrado no CRM.",
+                not_found_contact: true,
+                executed_at: new Date().toISOString(),
+              },
+            }).eq("id", suggestionId);
+
+            return new Response(JSON.stringify({
+              success: true,
+              data: {
+                message: "⚠️ Contato não encontrado no CRM. A criação automática está desativada.",
+                notFoundContact: true,
+              },
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
           // Create the contact in GHL
           console.log(`Contact not found, creating new contact for phone: ${contactPhone}`);
           const formattedPhone = baseNumber.length >= 10 ? `+55${baseNumber}` : contactPhone;
@@ -429,13 +494,11 @@ serve(async (req) => {
             contactCreated = true;
             console.log(`Created new GHL contact: ${contactId}`);
           } catch (createErr: any) {
-            // Handle duplicate contact error - extract existing contactId from error
             const errMsg = createErr?.message || "";
             const dupMatch = errMsg.match(/"contactId"\s*:\s*"([^"]+)"/);
             if (dupMatch && dupMatch[1]) {
               contactId = dupMatch[1];
               console.log(`Duplicate contact detected, using existing contactId: ${contactId}`);
-              // Fetch the existing contact details
               try {
                 const existingContact = await callGhl(`/contacts/${contactId}`, "GET", undefined, true) as any;
                 contact = existingContact?.contact || existingContact || { id: contactId };
@@ -460,13 +523,36 @@ serve(async (req) => {
         let opportunityCreated = false;
 
         if (opportunities.length > 0) {
-          // Sort by date desc and pick the latest
           opportunity = opportunities.sort((a: any, b: any) => 
             new Date(b.createdAt || b.dateAdded || 0).getTime() - new Date(a.createdAt || a.dateAdded || 0).getTime()
           )[0];
           console.log(`Found existing opportunity: ${opportunity.id}`);
         } else {
-          // Create a new opportunity - need a pipeline and stage
+          if (!allowCreateOpportunity) {
+            console.log("Opportunity not found and creation disabled by user config");
+            await supabase.from("suggestions").update({
+              status: "approved",
+              action_data: {
+                ...actionData,
+                executed: false,
+                execution_result: "Oportunidade não encontrada no CRM.",
+                not_found_opportunity: true,
+                ghl_contact_id: contactId,
+                contact_created: contactCreated,
+                executed_at: new Date().toISOString(),
+              },
+            }).eq("id", suggestionId);
+
+            return new Response(JSON.stringify({
+              success: true,
+              data: {
+                message: "⚠️ Oportunidade não encontrada no CRM. A criação automática está desativada.",
+                notFoundOpportunity: true,
+                contactCreated,
+              },
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
           const pipelinesResult = await callGhl("/opportunities/pipelines") as any;
           const pipelines = pipelinesResult?.pipelines || [];
           if (pipelines.length === 0) throw new Error("Nenhum funil encontrado no CRM para criar oportunidade.");
@@ -485,7 +571,6 @@ serve(async (req) => {
           }, true) as any;
 
           if (newOpp?.__duplicateError) {
-            // Duplicate - re-search opportunities (may have been created concurrently)
             console.log("Duplicate on create, re-searching opportunities...");
             const retryOpps = await callGhl(`/opportunities/search?location_id=${creds.locationId}&contact_id=${contactId}`, "GET", undefined, true) as any;
             const retryList = retryOpps?.opportunities || [];
