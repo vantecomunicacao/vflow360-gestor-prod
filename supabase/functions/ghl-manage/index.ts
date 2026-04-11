@@ -407,7 +407,38 @@ serve(async (req) => {
         let contact: any;
         const creds = await getGhlCredentials();
 
+        // Check creation permissions from integration config
+        let cfgQ = supabase.from("integrations").select("config").eq("user_id", resolvedUserId!).eq("type", "ghl");
+        if (workspaceId) cfgQ = cfgQ.eq("workspace_id", workspaceId);
+        const { data: cfgData } = await cfgQ.single();
+        const ghlConfig = (cfgData?.config || {}) as Record<string, any>;
+        const allowCreateContact = ghlConfig.allowCreateContact !== false; // default true
+        const allowCreateOpportunity = ghlConfig.allowCreateOpportunity !== false; // default true
+
         if (contacts.length === 0) {
+          if (!allowCreateContact) {
+            // Don't create - save alert and return
+            console.log("Contact not found and creation disabled by user config");
+            await supabase.from("suggestions").update({
+              status: "approved",
+              action_data: {
+                ...actionData,
+                executed: false,
+                execution_result: "Contato não encontrado no CRM.",
+                not_found_contact: true,
+                executed_at: new Date().toISOString(),
+              },
+            }).eq("id", suggestionId);
+
+            return new Response(JSON.stringify({
+              success: true,
+              data: {
+                message: "⚠️ Contato não encontrado no CRM. A criação automática está desativada.",
+                notFoundContact: true,
+              },
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
           // Create the contact in GHL
           console.log(`Contact not found, creating new contact for phone: ${contactPhone}`);
           const formattedPhone = baseNumber.length >= 10 ? `+55${baseNumber}` : contactPhone;
@@ -429,13 +460,11 @@ serve(async (req) => {
             contactCreated = true;
             console.log(`Created new GHL contact: ${contactId}`);
           } catch (createErr: any) {
-            // Handle duplicate contact error - extract existing contactId from error
             const errMsg = createErr?.message || "";
             const dupMatch = errMsg.match(/"contactId"\s*:\s*"([^"]+)"/);
             if (dupMatch && dupMatch[1]) {
               contactId = dupMatch[1];
               console.log(`Duplicate contact detected, using existing contactId: ${contactId}`);
-              // Fetch the existing contact details
               try {
                 const existingContact = await callGhl(`/contacts/${contactId}`, "GET", undefined, true) as any;
                 contact = existingContact?.contact || existingContact || { id: contactId };
