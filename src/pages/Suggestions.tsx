@@ -129,7 +129,7 @@ const Suggestions = () => {
     if (disabledContactsData) setDisabledContacts(disabledContactsData);
   }, [disabledContactsData]);
 
-  // Fetch creation config
+  // Fetch creation config and lost reasons
   useEffect(() => {
     if (!activeWorkspace) return;
     const fetchCreationConfig = async () => {
@@ -142,7 +142,20 @@ const Suggestions = () => {
         }
       } catch {}
     };
+    const fetchLostReasons = async () => {
+      setLoadingLostReasons(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("ghl-manage", {
+          body: { action: "lost_reasons", workspace_id: activeWorkspace.id },
+        });
+        if (!error && data?.success && Array.isArray(data.data)) {
+          setLostReasons(data.data);
+        }
+      } catch {}
+      setLoadingLostReasons(false);
+    };
     fetchCreationConfig();
+    fetchLostReasons();
   }, [activeWorkspace]);
 
   const saveCreationConfig = async (newConfig: { allowCreateContact: boolean; allowCreateOpportunity: boolean }) => {
