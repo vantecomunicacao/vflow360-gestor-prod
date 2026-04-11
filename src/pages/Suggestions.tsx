@@ -748,6 +748,7 @@ const Suggestions = () => {
                                   </div>
                                 </div>
                               </div>
+                            )}
 
                             {suggestion.status === "approved" && suggestion.action_data?.executed && (
                               <div className="bg-muted/30 border border-border rounded-lg p-3 mb-2">
