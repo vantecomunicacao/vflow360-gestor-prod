@@ -249,11 +249,22 @@ const Suggestions = () => {
 
   const handleAction = async (id: string, action: "approved" | "rejected") => {
     if (action === "approved") {
+      // Check if this is a "lost" suggestion that needs a lost reason
+      const suggestion = suggestions.find(s => s.id === id);
+      const isLost = suggestion?.type === "ganho_perdido" && !(suggestion?.action_data?.value || "").toLowerCase().includes("ganh");
+      const lostReasonId = isLost ? selectedLostReasons[id] : undefined;
+      
+      if (isLost && lostReasons.length > 0 && !lostReasonId) {
+        toast({ title: "Motivo de perda obrigatório", description: "Selecione o motivo de perda antes de aprovar.", variant: "destructive" });
+        return;
+      }
+
       setExecutingId(id);
       try {
-        const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", {
-          body: { action: "execute_suggestion", suggestionId: id, workspace_id: activeWorkspace?.id },
-        });
+        const body: Record<string, any> = { action: "execute_suggestion", suggestionId: id, workspace_id: activeWorkspace?.id };
+        if (lostReasonId) body.lostReasonId = lostReasonId;
+        
+        const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", { body });
 
         if (fnError || !result?.success) {
           const errorMsg = result?.error || fnError?.message || "Erro ao executar a sugestão no CRM.";
