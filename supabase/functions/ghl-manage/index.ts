@@ -335,6 +335,40 @@ serve(async (req) => {
         });
       }
 
+      case "save_creation_config": {
+        const allowCreateContact = payload.allowCreateContact !== false;
+        const allowCreateOpportunity = payload.allowCreateOpportunity !== false;
+        
+        let scq = supabase.from("integrations").select("config, id").eq("user_id", resolvedUserId!).eq("type", "ghl");
+        if (workspaceId) scq = scq.eq("workspace_id", workspaceId);
+        const { data: scInt } = await scq.single();
+        if (!scInt) throw new Error("GHL not connected");
+        
+        const currentCfg = scInt.config as Record<string, unknown>;
+        await supabase.from("integrations").update({
+          config: { ...currentCfg, allowCreateContact, allowCreateOpportunity },
+        }).eq("id", scInt.id);
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "get_creation_config": {
+        let gcq = supabase.from("integrations").select("config").eq("user_id", resolvedUserId!).eq("type", "ghl");
+        if (workspaceId) gcq = gcq.eq("workspace_id", workspaceId);
+        const { data: gcInt } = await gcq.single();
+        const cfg = (gcInt?.config || {}) as Record<string, any>;
+        
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            allowCreateContact: cfg.allowCreateContact !== false,
+            allowCreateOpportunity: cfg.allowCreateOpportunity !== false,
+          },
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       case "execute_suggestion": {
         const suggestionId = payload.suggestionId as string;
         if (!suggestionId) throw new Error("suggestionId is required");
