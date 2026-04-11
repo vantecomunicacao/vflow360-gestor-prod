@@ -732,6 +732,23 @@ const Suggestions = () => {
                               </div>
                             )}
 
+                            {suggestion.status === "approved" && (suggestion.action_data?.not_found_contact || suggestion.action_data?.not_found_opportunity) && (
+                              <div className="bg-warning/5 border border-warning/20 rounded-lg p-3 mb-2">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-warning mb-0.5">
+                                      {suggestion.action_data.not_found_contact ? "Contato não encontrado no CRM" : "Oportunidade não encontrada no CRM"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {suggestion.action_data.not_found_contact
+                                        ? "A criação automática de contatos está desativada. Crie o contato manualmente ou ative a criação em Configurar IA."
+                                        : "A criação automática de oportunidades está desativada. Crie a oportunidade manualmente ou ative a criação em Configurar IA."}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
                             {suggestion.status === "approved" && suggestion.action_data?.executed && (
                               <div className="bg-muted/30 border border-border rounded-lg p-3 mb-2">
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
