@@ -44,6 +44,8 @@ interface Suggestion {
     opportunity_created?: boolean;
     contact_created?: boolean;
     executed_at?: string;
+    not_found_contact?: boolean;
+    not_found_opportunity?: boolean;
   };
   created_at: string;
   conversation_id: string | null;
