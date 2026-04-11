@@ -837,6 +837,29 @@ const Suggestions = () => {
                               </div>
                             )}
 
+                            {suggestion.status === "pending" && suggestion.type === "ganho_perdido" && !(suggestion.action_data?.value || "").toLowerCase().includes("ganh") && lostReasons.length > 0 && (
+                              <div className="mb-3 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                                <label className="text-xs font-semibold text-destructive mb-1.5 block">
+                                  Motivo de perda (obrigatório)
+                                </label>
+                                <Select
+                                  value={selectedLostReasons[suggestion.id] || ""}
+                                  onValueChange={(v) => setSelectedLostReasons(prev => ({ ...prev, [suggestion.id]: v }))}
+                                >
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue placeholder="Selecione o motivo..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {lostReasons.map(r => (
+                                      <SelectItem key={r.id} value={r.id}>
+                                        {r.name} <span className="text-muted-foreground text-xs ml-1">({r.pipelineName})</span>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+
                             {suggestion.status === "pending" && (
                               <div className="flex gap-2">
                                 <Button size="sm" onClick={() => handleAction(suggestion.id, "approved")} disabled={executingId === suggestion.id}>
