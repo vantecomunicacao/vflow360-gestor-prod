@@ -489,13 +489,36 @@ serve(async (req) => {
         let opportunityCreated = false;
 
         if (opportunities.length > 0) {
-          // Sort by date desc and pick the latest
           opportunity = opportunities.sort((a: any, b: any) => 
             new Date(b.createdAt || b.dateAdded || 0).getTime() - new Date(a.createdAt || a.dateAdded || 0).getTime()
           )[0];
           console.log(`Found existing opportunity: ${opportunity.id}`);
         } else {
-          // Create a new opportunity - need a pipeline and stage
+          if (!allowCreateOpportunity) {
+            console.log("Opportunity not found and creation disabled by user config");
+            await supabase.from("suggestions").update({
+              status: "approved",
+              action_data: {
+                ...actionData,
+                executed: false,
+                execution_result: "Oportunidade não encontrada no CRM.",
+                not_found_opportunity: true,
+                ghl_contact_id: contactId,
+                contact_created: contactCreated,
+                executed_at: new Date().toISOString(),
+              },
+            }).eq("id", suggestionId);
+
+            return new Response(JSON.stringify({
+              success: true,
+              data: {
+                message: "⚠️ Oportunidade não encontrada no CRM. A criação automática está desativada.",
+                notFoundOpportunity: true,
+                contactCreated,
+              },
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
           const pipelinesResult = await callGhl("/opportunities/pipelines") as any;
           const pipelines = pipelinesResult?.pipelines || [];
           if (pipelines.length === 0) throw new Error("Nenhum funil encontrado no CRM para criar oportunidade.");
@@ -514,7 +537,6 @@ serve(async (req) => {
           }, true) as any;
 
           if (newOpp?.__duplicateError) {
-            // Duplicate - re-search opportunities (may have been created concurrently)
             console.log("Duplicate on create, re-searching opportunities...");
             const retryOpps = await callGhl(`/opportunities/search?location_id=${creds.locationId}&contact_id=${contactId}`, "GET", undefined, true) as any;
             const retryList = retryOpps?.opportunities || [];
