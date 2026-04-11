@@ -790,9 +790,17 @@ serve(async (req) => {
 
           case "ganho_perdido": {
             const status = (actionData?.value || "").toLowerCase().includes("ganh") ? "won" : "lost";
-            await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
-              status: status,
-            }, true);
+            const updateBody: Record<string, any> = { status };
+            
+            // If lost, check for lostReasonId from payload or action_data
+            if (status === "lost") {
+              const lostReasonId = payload.lostReasonId || actionData?.lostReasonId;
+              if (lostReasonId) {
+                updateBody.lostReasonId = lostReasonId;
+              }
+            }
+            
+            await callGhl(`/opportunities/${opportunity.id}`, "PUT", updateBody, true);
             executionResult = `Oportunidade marcada como ${status === "won" ? "ganha" : "perdida"}`;
             break;
           }
