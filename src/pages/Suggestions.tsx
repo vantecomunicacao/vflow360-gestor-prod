@@ -464,63 +464,98 @@ const Suggestions = () => {
               onOpenChange={() => toggleContact(group.key)}
             >
               <CollapsibleTrigger asChild>
-                <button className={`w-full glass-card p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer rounded-lg ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "opacity-50 border-dashed" : ""}`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "bg-muted" : "bg-primary/10"}`}>
-                      <User className={`w-5 h-5 ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "text-muted-foreground" : "text-primary"}`} />
+                <button className={`w-full glass-card p-4 hover:bg-muted/50 transition-colors cursor-pointer rounded-lg ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "opacity-50 border-dashed" : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "bg-muted" : "bg-primary/10"}`}>
+                        <User className={`w-5 h-5 ${group.contactPhone && disabledContacts.has(group.contactPhone) ? "text-muted-foreground" : "text-primary"}`} />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-foreground">{group.contactName}</p>
+                        {group.contactPhone && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {formatPhone(group.contactPhone)}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <p className="text-sm font-semibold text-foreground">{group.contactName}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {group.suggestions.length} sugestão{group.suggestions.length !== 1 ? "ões" : ""}
+                        </span>
+                        {group.pendingCount > 0 && (
+                          <Badge variant="default" className="text-xs">
+                            {group.pendingCount} pendente{group.pendingCount !== 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                      </div>
                       {group.contactPhone && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {formatPhone(group.contactPhone)}
-                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`h-7 px-2 ${disabledContacts.has(group.contactPhone) ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary"}`}
+                          onClick={(e) => toggleContactAI(group.contactPhone, e)}
+                          title={disabledContacts.has(group.contactPhone) ? "IA desativada para este contato" : "IA ativa para este contato"}
+                        >
+                          <Power className="w-3.5 h-3.5 mr-1" />
+                          <span className="text-xs">{disabledContacts.has(group.contactPhone) ? "IA off" : "IA on"}</span>
+                        </Button>
                       )}
+                      {group.pendingCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
+                          disabled={rejectingContact === group.key}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRejectAllByContact(group);
+                          }}
+                        >
+                          {rejectingContact === group.key ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <><XCircle className="w-3.5 h-3.5 mr-1" /> Rejeitar todas</>
+                          )}
+                        </Button>
+                      )}
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${openContacts.has(group.key) ? "rotate-180" : ""}`} />
                     </div>
                   </div>
-                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {group.suggestions.length} sugestão{group.suggestions.length !== 1 ? "ões" : ""}
+                  {/* Metadata row */}
+                  <div className="flex items-center gap-3 mt-2 ml-[52px] flex-wrap">
+                    {group.integrationLabel && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Smartphone className="w-3 h-3" />
+                        <span className="font-medium text-foreground">{group.integrationLabel}</span>
                       </span>
-                      {group.pendingCount > 0 && (
-                        <Badge variant="default" className="text-xs">
-                          {group.pendingCount} pendente{group.pendingCount !== 1 ? "s" : ""}
-                        </Badge>
-                      )}
-                    </div>
-                    {group.contactPhone && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={`h-7 px-2 ${disabledContacts.has(group.contactPhone) ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary"}`}
-                        onClick={(e) => toggleContactAI(group.contactPhone, e)}
-                        title={disabledContacts.has(group.contactPhone) ? "IA desativada para este contato" : "IA ativa para este contato"}
-                      >
-                        <Power className="w-3.5 h-3.5 mr-1" />
-                        <span className="text-xs">{disabledContacts.has(group.contactPhone) ? "IA off" : "IA on"}</span>
-                      </Button>
                     )}
-                    {group.pendingCount > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
-                        disabled={rejectingContact === group.key}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRejectAllByContact(group);
-                        }}
-                      >
-                        {rejectingContact === group.key ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <><XCircle className="w-3.5 h-3.5 mr-1" /> Rejeitar todas</>
-                        )}
-                      </Button>
+                    {group.lastAssignedTo && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <UserCheck className="w-3 h-3" />
+                        <span className="font-medium text-foreground">{group.lastAssignedTo}</span>
+                      </span>
                     )}
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${openContacts.has(group.key) ? "rotate-180" : ""}`} />
+                    {group.lastApprovedAt && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        {formatDistanceToNow(new Date(group.lastApprovedAt), { addSuffix: true, locale: ptBR })}
+                      </span>
+                    )}
+                    {group.actionSummary.length > 0 && (
+                      <div className="flex items-center gap-1 ml-auto">
+                        {group.actionSummary.map(({ type, count }) => (
+                          <span
+                            key={type}
+                            className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium ${typeColors[type] || "bg-muted text-muted-foreground border-border"}`}
+                          >
+                            {count}× {ACTION_TYPE_LABELS[type]?.split(" ")[0] || type}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </button>
               </CollapsibleTrigger>
