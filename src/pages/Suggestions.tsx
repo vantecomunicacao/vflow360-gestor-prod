@@ -438,6 +438,31 @@ const Suggestions = () => {
                     )}
                   </div>
                 ))}
+                <div className="border-t border-border pt-3 mt-3 space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Criação automática no CRM</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm text-foreground">Criar contato</span>
+                      <p className="text-[10px] text-muted-foreground">Se não encontrar o contato no CRM</p>
+                    </div>
+                    <Switch
+                      checked={creationConfig.allowCreateContact}
+                      disabled={savingCreationConfig}
+                      onCheckedChange={(v) => saveCreationConfig({ ...creationConfig, allowCreateContact: v })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm text-foreground">Criar oportunidade</span>
+                      <p className="text-[10px] text-muted-foreground">Se não encontrar oportunidade no CRM</p>
+                    </div>
+                    <Switch
+                      checked={creationConfig.allowCreateOpportunity}
+                      disabled={savingCreationConfig}
+                      onCheckedChange={(v) => saveCreationConfig({ ...creationConfig, allowCreateOpportunity: v })}
+                    />
+                  </div>
+                </div>
               </div>
             </PopoverContent>
           </Popover>
