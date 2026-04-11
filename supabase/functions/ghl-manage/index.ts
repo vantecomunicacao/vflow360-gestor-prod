@@ -272,6 +272,25 @@ serve(async (req) => {
         });
       }
 
+      case "lost_reasons": {
+        // Fetch pipelines and extract lostReasons from all of them
+        const pipelinesResult = await callGhl("/opportunities/pipelines") as any;
+        const allLostReasons: { id: string; name: string; pipelineId: string; pipelineName: string }[] = [];
+        for (const pipeline of (pipelinesResult?.pipelines || [])) {
+          for (const reason of (pipeline.lostReasons || [])) {
+            allLostReasons.push({
+              id: reason.id || reason._id,
+              name: reason.name,
+              pipelineId: pipeline.id,
+              pipelineName: pipeline.name,
+            });
+          }
+        }
+        return new Response(JSON.stringify({ success: true, data: allLostReasons }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       case "opportunities": {
         const data = await callGhl("/opportunities/search");
         return new Response(JSON.stringify({ success: true, data }), {
@@ -771,9 +790,17 @@ serve(async (req) => {
 
           case "ganho_perdido": {
             const status = (actionData?.value || "").toLowerCase().includes("ganh") ? "won" : "lost";
-            await callGhl(`/opportunities/${opportunity.id}`, "PUT", {
-              status: status,
-            }, true);
+            const updateBody: Record<string, any> = { status };
+            
+            // If lost, check for lostReasonId from payload or action_data
+            if (status === "lost") {
+              const lostReasonId = payload.lostReasonId || actionData?.lostReasonId;
+              if (lostReasonId) {
+                updateBody.lostReasonId = lostReasonId;
+              }
+            }
+            
+            await callGhl(`/opportunities/${opportunity.id}`, "PUT", updateBody, true);
             executionResult = `Oportunidade marcada como ${status === "won" ? "ganha" : "perdida"}`;
             break;
           }

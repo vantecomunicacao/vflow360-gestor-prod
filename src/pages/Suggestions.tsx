@@ -104,6 +104,9 @@ const Suggestions = () => {
   const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
   const [creationConfig, setCreationConfig] = useState({ allowCreateContact: true, allowCreateOpportunity: true });
   const [savingCreationConfig, setSavingCreationConfig] = useState(false);
+  const [lostReasons, setLostReasons] = useState<{ id: string; name: string; pipelineId: string; pipelineName: string }[]>([]);
+  const [selectedLostReasons, setSelectedLostReasons] = useState<Record<string, string>>({});
+  const [loadingLostReasons, setLoadingLostReasons] = useState(false);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
@@ -126,7 +129,7 @@ const Suggestions = () => {
     if (disabledContactsData) setDisabledContacts(disabledContactsData);
   }, [disabledContactsData]);
 
-  // Fetch creation config
+  // Fetch creation config and lost reasons
   useEffect(() => {
     if (!activeWorkspace) return;
     const fetchCreationConfig = async () => {
@@ -139,7 +142,20 @@ const Suggestions = () => {
         }
       } catch {}
     };
+    const fetchLostReasons = async () => {
+      setLoadingLostReasons(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("ghl-manage", {
+          body: { action: "lost_reasons", workspace_id: activeWorkspace.id },
+        });
+        if (!error && data?.success && Array.isArray(data.data)) {
+          setLostReasons(data.data);
+        }
+      } catch {}
+      setLoadingLostReasons(false);
+    };
     fetchCreationConfig();
+    fetchLostReasons();
   }, [activeWorkspace]);
 
   const saveCreationConfig = async (newConfig: { allowCreateContact: boolean; allowCreateOpportunity: boolean }) => {
@@ -233,11 +249,22 @@ const Suggestions = () => {
 
   const handleAction = async (id: string, action: "approved" | "rejected") => {
     if (action === "approved") {
+      // Check if this is a "lost" suggestion that needs a lost reason
+      const suggestion = suggestions.find(s => s.id === id);
+      const isLost = suggestion?.type === "ganho_perdido" && !(suggestion?.action_data?.value || "").toLowerCase().includes("ganh");
+      const lostReasonId = isLost ? selectedLostReasons[id] : undefined;
+      
+      if (isLost && lostReasons.length > 0 && !lostReasonId) {
+        toast({ title: "Motivo de perda obrigatório", description: "Selecione o motivo de perda antes de aprovar.", variant: "destructive" });
+        return;
+      }
+
       setExecutingId(id);
       try {
-        const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", {
-          body: { action: "execute_suggestion", suggestionId: id, workspace_id: activeWorkspace?.id },
-        });
+        const body: Record<string, any> = { action: "execute_suggestion", suggestionId: id, workspace_id: activeWorkspace?.id };
+        if (lostReasonId) body.lostReasonId = lostReasonId;
+        
+        const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", { body });
 
         if (fnError || !result?.success) {
           const errorMsg = result?.error || fnError?.message || "Erro ao executar a sugestão no CRM.";
@@ -807,6 +834,29 @@ const Suggestions = () => {
                                     ✅ {suggestion.action_data.execution_result}
                                   </p>
                                 )}
+                              </div>
+                            )}
+
+                            {suggestion.status === "pending" && suggestion.type === "ganho_perdido" && !(suggestion.action_data?.value || "").toLowerCase().includes("ganh") && lostReasons.length > 0 && (
+                              <div className="mb-3 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                                <label className="text-xs font-semibold text-destructive mb-1.5 block">
+                                  Motivo de perda (obrigatório)
+                                </label>
+                                <Select
+                                  value={selectedLostReasons[suggestion.id] || ""}
+                                  onValueChange={(v) => setSelectedLostReasons(prev => ({ ...prev, [suggestion.id]: v }))}
+                                >
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue placeholder="Selecione o motivo..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {lostReasons.map(r => (
+                                      <SelectItem key={r.id} value={r.id}>
+                                        {r.name} <span className="text-muted-foreground text-xs ml-1">({r.pipelineName})</span>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                             )}
 
