@@ -657,7 +657,17 @@ const Suggestions = () => {
                                   <AlertTriangle className="w-3 h-3 mr-1" /> Auto-aprovação falhou
                                 </Badge>
                               )}
-                              {suggestion.status === "approved" && (executionResults[suggestion.id] || suggestion.action_data?.executed) && (
+                              {suggestion.status === "approved" && suggestion.action_data?.not_found_contact && (
+                                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                                  <AlertTriangle className="w-3 h-3 mr-1" /> Contato não encontrado
+                                </Badge>
+                              )}
+                              {suggestion.status === "approved" && suggestion.action_data?.not_found_opportunity && (
+                                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                                  <AlertTriangle className="w-3 h-3 mr-1" /> Oportunidade não encontrada
+                                </Badge>
+                              )}
+                              {suggestion.status === "approved" && (executionResults[suggestion.id] || suggestion.action_data?.executed) && !suggestion.action_data?.not_found_contact && !suggestion.action_data?.not_found_opportunity && (
                                 <>
                                   {(executionResults[suggestion.id]?.contactCreated || suggestion.action_data?.contact_created) && (
                                     <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
