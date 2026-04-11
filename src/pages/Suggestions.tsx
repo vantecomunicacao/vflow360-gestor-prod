@@ -275,12 +275,39 @@ const Suggestions = () => {
           contactPhone: phone,
           suggestions: [],
           pendingCount: 0,
+          integrationLabel: null,
+          lastApprovedAt: null,
+          lastAssignedTo: null,
+          actionSummary: [],
         });
       }
 
       const group = groups.get(key)!;
       group.suggestions.push(s);
       if (s.status === "pending") group.pendingCount++;
+    }
+
+    // Compute metadata for each group
+    for (const group of groups.values()) {
+      // Integration label from the first suggestion that has it
+      const withLabel = group.suggestions.find(s => s.conversations?.integration_label);
+      if (withLabel) group.integrationLabel = withLabel.conversations!.integration_label;
+
+      // Last approved suggestion
+      const approved = group.suggestions
+        .filter(s => s.status === "approved")
+        .sort((a, b) => (b.action_data?.executed_at || b.created_at).localeCompare(a.action_data?.executed_at || a.created_at));
+      if (approved.length > 0) {
+        group.lastApprovedAt = approved[0].action_data?.executed_at || approved[0].created_at;
+        group.lastAssignedTo = approved[0].action_data?.ghl_assigned_to || null;
+      }
+
+      // Action type summary
+      const typeCounts = new Map<string, number>();
+      for (const s of group.suggestions) {
+        typeCounts.set(s.type, (typeCounts.get(s.type) || 0) + 1);
+      }
+      group.actionSummary = Array.from(typeCounts.entries()).map(([type, count]) => ({ type, count }));
     }
 
     // Sort: contacts with pending suggestions first, then by most recent suggestion
