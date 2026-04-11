@@ -104,6 +104,9 @@ const Suggestions = () => {
   const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
   const [creationConfig, setCreationConfig] = useState({ allowCreateContact: true, allowCreateOpportunity: true });
   const [savingCreationConfig, setSavingCreationConfig] = useState(false);
+  const [lostReasons, setLostReasons] = useState<{ id: string; name: string; pipelineId: string; pipelineName: string }[]>([]);
+  const [selectedLostReasons, setSelectedLostReasons] = useState<Record<string, string>>({});
+  const [loadingLostReasons, setLoadingLostReasons] = useState(false);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
