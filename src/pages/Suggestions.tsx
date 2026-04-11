@@ -102,6 +102,8 @@ const Suggestions = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [disabledContacts, setDisabledContacts] = useState<Set<string>>(new Set());
+  const [creationConfig, setCreationConfig] = useState({ allowCreateContact: true, allowCreateOpportunity: true });
+  const [savingCreationConfig, setSavingCreationConfig] = useState(false);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
@@ -123,6 +125,37 @@ const Suggestions = () => {
   useEffect(() => {
     if (disabledContactsData) setDisabledContacts(disabledContactsData);
   }, [disabledContactsData]);
+
+  // Fetch creation config
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    const fetchCreationConfig = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("ghl-manage", {
+          body: { action: "get_creation_config", workspace_id: activeWorkspace.id },
+        });
+        if (!error && data?.success) {
+          setCreationConfig(data.data);
+        }
+      } catch {}
+    };
+    fetchCreationConfig();
+  }, [activeWorkspace]);
+
+  const saveCreationConfig = async (newConfig: { allowCreateContact: boolean; allowCreateOpportunity: boolean }) => {
+    setSavingCreationConfig(true);
+    try {
+      await supabase.functions.invoke("ghl-manage", {
+        body: { action: "save_creation_config", workspace_id: activeWorkspace?.id, ...newConfig },
+      });
+      setCreationConfig(newConfig);
+      toast({ title: "Configuração salva", description: "Preferências de criação atualizadas." });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível salvar.", variant: "destructive" });
+    } finally {
+      setSavingCreationConfig(false);
+    }
+  };
 
   const fetchSuggestions = useCallback(() => {
     refetchSuggestions();
