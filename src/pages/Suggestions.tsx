@@ -855,7 +855,7 @@ const Suggestions = () => {
                             {suggestion.status === "pending" && suggestion.type === "ganho_perdido" && !(suggestion.action_data?.value || "").toLowerCase().includes("ganh") && lostReasons.length > 0 && (
                               <div className="mb-3 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
                                 <label className="text-xs font-semibold text-destructive mb-1.5 block">
-                                  Motivo de perda (obrigatório)
+                                  Motivo de perda {(suggestion.action_data as any)?.lostReasonId ? "(sugerido pela IA ✨)" : "(obrigatório)"}
                                 </label>
                                 <Select
                                   value={selectedLostReasons[suggestion.id] || ""}
