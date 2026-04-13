@@ -526,6 +526,10 @@ REGRAS OBRIGATÓRIAS:
               due_date: s.due_date || null,
               task_description: s.description || null,
             } : {}),
+            ...(s.type === "ganho_perdido" && s.lost_reason_id ? {
+              lostReasonId: s.lost_reason_id,
+              lostReasonName: lostReasonsMap[s.lost_reason_id] || null,
+            } : {}),
           },
           ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o"}` : `lovable/${aiModel}`,
         })
