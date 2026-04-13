@@ -158,6 +158,20 @@ const Suggestions = () => {
     fetchLostReasons();
   }, [activeWorkspace]);
 
+  // Pre-fill selectedLostReasons from AI-suggested lostReasonId in action_data
+  useEffect(() => {
+    if (!suggestionsData) return;
+    const prefilled: Record<string, string> = {};
+    for (const s of suggestionsData) {
+      if (s.type === "ganho_perdido" && s.status === "pending" && s.action_data?.lostReasonId) {
+        prefilled[s.id] = s.action_data.lostReasonId;
+      }
+    }
+    if (Object.keys(prefilled).length > 0) {
+      setSelectedLostReasons(prev => ({ ...prefilled, ...prev }));
+    }
+  }, [suggestionsData]);
+
   const saveCreationConfig = async (newConfig: { allowCreateContact: boolean; allowCreateOpportunity: boolean }) => {
     setSavingCreationConfig(true);
     try {
