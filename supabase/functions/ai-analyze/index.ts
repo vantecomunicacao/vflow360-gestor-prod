@@ -103,6 +103,40 @@ serve(async (req) => {
     const selectedStages = ghlConfig.selectedStages || [];
     const aiPrompt = ghlConfig.aiPrompt || "";
 
+    // 3b. Fetch lost reasons from GHL pipelines (for ganho_perdido suggestions)
+    let lostReasonsDescription = "";
+    const lostReasonsMap: Record<string, string> = {}; // id -> name for validation
+    if (ghlIntegration?.status === "connected" && ghlConfig.apiKey) {
+      try {
+        const GHL_BASE = "https://services.leadconnectorhq.com";
+        const pipelinesUrl = new URL("/opportunities/pipelines", GHL_BASE);
+        pipelinesUrl.searchParams.set("locationId", ghlConfig.locationId);
+        const pResp = await fetch(pipelinesUrl.toString(), {
+          headers: {
+            Authorization: `Bearer ${ghlConfig.apiKey}`,
+            "Content-Type": "application/json",
+            Version: "2021-07-28",
+          },
+        });
+        if (pResp.ok) {
+          const pData = await pResp.json();
+          const reasons: { id: string; name: string; pipelineName: string }[] = [];
+          for (const pipeline of (pData?.pipelines || [])) {
+            for (const reason of (pipeline.lostReasons || [])) {
+              const rId = reason.id || reason._id;
+              reasons.push({ id: rId, name: reason.name, pipelineName: pipeline.name });
+              lostReasonsMap[rId] = reason.name;
+            }
+          }
+          if (reasons.length > 0) {
+            lostReasonsDescription = `\n\nMotivos de perda disponíveis no CRM (para sugestões de "perdido", OBRIGATORIAMENTE escolha o motivo mais adequado usando o campo "lost_reason_id"):\n${reasons.map(r => `- ID: "${r.id}" → "${r.name}" (pipeline: ${r.pipelineName})`).join("\n")}`;
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch lost reasons:", e);
+      }
+    }
+
     // 4. Fetch AI config (which actions are enabled)
     let aiConfigQuery = supabase
       .from("ai_config")
@@ -211,7 +245,7 @@ ${filteredActionTypes.includes("campo_personalizado") ? "- campo_personalizado: 
 ${filteredActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
 ${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor monetário da oportunidade/negociação no CRM. SEMPRE que o lead mencionar preço, orçamento, valor, custo ou qualquer quantia monetária, use ESTE tipo (NÃO use campo_personalizado para valores monetários). O campo 'value' deve conter APENAS o número (ex: '1500' ou '1500.00'), sem 'R$' ou texto." : ""}
 ${filteredActionTypes.includes("agendar_lembrete") ? "- agendar_lembrete: Criar uma TAREFA no CRM com data de vencimento. Use 'task_title' para o título (ex: 'Retornar ligação', 'Enviar proposta') e 'due_date' no formato ISO 8601 (ex: '2026-04-10T14:00:00'). Se a mensagem mencionar uma data/hora específica, use essa. Caso contrário, defina para 24 horas a partir de agora. O título deve refletir a ação mencionada na conversa ou 'Entrar em contato' como padrão." : ""}
-${filteredActionTypes.includes("ganho_perdido") ? "- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida" : ""}`.replace(/\n\n+/g, "\n");
+${filteredActionTypes.includes("ganho_perdido") ? `- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida. Para "perdido", é OBRIGATÓRIO incluir o campo "lost_reason_id" com o ID exato de um dos motivos de perda listados abaixo. Analise o contexto da conversa para escolher o motivo mais adequado.${lostReasonsDescription}` : ""}`.replace(/\n\n+/g, "\n");
 
     // Build valid field keys set for validation
     const validFieldKeys = new Set(selectedFields.map((f: any) => f.fieldKey));
@@ -311,6 +345,10 @@ REGRAS OBRIGATÓRIAS:
                       due_date: {
                         type: "string",
                         description: "Apenas para agendar_lembrete: data/hora de vencimento em ISO 8601 (ex: '2026-04-10T14:00:00'). Se não mencionada na conversa, omitir (será 24h a partir de agora).",
+                      },
+                      lost_reason_id: {
+                        type: "string",
+                        description: "OBRIGATÓRIO para ganho_perdido com valor 'perdido': ID exato do motivo de perda escolhido da lista de motivos disponíveis.",
                       },
                     },
                     required: ["type", "title", "description"],
@@ -487,6 +525,10 @@ REGRAS OBRIGATÓRIAS:
               task_title: s.task_title || s.value || "Entrar em contato",
               due_date: s.due_date || null,
               task_description: s.description || null,
+            } : {}),
+            ...(s.type === "ganho_perdido" && s.lost_reason_id ? {
+              lostReasonId: s.lost_reason_id,
+              lostReasonName: lostReasonsMap[s.lost_reason_id] || null,
             } : {}),
           },
           ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o"}` : `lovable/${aiModel}`,

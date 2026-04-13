@@ -158,6 +158,21 @@ const Suggestions = () => {
     fetchLostReasons();
   }, [activeWorkspace]);
 
+  // Pre-fill selectedLostReasons from AI-suggested lostReasonId in action_data
+  useEffect(() => {
+    if (!suggestionsData) return;
+    const prefilled: Record<string, string> = {};
+    for (const s of suggestionsData) {
+      const ad = s.action_data as Record<string, any> | null;
+      if (s.type === "ganho_perdido" && s.status === "pending" && ad?.lostReasonId) {
+        prefilled[s.id] = ad.lostReasonId;
+      }
+    }
+    if (Object.keys(prefilled).length > 0) {
+      setSelectedLostReasons(prev => ({ ...prefilled, ...prev }));
+    }
+  }, [suggestionsData]);
+
   const saveCreationConfig = async (newConfig: { allowCreateContact: boolean; allowCreateOpportunity: boolean }) => {
     setSavingCreationConfig(true);
     try {
@@ -840,7 +855,7 @@ const Suggestions = () => {
                             {suggestion.status === "pending" && suggestion.type === "ganho_perdido" && !(suggestion.action_data?.value || "").toLowerCase().includes("ganh") && lostReasons.length > 0 && (
                               <div className="mb-3 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
                                 <label className="text-xs font-semibold text-destructive mb-1.5 block">
-                                  Motivo de perda (obrigatório)
+                                  Motivo de perda {(suggestion.action_data as any)?.lostReasonId ? "(sugerido pela IA ✨)" : "(obrigatório)"}
                                 </label>
                                 <Select
                                   value={selectedLostReasons[suggestion.id] || ""}
