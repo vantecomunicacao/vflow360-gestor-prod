@@ -103,15 +103,15 @@ serve(async (req) => {
     const selectedStages = ghlConfig.selectedStages || [];
     const aiPrompt = ghlConfig.aiPrompt || "";
 
-    // 3b. Fetch lost reasons from GHL pipelines (for ganho_perdido suggestions)
+    // 3b. Fetch lost reasons from GHL dedicated endpoint (for ganho_perdido suggestions)
     let lostReasonsDescription = "";
     const lostReasonsMap: Record<string, string> = {}; // id -> name for validation
     if (ghlIntegration?.status === "connected" && ghlConfig.apiKey) {
       try {
         const GHL_BASE = "https://services.leadconnectorhq.com";
-        const pipelinesUrl = new URL("/opportunities/pipelines", GHL_BASE);
-        pipelinesUrl.searchParams.set("locationId", ghlConfig.locationId);
-        const pResp = await fetch(pipelinesUrl.toString(), {
+        const lostReasonUrl = new URL("/opportunities/lost-reason", GHL_BASE);
+        lostReasonUrl.searchParams.set("locationId", ghlConfig.locationId);
+        const pResp = await fetch(lostReasonUrl.toString(), {
           headers: {
             Authorization: `Bearer ${ghlConfig.apiKey}`,
             "Content-Type": "application/json",
@@ -120,16 +120,14 @@ serve(async (req) => {
         });
         if (pResp.ok) {
           const pData = await pResp.json();
-          const reasons: { id: string; name: string; pipelineName: string }[] = [];
-          for (const pipeline of (pData?.pipelines || [])) {
-            for (const reason of (pipeline.lostReasons || [])) {
-              const rId = reason.id || reason._id;
-              reasons.push({ id: rId, name: reason.name, pipelineName: pipeline.name });
-              lostReasonsMap[rId] = reason.name;
-            }
+          const reasons: { id: string; name: string }[] = [];
+          for (const reason of (pData?.lostReasons || [])) {
+            const rId = reason.id || reason._id;
+            reasons.push({ id: rId, name: reason.name });
+            lostReasonsMap[rId] = reason.name;
           }
           if (reasons.length > 0) {
-            lostReasonsDescription = `\n\nMotivos de perda disponíveis no CRM (para sugestões de "perdido", OBRIGATORIAMENTE escolha o motivo mais adequado usando o campo "lost_reason_id"):\n${reasons.map(r => `- ID: "${r.id}" → "${r.name}" (pipeline: ${r.pipelineName})`).join("\n")}`;
+            lostReasonsDescription = `\n\nMotivos de perda disponíveis no CRM (para sugestões de "perdido", OBRIGATORIAMENTE escolha o motivo mais adequado usando o campo "lost_reason_id"):\n${reasons.map(r => `- ID: "${r.id}" → "${r.name}"`).join("\n")}`;
           }
         }
       } catch (e) {
