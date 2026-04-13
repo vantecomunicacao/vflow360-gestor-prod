@@ -273,18 +273,14 @@ serve(async (req) => {
       }
 
       case "lost_reasons": {
-        // Fetch pipelines and extract lostReasons from all of them
-        const pipelinesResult = await callGhl("/opportunities/pipelines") as any;
-        const allLostReasons: { id: string; name: string; pipelineId: string; pipelineName: string }[] = [];
-        for (const pipeline of (pipelinesResult?.pipelines || [])) {
-          for (const reason of (pipeline.lostReasons || [])) {
-            allLostReasons.push({
-              id: reason.id || reason._id,
-              name: reason.name,
-              pipelineId: pipeline.id,
-              pipelineName: pipeline.name,
-            });
-          }
+        // Fetch lost reasons from the dedicated endpoint
+        const lostReasonResult = await callGhl("/opportunities/lost-reason") as any;
+        const allLostReasons: { id: string; name: string }[] = [];
+        for (const reason of (lostReasonResult?.lostReasons || [])) {
+          allLostReasons.push({
+            id: reason.id || reason._id,
+            name: reason.name,
+          });
         }
         return new Response(JSON.stringify({ success: true, data: allLostReasons }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
