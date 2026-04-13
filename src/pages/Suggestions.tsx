@@ -163,8 +163,9 @@ const Suggestions = () => {
     if (!suggestionsData) return;
     const prefilled: Record<string, string> = {};
     for (const s of suggestionsData) {
-      if (s.type === "ganho_perdido" && s.status === "pending" && s.action_data?.lostReasonId) {
-        prefilled[s.id] = s.action_data.lostReasonId;
+      const ad = s.action_data as Record<string, any> | null;
+      if (s.type === "ganho_perdido" && s.status === "pending" && ad?.lostReasonId) {
+        prefilled[s.id] = ad.lostReasonId;
       }
     }
     if (Object.keys(prefilled).length > 0) {
