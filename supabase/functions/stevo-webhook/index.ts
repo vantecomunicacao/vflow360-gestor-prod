@@ -680,6 +680,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string) {
       .from("conversations")
       .select("id, unread_count, contact_name")
       .eq("user_id", userId)
+      .eq("workspace_id", workspaceId)
       .eq("contact_phone", phone)
       .maybeSingle();
 
