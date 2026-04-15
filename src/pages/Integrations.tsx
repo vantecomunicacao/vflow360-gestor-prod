@@ -1,4 +1,5 @@
 import { MessageSquare, Link2, CheckCircle, XCircle, RefreshCw, Sparkles, Loader2, Wifi, WifiOff, Download, Plus, Trash2, Copy, Clock, Pencil } from "lucide-react";
+import { WebhookLogs } from "@/components/WebhookLogs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -547,11 +548,12 @@ const Integrations = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Integrações</h1>
-        <p className="text-muted-foreground">Gerencie suas conexões com WhatsApp e Go High Level</p>
-      </div>
+    <div className="flex gap-6">
+      <div className="space-y-6 flex-1 max-w-3xl">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Integrações</h1>
+          <p className="text-muted-foreground">Gerencie suas conexões com WhatsApp e Go High Level</p>
+        </div>
 
       {/* WhatsApp */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6">
@@ -949,6 +951,10 @@ const Integrations = () => {
           </div>
         )}
       </motion.div>
+      </div>
+      <div className="hidden xl:block w-80 shrink-0">
+        <WebhookLogs />
+      </div>
     </div>
   );
 };
