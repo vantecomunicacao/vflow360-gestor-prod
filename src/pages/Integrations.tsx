@@ -548,11 +548,12 @@ const Integrations = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Integrações</h1>
-        <p className="text-muted-foreground">Gerencie suas conexões com WhatsApp e Go High Level</p>
-      </div>
+    <div className="flex gap-6">
+      <div className="space-y-6 flex-1 max-w-3xl">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Integrações</h1>
+          <p className="text-muted-foreground">Gerencie suas conexões com WhatsApp e Go High Level</p>
+        </div>
 
       {/* WhatsApp */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6">
