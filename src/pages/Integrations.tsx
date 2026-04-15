@@ -958,6 +958,5 @@ const Integrations = () => {
     </div>
   );
 };
-};
 
 export default Integrations;
