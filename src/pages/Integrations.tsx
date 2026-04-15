@@ -951,8 +951,13 @@ const Integrations = () => {
           </div>
         )}
       </motion.div>
+      </div>
+      <div className="hidden xl:block w-80 shrink-0">
+        <WebhookLogs />
+      </div>
     </div>
   );
+};
 };
 
 export default Integrations;
