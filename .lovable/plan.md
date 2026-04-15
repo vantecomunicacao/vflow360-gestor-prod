@@ -1,34 +1,59 @@
 
 
-## Plano: Enriquecer a barra de agrupamento por contato
+# Bug: Webhooks roteando mensagens para o workspace errado
 
-### Situação atual
-A barra do acordeão de cada lead mostra apenas: nome, telefone, contagem de sugestões, badge de pendentes, botão IA on/off e botão rejeitar todas.
+## Diagnóstico
 
-### Dados disponíveis
-- **integration_label** (nome do WhatsApp): está na tabela `conversations`, acessível via `conversation_id` da sugestão. Ex: "Stevo #1", "Stevo #2".
-- **ghl_assigned_to** (responsável GHL): já está em `action_data` das sugestões aprovadas.
-- **updated_at / executed_at**: timestamp da última aprovação, disponível nas sugestões aprovadas.
+O problema foi confirmado nos dados:
 
-### O que será adicionado na barra
+- A integração **"Deyvison - TU"** (`01dc29c8`) pertence ao workspace **Tanques União** (`1b745ecb`).
+- Porém, a conversa do contato "Leo Barco" (`554491834177`) com label "Deyvison - TU" está no workspace **AcquaVitalle** (`8a92803b`).
 
-1. **Nome do WhatsApp conectado** — extraído do `integration_label` da conversa vinculada. Será buscado via JOIN no hook `useSuggestions`.
+**Causa raiz**: Tanto `stevo-webhook` quanto `uazap-webhook` buscam a conversa existente usando apenas `user_id` + `contact_phone`, **sem filtrar por `workspace_id`**. Como o mesmo usuário é dono de ambos os workspaces, se um contato já existia em AcquaVitalle, o webhook da Tanques União encontra essa conversa e grava as mensagens lá.
 
-2. **Última aprovação** — data/hora da sugestão aprovada mais recente do grupo, formatada como "há X min" ou data completa.
+## Correção
 
-3. **Responsável GHL** — nome do usuário responsável (`ghl_assigned_to`) da última sugestão aprovada do grupo.
+### 1. Corrigir `stevo-webhook/index.ts` (linhas 679-684)
 
-### Minha sugestão de melhoria
+Adicionar `.eq("workspace_id", workspaceId)` na query de busca da conversa:
 
-**Indicador visual de status consolidado por lead**: Adicionar mini-badges coloridos na barra mostrando um resumo rápido dos tipos de ação (ex: 2x Mover funil, 1x Nota) com cores correspondentes. Isso permite ver de relance quais ações a IA sugeriu sem precisar abrir o acordeão.
+```typescript
+let { data: conversation } = await supabase
+  .from("conversations")
+  .select("id, unread_count, contact_name")
+  .eq("user_id", userId)
+  .eq("workspace_id", workspaceId)   // ← NOVO
+  .eq("contact_phone", phone)
+  .maybeSingle();
+```
 
-### Alterações técnicas
+### 2. Corrigir `uazap-webhook/index.ts` (linhas 626-629)
 
-1. **`src/hooks/use-suggestions.ts`** — Modificar a query para incluir `conversations.integration_label` via select com join: `.select("*, conversations!conversation_id(integration_label)")`.
+Mesma correção:
 
-2. **`src/pages/Suggestions.tsx`**:
-   - Atualizar a interface `Suggestion` para incluir `integration_label` (vindo do join).
-   - No `ContactGroup`, computar: `lastApprovedAt`, `lastAssignedTo`, `integrationLabel`.
-   - Renderizar na barra: ícone de WhatsApp + label, ícone de relógio + última aprovação, ícone de usuário + responsável.
-   - Adicionar mini-badges de tipos de ação como resumo visual.
+```typescript
+let { data: conversation } = await supabase
+  .from("conversations")
+  .select("id, unread_count")
+  .eq("user_id", userId)
+  .eq("workspace_id", workspaceId)   // ← NOVO
+  .eq("contact_phone", phone)
+  .single();
+```
+
+### 3. Corrigir conversa existente contaminada
+
+Mover a conversa "Leo Barco" (`554491834177`) que está em AcquaVitalle com label "Deyvison - TU" para o workspace correto (Tanques União), via migration SQL:
+
+```sql
+UPDATE conversations
+SET workspace_id = '1b745ecb-c541-42a1-a91c-71cd71d75b53'
+WHERE id = '81857066-3ab0-4754-bdf0-9cb1c34cfd5d';
+```
+
+### 4. Re-deploy ambas as Edge Functions
+
+---
+
+**Impacto**: Correção de 1 linha em cada webhook + 1 migration para dados existentes. Sem mudanças de UI.
 
