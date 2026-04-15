@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2, Trash2, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -125,7 +125,22 @@ const Conversations = () => {
 
   return (
     <div className="h-[calc(100vh-8rem)]">
-      <h1 className="text-2xl font-bold text-foreground mb-1">Conversas</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-2xl font-bold text-foreground">Conversas</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            queryClient.invalidateQueries({ queryKey: ["conversations", activeWorkspace?.id] });
+            if (selected) {
+              queryClient.invalidateQueries({ queryKey: ["messages", selected.id] });
+            }
+            toast({ title: "Conversas atualizadas" });
+          }}
+        >
+          <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
+        </Button>
+      </div>
       <p className="text-muted-foreground mb-6">Mensagens recebidas do WhatsApp</p>
 
       <div className="flex gap-4 h-[calc(100%-4rem)]">
