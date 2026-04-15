@@ -625,8 +625,9 @@ serve(async (req) => {
         .from("conversations")
         .select("id, unread_count")
         .eq("user_id", userId)
+        .eq("workspace_id", workspaceId)
         .eq("contact_phone", phone)
-        .single();
+        .maybeSingle();
 
       const displayMessage = content.length > 100 ? content.slice(0, 100) + "..." : content;
 
