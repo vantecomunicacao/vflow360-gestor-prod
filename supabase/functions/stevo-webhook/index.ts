@@ -439,25 +439,12 @@ function parseSafeTimestamp(rawTs: unknown): string {
   }
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+async function processWebhook(rawPayload: unknown, integrationId: string) {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    const url = new URL(req.url);
-    const integrationId = url.searchParams.get("id");
-
-    if (!integrationId) {
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const { data: integration } = await supabase
       .from("integrations")
@@ -468,9 +455,7 @@ serve(async (req) => {
 
     if (!integration) {
       console.log("No matching Stevo integration for ID:", integrationId);
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return;
     }
 
     const userId = integration.user_id;
@@ -478,16 +463,16 @@ serve(async (req) => {
     const integrationConfig = integration.config as { label?: string; last_webhook_at?: string; serverUrl?: string; instanceToken?: string } || {};
     const integrationLabel = integrationConfig.label || "Stevo";
 
-    let payload = await req.json();
+    let payload = rawPayload as Record<string, unknown>;
 
     // Handle array wrapper
     if (Array.isArray(payload)) {
-      payload = payload[0] || {};
+      payload = (payload[0] || {}) as Record<string, unknown>;
     }
 
     // Handle nested data wrapper
     if (payload.data && typeof payload.data === "object" && !payload.SourceWebMsg) {
-      const inner = payload.data;
+      const inner = payload.data as Record<string, unknown>;
       if (inner.SourceWebMsg || inner.Message) {
         payload = { ...inner, event: payload.event || inner.event, instanceName: payload.instanceName || inner.instanceName };
       }
@@ -498,7 +483,8 @@ serve(async (req) => {
     const serverUrl = (payload.serverUrl as string) || (config.serverUrl as string) || "";
     const instanceToken = (payload.instanceToken as string) || (config.instanceToken as string) || "";
 
-    await supabase
+    // Fire-and-forget config update
+    supabase
       .from("integrations")
       .update({
         config: {
@@ -509,7 +495,8 @@ serve(async (req) => {
         },
         status: "connected",
       })
-      .eq("id", integration.id);
+      .eq("id", integration.id)
+      .then(() => {});
 
     console.log("Stevo webhook event:", payload.event, "instance:", payload.instanceName);
 
@@ -517,9 +504,7 @@ serve(async (req) => {
 
     if (event !== "Message") {
       console.log("Stevo: unhandled event:", event);
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return;
     }
 
     const sourceMsg = payload.SourceWebMsg || payload.sourceWebMsg || null;
@@ -540,28 +525,23 @@ serve(async (req) => {
     } else {
       const msgKey = payload?.key || payload?.Key;
       if (msgKey) {
-        remoteJID = msgKey.remoteJID || msgKey.remoteJid || msgKey.RemoteJID || "";
-        isFromMe = msgKey.fromMe === true || msgKey.FromMe === true;
+        remoteJID = (msgKey as Record<string, unknown>).remoteJID as string || (msgKey as Record<string, unknown>).remoteJid as string || (msgKey as Record<string, unknown>).RemoteJID as string || "";
+        isFromMe = (msgKey as Record<string, unknown>).fromMe === true || (msgKey as Record<string, unknown>).FromMe === true;
       }
     }
 
     if (!remoteJID) {
       console.log("Stevo: no remoteJID found");
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return;
     }
 
     if (remoteJID.endsWith("@g.us")) {
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return;
     }
 
     const phone = remoteJID.replace("@s.whatsapp.net", "").replace("@lid", "").replace("@g.us", "");
 
-    // Extract contact name ONLY from inbound messages (pushName = lead's name)
-    // For outbound, pushName would be the owner's name, so we skip it
+    // Extract contact name ONLY from inbound messages
     let inboundContactName = "";
     if (!isFromMe) {
       inboundContactName =
@@ -686,9 +666,7 @@ serve(async (req) => {
 
     if (!content) {
       console.log("Stevo: no content extracted");
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return;
     }
 
     const msgTimestamp = parseSafeTimestamp(
@@ -707,9 +685,6 @@ serve(async (req) => {
 
     const displayMessage = content.length > 100 ? content.slice(0, 100) + "..." : content;
 
-    // Determine the contact name to use:
-    // - For new conversations: use inbound name or phone
-    // - For updates: only change name if we have a valid inbound name
     const effectiveContactName = inboundContactName || phone;
 
     if (!conversation) {
@@ -730,7 +705,6 @@ serve(async (req) => {
         .single();
       conversation = newConv;
     } else {
-      // Only update contact_name if we have a valid inbound name
       const updateData: Record<string, unknown> = {
         last_message: displayMessage,
         last_message_at: msgTimestamp,
@@ -755,12 +729,10 @@ serve(async (req) => {
       });
 
       if (!isFromMe) {
-        // Debounce: wait 4 minutes without new messages before analyzing (10 min ceiling)
-        const DEBOUNCE_MS = 4 * 60 * 1000; // 4 minutes
-        const CEILING_MS = 10 * 60 * 1000; // 10 minutes
+        const DEBOUNCE_MS = 4 * 60 * 1000;
+        const CEILING_MS = 10 * 60 * 1000;
         const now = new Date();
 
-        // Check current analyze_started_at for ceiling calculation
         const { data: convDebounce } = await supabase
           .from("conversations")
           .select("analyze_started_at")
@@ -774,7 +746,6 @@ serve(async (req) => {
         const ceilingReached = analyzeStartedAt && (now.getTime() - analyzeStartedAt.getTime() >= CEILING_MS);
 
         if (ceilingReached) {
-          // Ceiling reached: trigger analysis immediately
           console.log(`Debounce ceiling reached for ${conversation.id}, triggering analysis now`);
           await supabase
             .from("conversations")
@@ -790,7 +761,6 @@ serve(async (req) => {
             body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
           }).catch((e) => console.error("AI analyze trigger failed:", e));
         } else {
-          // Set/reset debounce timer
           const analyzeAfter = new Date(now.getTime() + DEBOUNCE_MS).toISOString();
           const updateData: Record<string, unknown> = { analyze_after: analyzeAfter };
           if (!analyzeStartedAt) {
@@ -802,22 +772,59 @@ serve(async (req) => {
             .eq("id", conversation.id);
 
           console.log(`Debounce set for ${conversation.id}: analyze_after=${analyzeAfter}`);
-
-          // Analysis will be triggered by the analyze-scheduler cron
         }
       }
 
       console.log("Stevo message saved:", conversation.id);
     }
+  } catch (error) {
+    console.error("Stevo webhook processing error:", error);
+  }
+}
 
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const okResponse = new Response(JSON.stringify({ ok: true }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+  try {
+    const url = new URL(req.url);
+    const integrationId = url.searchParams.get("id");
+
+    if (!integrationId) {
+      console.log("Stevo webhook: no ?id= parameter received, URL:", req.url);
+      return okResponse;
+    }
+
+    // Parse payload before responding
+    let payload: unknown;
+    try {
+      payload = await req.json();
+    } catch {
+      console.log("Stevo webhook: invalid JSON body");
+      return okResponse;
+    }
+
+    // Respond 200 immediately — Stevo gets fast confirmation
+    // Process the message asynchronously
+    // deno-lint-ignore no-explicit-any
+    const runtime = (globalThis as any).EdgeRuntime;
+    if (runtime?.waitUntil) {
+      runtime.waitUntil(processWebhook(payload, integrationId));
+    } else {
+      // Fallback: fire-and-forget (function stays alive briefly after response)
+      processWebhook(payload, integrationId).catch((e) =>
+        console.error("Stevo background processing error:", e)
+      );
+    }
+
+    return okResponse;
   } catch (error) {
     console.error("Stevo webhook error:", error);
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return okResponse;
   }
 });
