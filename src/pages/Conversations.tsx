@@ -299,6 +299,29 @@ const Conversations = () => {
                 </div>
               </div>
               <div className="ml-auto flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePdfUpload(file);
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPdf}
+                  title="Enviar PDF (até 10 MB)"
+                >
+                  {uploadingPdf ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Processando...</>
+                  ) : (
+                    <><Paperclip className="w-4 h-4 mr-1" /> PDF</>
+                  )}
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
