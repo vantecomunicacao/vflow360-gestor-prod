@@ -249,7 +249,11 @@ ${filteredActionTypes.includes("ganho_perdido") ? `- ganho_perdido: Sugerir marc
     const validFieldKeys = new Set(selectedFields.map((f: any) => f.fieldKey));
     const validStageNames = new Set(stageNames);
 
+    const nowBrazil = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" });
     const systemPrompt = `Você é um assistente de CRM inteligente. Analise a conversa de WhatsApp abaixo e gere sugestões de ações para o CRM (Go High Level).
+
+DATA E HORA ATUAL (referência obrigatória, fuso UTC-03 / America/Sao_Paulo): ${nowBrazil}
+Qualquer data sugerida (como vencimento de tarefa) DEVE ser igual ou posterior a esta data. NUNCA use anos no passado.
 
 ${aiPrompt}
 ${fieldsDescription}
