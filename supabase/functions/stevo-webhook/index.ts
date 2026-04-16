@@ -642,7 +642,61 @@ async function processWebhook(rawPayload: unknown, integrationId: string) {
         content = vid?.caption ? `🎬 [Vídeo]: ${vid.caption}` : "[Enviado uma mídia não suportada]";
       } else if (media.type === "document") {
         const doc = messageData.documentMessage as Record<string, unknown> | undefined;
-        content = doc?.fileName ? `📎 [Documento]: ${doc.fileName}` : "[Enviado uma mídia não suportada]";
+        const fileName = (doc?.fileName as string) || "documento";
+        const docMime = (doc?.mimetype as string) || "";
+        const isPdf = docMime.toLowerCase().includes("pdf") || fileName.toLowerCase().endsWith(".pdf");
+
+        if (isPdf) {
+          // Try to fetch PDF bytes
+          const extractedDoc = mergeMedia(
+            extractMediaData(doc),
+            extractMediaData({ payload, messageData, sourceMsg, infoData }),
+          );
+
+          let pdfBase64 = extractedDoc.base64 || "";
+
+          if ((!pdfBase64 || pdfBase64.length < 100) && serverUrl && instanceToken) {
+            const downloaded = await downloadMediaViaStevo(
+              serverUrl,
+              instanceToken,
+              messageData,
+              "document",
+              docMime || "application/pdf",
+            );
+            if (downloaded?.base64?.length > 100) pdfBase64 = downloaded.base64;
+          }
+
+          if ((!pdfBase64 || pdfBase64.length < 100) && extractedDoc.url) {
+            const fromUrl = await fetchMediaFromUrl(extractedDoc.url, docMime || "application/pdf", "document");
+            if (fromUrl) pdfBase64 = fromUrl.base64;
+          }
+
+          if (pdfBase64 && pdfBase64.length > 100) {
+            try {
+              const pdfResp = await fetch(`${SUPABASE_URL}/functions/v1/pdf-extract`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                },
+                body: JSON.stringify({
+                  pdf_base64: pdfBase64,
+                  file_name: fileName,
+                  user_id: userId,
+                }),
+              });
+              const pdfJson = await pdfResp.json();
+              content = pdfJson?.message || `📄 [PDF]: ${fileName}`;
+            } catch (e) {
+              console.error("Stevo PDF extract failed:", e);
+              content = `📄 [PDF]: ${fileName} — Erro ao processar.`;
+            }
+          } else {
+            content = `📄 [PDF]: ${fileName} — Não foi possível baixar o arquivo.`;
+          }
+        } else {
+          content = fileName ? `📎 [Documento]: ${fileName}` : "[Enviado uma mídia não suportada]";
+        }
       } else if (media.type === "sticker") {
         content = "[🎨 Figurinha recebida]";
       } else if (media.type === "contact") {

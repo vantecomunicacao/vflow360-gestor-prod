@@ -577,7 +577,34 @@ serve(async (req) => {
         } else if (media.type === "video") {
           content = "[Enviado uma mídia não suportada]";
         } else if (media.type === "document") {
-          content = "[Enviado uma mídia não suportada]";
+          const fileName = (message?.fileName as string) || (message?.filename as string) || "documento";
+          const isPdf = (mediaMime || "").toLowerCase().includes("pdf") || fileName.toLowerCase().endsWith(".pdf");
+
+          if (isPdf && hasUsableData) {
+            try {
+              const pdfResp = await fetch(`${SUPABASE_URL}/functions/v1/pdf-extract`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                },
+                body: JSON.stringify({
+                  pdf_base64: mediaBase64,
+                  file_name: fileName,
+                  user_id: userId,
+                }),
+              });
+              const pdfJson = await pdfResp.json();
+              content = pdfJson?.message || `📄 [PDF]: ${fileName}`;
+            } catch (e) {
+              console.error("Uazap PDF extract failed:", e);
+              content = `📄 [PDF]: ${fileName} — Erro ao processar.`;
+            }
+          } else if (isPdf) {
+            content = `📄 [PDF]: ${fileName} — Não foi possível baixar o arquivo.`;
+          } else {
+            content = "[Enviado uma mídia não suportada]";
+          }
         } else if (media.type === "sticker") {
           content = "[🎨 Figurinha recebida]";
         } else {
