@@ -62,6 +62,85 @@ const Conversations = () => {
     }
   };
 
+  const handlePdfUpload = async (file: File) => {
+    if (!selected) return;
+
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      toast({ title: "Apenas arquivos PDF são suportados", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "PDF muito grande",
+        description: "O limite é de 10 MB. Reduza o arquivo e tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingPdf(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Não autenticado");
+
+      // Upload to storage (under user_id folder)
+      const userId = session.user.id;
+      const path = `${userId}/${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`;
+      const { error: upErr } = await supabase.storage
+        .from("whatsapp-media")
+        .upload(path, file, { contentType: "application/pdf" });
+      if (upErr) throw upErr;
+
+      // Convert to base64 for extraction
+      const arrayBuf = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuf);
+      let binary = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      const base64 = btoa(binary);
+
+      const { data, error } = await supabase.functions.invoke("pdf-extract", {
+        body: { pdf_base64: base64, file_name: file.name, user_id: userId },
+      });
+      if (error) throw error;
+
+      const messageContent = data?.message || `📄 [PDF]: ${file.name}`;
+
+      const { error: msgErr } = await supabase.from("messages").insert({
+        conversation_id: selected.id,
+        direction: "inbound",
+        content: messageContent,
+        media_url: path,
+      });
+      if (msgErr) throw msgErr;
+
+      await supabase
+        .from("conversations")
+        .update({
+          last_message: messageContent.slice(0, 100),
+          last_message_at: new Date().toISOString(),
+        })
+        .eq("id", selected.id);
+
+      queryClient.invalidateQueries({ queryKey: ["messages", selected.id] });
+      queryClient.invalidateQueries({ queryKey: ["conversations", activeWorkspace?.id] });
+
+      toast({ title: "PDF processado", description: data?.summary ? "Resumo gerado pela IA." : "Arquivo registrado." });
+    } catch (err) {
+      toast({
+        title: "Erro ao processar PDF",
+        description: err instanceof Error ? err.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingPdf(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleAnalyze = async () => {
     if (!selected) return;
     setAnalyzing(true);
