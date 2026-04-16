@@ -346,7 +346,7 @@ REGRAS OBRIGATÓRIAS:
                       },
                       due_date: {
                         type: "string",
-                        description: "Apenas para agendar_lembrete: data/hora de vencimento em ISO 8601 (ex: '2026-04-10T14:00:00'). Se não mencionada na conversa, omitir (será 24h a partir de agora).",
+                        description: "Apenas para agendar_lembrete: data/hora de vencimento em ISO 8601 com offset -03:00 (fuso horário de Brasília, UTC-03). Formato: 'YYYY-MM-DDTHH:mm:ss-03:00'. DEVE ser sempre no futuro relativo à DATA E HORA ATUAL informada no início do prompt. NUNCA use anos passados. Se não mencionada na conversa, omitir (será 24h a partir de agora).",
                       },
                       lost_reason_id: {
                         type: "string",
