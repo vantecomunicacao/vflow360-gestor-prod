@@ -805,14 +805,22 @@ serve(async (req) => {
             const taskTitle = actionData?.task_title || actionData?.value || suggestion.title || "Entrar em contato";
             const taskDescription = actionData?.task_description || suggestion.description || "";
             
-            // Calculate due date: use provided date or default to 24h from now
+            // Calculate due date: use provided date or default to 24h from now.
+            // Clamp to "now + 1h" if AI returned a past date (safety guard).
             let dueDate: string;
+            const fallback = new Date(Date.now() + 24 * 60 * 60 * 1000);
             if (actionData?.due_date) {
-              dueDate = new Date(actionData.due_date).toISOString();
+              const parsed = new Date(actionData.due_date);
+              if (isNaN(parsed.getTime())) {
+                dueDate = fallback.toISOString();
+              } else if (parsed.getTime() < Date.now()) {
+                // Past date — push to 1h from now to avoid creating expired tasks
+                dueDate = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+              } else {
+                dueDate = parsed.toISOString();
+              }
             } else {
-              const tomorrow = new Date();
-              tomorrow.setHours(tomorrow.getHours() + 24);
-              dueDate = tomorrow.toISOString();
+              dueDate = fallback.toISOString();
             }
 
             await callGhl(`/contacts/${contactId}/tasks`, "POST", {

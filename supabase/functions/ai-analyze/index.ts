@@ -242,14 +242,18 @@ ${filteredActionTypes.includes("mover_funil") ? "- mover_funil: Sugerir mover o 
 ${filteredActionTypes.includes("campo_personalizado") ? "- campo_personalizado: Sugerir preencher/atualizar um campo personalizado" : ""}
 ${filteredActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
 ${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor monetário da oportunidade/negociação no CRM. SEMPRE que o lead mencionar preço, orçamento, valor, custo ou qualquer quantia monetária, use ESTE tipo (NÃO use campo_personalizado para valores monetários). O campo 'value' deve conter APENAS o número (ex: '1500' ou '1500.00'), sem 'R$' ou texto." : ""}
-${filteredActionTypes.includes("agendar_lembrete") ? "- agendar_lembrete: Criar uma TAREFA no CRM com data de vencimento. Use 'task_title' para o título (ex: 'Retornar ligação', 'Enviar proposta') e 'due_date' no formato ISO 8601 (ex: '2026-04-10T14:00:00'). Se a mensagem mencionar uma data/hora específica, use essa. Caso contrário, defina para 24 horas a partir de agora. O título deve refletir a ação mencionada na conversa ou 'Entrar em contato' como padrão." : ""}
+${filteredActionTypes.includes("agendar_lembrete") ? `- agendar_lembrete: Criar uma TAREFA no CRM com data de vencimento. Use 'task_title' para o título (ex: 'Retornar ligação', 'Enviar proposta') e 'due_date' no formato ISO 8601 com offset -03:00 (ex: '${new Date(Date.now() + 24*60*60*1000).toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).replace(" ", "T")}-03:00'). A data DEVE estar no fuso UTC-03 (horário de Brasília) e SEMPRE no futuro relativo à data atual informada acima. NUNCA use anos passados. Se a mensagem mencionar uma data/hora específica, use essa (sempre no futuro). Caso contrário, defina para 24 horas a partir de agora. O título deve refletir a ação mencionada na conversa ou 'Entrar em contato' como padrão.` : ""}
 ${filteredActionTypes.includes("ganho_perdido") ? `- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida. Para "perdido", é OBRIGATÓRIO incluir o campo "lost_reason_id" com o ID exato de um dos motivos de perda listados abaixo. Analise o contexto da conversa para escolher o motivo mais adequado.${lostReasonsDescription}` : ""}`.replace(/\n\n+/g, "\n");
 
     // Build valid field keys set for validation
     const validFieldKeys = new Set(selectedFields.map((f: any) => f.fieldKey));
     const validStageNames = new Set(stageNames);
 
+    const nowBrazil = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" });
     const systemPrompt = `Você é um assistente de CRM inteligente. Analise a conversa de WhatsApp abaixo e gere sugestões de ações para o CRM (Go High Level).
+
+DATA E HORA ATUAL (referência obrigatória, fuso UTC-03 / America/Sao_Paulo): ${nowBrazil}
+Qualquer data sugerida (como vencimento de tarefa) DEVE ser igual ou posterior a esta data. NUNCA use anos no passado.
 
 ${aiPrompt}
 ${fieldsDescription}
@@ -342,7 +346,7 @@ REGRAS OBRIGATÓRIAS:
                       },
                       due_date: {
                         type: "string",
-                        description: "Apenas para agendar_lembrete: data/hora de vencimento em ISO 8601 (ex: '2026-04-10T14:00:00'). Se não mencionada na conversa, omitir (será 24h a partir de agora).",
+                        description: "Apenas para agendar_lembrete: data/hora de vencimento em ISO 8601 com offset -03:00 (fuso horário de Brasília, UTC-03). Formato: 'YYYY-MM-DDTHH:mm:ss-03:00'. DEVE ser sempre no futuro relativo à DATA E HORA ATUAL informada no início do prompt. NUNCA use anos passados. Se não mencionada na conversa, omitir (será 24h a partir de agora).",
                       },
                       lost_reason_id: {
                         type: "string",
