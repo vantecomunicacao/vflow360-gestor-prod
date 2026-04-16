@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2, Trash2, RefreshCw } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2, Trash2, RefreshCw, Paperclip } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ const Conversations = () => {
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [search, setSearch] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
