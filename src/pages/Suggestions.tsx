@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock, ExternalLink, Smartphone } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, CheckCircle2, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock, ExternalLink, Smartphone } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -407,6 +408,9 @@ const Suggestions = () => {
   };
 
   const [rejectingContact, setRejectingContact] = useState<string | null>(null);
+  const [approvingContact, setApprovingContact] = useState<string | null>(null);
+  const [approveProgress, setApproveProgress] = useState<{ current: number; total: number } | null>(null);
+  const [confirmApproveGroup, setConfirmApproveGroup] = useState<ContactGroup | null>(null);
 
   const handleRejectAllByContact = async (group: ContactGroup) => {
     const pendingIds = group.suggestions.filter(s => s.status === "pending").map(s => s.id);
@@ -424,6 +428,70 @@ const Suggestions = () => {
       toast({ title: "Erro", description: "Não foi possível rejeitar as sugestões.", variant: "destructive" });
     } finally {
       setRejectingContact(null);
+    }
+  };
+
+  // Approve all pending suggestions for a contact, one at a time, bottom-up.
+  // Continues on per-suggestion errors and reports a summary at the end.
+  const handleApproveAllByContact = async (group: ContactGroup) => {
+    // Bottom-up: list rendering shows newest first, so reverse to start from oldest (bottom)
+    const pending = group.suggestions.filter(s => s.status === "pending").slice().reverse();
+    if (pending.length === 0) return;
+
+    setApprovingContact(group.key);
+    setApproveProgress({ current: 0, total: pending.length });
+
+    let approvedCount = 0;
+    const failures: { id: string; reason: string }[] = [];
+
+    for (let i = 0; i < pending.length; i++) {
+      const s = pending[i];
+      setApproveProgress({ current: i + 1, total: pending.length });
+
+      // Skip "lost" suggestions that require a reason but don't have one selected
+      const isLost = s.type === "ganho_perdido" && !(s.action_data?.value || "").toLowerCase().includes("ganh");
+      const lostReasonId = isLost ? selectedLostReasons[s.id] : undefined;
+      if (isLost && lostReasons.length > 0 && !lostReasonId) {
+        failures.push({ id: s.id, reason: "Motivo de perda não selecionado" });
+        continue;
+      }
+
+      try {
+        const body: Record<string, any> = { action: "execute_suggestion", suggestionId: s.id, workspace_id: activeWorkspace?.id };
+        if (lostReasonId) body.lostReasonId = lostReasonId;
+        const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", { body });
+
+        if (fnError || !result?.success) {
+          failures.push({ id: s.id, reason: result?.error || fnError?.message || "Erro no CRM" });
+          continue;
+        }
+
+        approvedCount++;
+        setSuggestions(prev => prev.map(x => x.id === s.id ? { ...x, status: "approved" as SuggestionStatus } : x));
+        setExecutionResults(prev => ({
+          ...prev,
+          [s.id]: {
+            opportunityCreated: result.data?.opportunityCreated ?? false,
+            contactCreated: result.data?.contactCreated ?? false,
+            message: result.data?.message || "Ação aplicada com sucesso.",
+          },
+        }));
+      } catch (e) {
+        failures.push({ id: s.id, reason: e instanceof Error ? e.message : "Falha de conexão" });
+      }
+    }
+
+    setApprovingContact(null);
+    setApproveProgress(null);
+
+    if (failures.length === 0) {
+      toast({ title: "✅ Todas executadas", description: `${approvedCount} sugestão(ões) de ${group.contactName} foram aceitas.` });
+    } else {
+      toast({
+        title: `Concluído com ${failures.length} falha(s)`,
+        description: `${approvedCount} aceita(s), ${failures.length} falharam. As que falharam continuam pendentes.`,
+        variant: failures.length === pending.length ? "destructive" : "default",
+      });
     }
   };
 
@@ -609,8 +677,29 @@ const Suggestions = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="text-primary hover:text-primary hover:bg-primary/10 h-7 px-2"
+                          disabled={approvingContact === group.key || rejectingContact === group.key || !!executingId}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmApproveGroup(group);
+                          }}
+                        >
+                          {approvingContact === group.key ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                              {approveProgress ? `${approveProgress.current}/${approveProgress.total}` : "..."}
+                            </>
+                          ) : (
+                            <><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Aceitar todas</>
+                          )}
+                        </Button>
+                      )}
+                      {group.pendingCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
-                          disabled={rejectingContact === group.key}
+                          disabled={rejectingContact === group.key || approvingContact === group.key}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRejectAllByContact(group);
@@ -900,6 +989,35 @@ const Suggestions = () => {
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!confirmApproveGroup} onOpenChange={(open) => !open && setConfirmApproveGroup(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aceitar todas as sugestões?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmApproveGroup && (
+                <>
+                  Serão executadas <strong>{confirmApproveGroup.suggestions.filter(s => s.status === "pending").length}</strong> sugestão(ões) pendentes de <strong>{confirmApproveGroup.contactName}</strong>, uma por vez (de baixo para cima).
+                  <br /><br />
+                  Se alguma falhar no CRM, o lote continua e as que falharem permanecem pendentes para você revisar.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const g = confirmApproveGroup;
+                setConfirmApproveGroup(null);
+                if (g) handleApproveAllByContact(g);
+              }}
+            >
+              Aceitar todas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
