@@ -70,6 +70,88 @@ async function summarizeWithAI(
   }
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  // Convert in chunks to avoid call stack overflow on large files
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+/**
+ * OCR via Gemini Vision multimodal — envia o PDF inteiro como inline_data.
+ * Gemini processa PDFs nativamente, extraindo texto de páginas escaneadas (imagens).
+ * Retorna { text, summary } combinados em uma única chamada.
+ */
+async function ocrWithGeminiVision(
+  pdfBytes: Uint8Array,
+  apiKey: string,
+  fileName: string,
+  totalPages: number,
+): Promise<{ text: string; summary: string }> {
+  try {
+    const base64Pdf = bytesToBase64(pdfBytes);
+    console.log(`OCR fallback: sending ${formatBytes(pdfBytes.byteLength)} PDF to Gemini Vision`);
+
+    // Using Lovable AI Gateway with Gemini multimodal — supports PDF input via image_url with data URL
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é um OCR de PDFs em português. Receberá um PDF (possivelmente escaneado) e deve: 1) extrair TODO o texto visível, página por página; 2) gerar um resumo curto (2-4 frases) destacando tipo de documento, assunto e dados relevantes. Retorne no formato exato:\n\n===TEXTO===\n[texto extraído]\n\n===RESUMO===\n[resumo]",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Arquivo: ${fileName} (${totalPages} páginas). Faça OCR completo e gere o resumo.`,
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:application/pdf;base64,${base64Pdf}`,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Gemini Vision OCR error:", response.status, errText);
+      return { text: "", summary: "" };
+    }
+
+    const data = await response.json();
+    const fullContent: string = data.choices?.[0]?.message?.content?.trim() || "";
+
+    // Parse response into text + summary
+    const textMatch = fullContent.match(/===TEXTO===\s*([\s\S]*?)\s*===RESUMO===/);
+    const summaryMatch = fullContent.match(/===RESUMO===\s*([\s\S]*?)$/);
+
+    const text = textMatch?.[1]?.trim() || "";
+    const summary = summaryMatch?.[1]?.trim() || fullContent;
+
+    return { text, summary };
+  } catch (e) {
+    console.error("Gemini Vision OCR failed:", e);
+    return { text: "", summary: "" };
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
