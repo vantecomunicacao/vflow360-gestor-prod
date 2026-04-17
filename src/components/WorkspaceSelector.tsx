@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Building2, Plus, ChevronDown, Check } from "lucide-react";
+import { Building2, Plus, ChevronDown, Check, Settings2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   DropdownMenu,
@@ -30,6 +31,7 @@ export function WorkspaceSelector({ collapsed }: WorkspaceSelectorProps) {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -65,6 +67,9 @@ export function WorkspaceSelector({ collapsed }: WorkspaceSelectorProps) {
           <DropdownMenuItem onClick={() => setShowCreate(true)}>
             <Plus className="w-4 h-4 mr-2" /> Nova conta
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate("/workspaces")}>
+            <Settings2 className="w-4 h-4 mr-2" /> Gerenciar contas
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -92,6 +97,9 @@ export function WorkspaceSelector({ collapsed }: WorkspaceSelectorProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowCreate(true)}>
             <Plus className="w-4 h-4 mr-2" /> Nova conta
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate("/workspaces")}>
+            <Settings2 className="w-4 h-4 mr-2" /> Gerenciar contas
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
