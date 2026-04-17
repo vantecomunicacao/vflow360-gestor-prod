@@ -677,8 +677,29 @@ const Suggestions = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="text-primary hover:text-primary hover:bg-primary/10 h-7 px-2"
+                          disabled={approvingContact === group.key || rejectingContact === group.key || !!executingId}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmApproveGroup(group);
+                          }}
+                        >
+                          {approvingContact === group.key ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                              {approveProgress ? `${approveProgress.current}/${approveProgress.total}` : "..."}
+                            </>
+                          ) : (
+                            <><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Aceitar todas</>
+                          )}
+                        </Button>
+                      )}
+                      {group.pendingCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
-                          disabled={rejectingContact === group.key}
+                          disabled={rejectingContact === group.key || approvingContact === group.key}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRejectAllByContact(group);
