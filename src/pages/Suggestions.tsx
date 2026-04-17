@@ -408,6 +408,9 @@ const Suggestions = () => {
   };
 
   const [rejectingContact, setRejectingContact] = useState<string | null>(null);
+  const [approvingContact, setApprovingContact] = useState<string | null>(null);
+  const [approveProgress, setApproveProgress] = useState<{ current: number; total: number } | null>(null);
+  const [confirmApproveGroup, setConfirmApproveGroup] = useState<ContactGroup | null>(null);
 
   const handleRejectAllByContact = async (group: ContactGroup) => {
     const pendingIds = group.suggestions.filter(s => s.status === "pending").map(s => s.id);
@@ -425,6 +428,70 @@ const Suggestions = () => {
       toast({ title: "Erro", description: "Não foi possível rejeitar as sugestões.", variant: "destructive" });
     } finally {
       setRejectingContact(null);
+    }
+  };
+
+  // Approve all pending suggestions for a contact, one at a time, bottom-up.
+  // Continues on per-suggestion errors and reports a summary at the end.
+  const handleApproveAllByContact = async (group: ContactGroup) => {
+    // Bottom-up: list rendering shows newest first, so reverse to start from oldest (bottom)
+    const pending = group.suggestions.filter(s => s.status === "pending").slice().reverse();
+    if (pending.length === 0) return;
+
+    setApprovingContact(group.key);
+    setApproveProgress({ current: 0, total: pending.length });
+
+    let approvedCount = 0;
+    const failures: { id: string; reason: string }[] = [];
+
+    for (let i = 0; i < pending.length; i++) {
+      const s = pending[i];
+      setApproveProgress({ current: i + 1, total: pending.length });
+
+      // Skip "lost" suggestions that require a reason but don't have one selected
+      const isLost = s.type === "ganho_perdido" && !(s.action_data?.value || "").toLowerCase().includes("ganh");
+      const lostReasonId = isLost ? selectedLostReasons[s.id] : undefined;
+      if (isLost && lostReasons.length > 0 && !lostReasonId) {
+        failures.push({ id: s.id, reason: "Motivo de perda não selecionado" });
+        continue;
+      }
+
+      try {
+        const body: Record<string, any> = { action: "execute_suggestion", suggestionId: s.id, workspace_id: activeWorkspace?.id };
+        if (lostReasonId) body.lostReasonId = lostReasonId;
+        const { data: result, error: fnError } = await supabase.functions.invoke("ghl-manage", { body });
+
+        if (fnError || !result?.success) {
+          failures.push({ id: s.id, reason: result?.error || fnError?.message || "Erro no CRM" });
+          continue;
+        }
+
+        approvedCount++;
+        setSuggestions(prev => prev.map(x => x.id === s.id ? { ...x, status: "approved" as SuggestionStatus } : x));
+        setExecutionResults(prev => ({
+          ...prev,
+          [s.id]: {
+            opportunityCreated: result.data?.opportunityCreated ?? false,
+            contactCreated: result.data?.contactCreated ?? false,
+            message: result.data?.message || "Ação aplicada com sucesso.",
+          },
+        }));
+      } catch (e) {
+        failures.push({ id: s.id, reason: e instanceof Error ? e.message : "Falha de conexão" });
+      }
+    }
+
+    setApprovingContact(null);
+    setApproveProgress(null);
+
+    if (failures.length === 0) {
+      toast({ title: "✅ Todas executadas", description: `${approvedCount} sugestão(ões) de ${group.contactName} foram aceitas.` });
+    } else {
+      toast({
+        title: `Concluído com ${failures.length} falha(s)`,
+        description: `${approvedCount} aceita(s), ${failures.length} falharam. As que falharam continuam pendentes.`,
+        variant: failures.length === pending.length ? "destructive" : "default",
+      });
     }
   };
 
