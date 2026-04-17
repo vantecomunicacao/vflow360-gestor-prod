@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock, ExternalLink, Smartphone } from "lucide-react";
+import { Sparkles, Check, X, MessageSquare, ArrowRight, Filter, Settings2, Loader2, RefreshCw, User, Phone, ChevronDown, Search, XCircle, CheckCircle2, Power, AlertTriangle, UserCheck, GitBranch, DollarSign, Clock, ExternalLink, Smartphone } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
