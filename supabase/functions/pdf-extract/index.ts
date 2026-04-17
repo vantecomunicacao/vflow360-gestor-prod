@@ -235,6 +235,7 @@ serve(async (req) => {
     let text = "";
     let totalPages = 0;
     let pagesUsed = 0;
+    let extractionError = false;
 
     try {
       const pdf = await getDocumentProxy(pdfBytes);
@@ -247,16 +248,7 @@ serve(async (req) => {
       text = pageTexts.join("\n\n").trim();
     } catch (e) {
       console.error("PDF text extraction failed:", e);
-      const message = `📄 [PDF]: ${file_name} (${formatBytes(fileSize)}) — Não foi possível ler o conteúdo do PDF (pode ser um arquivo escaneado ou corrompido).`;
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message,
-          extraction_failed: true,
-          file_size: fileSize,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      extractionError = true;
     }
 
     // Char limit
@@ -266,13 +258,36 @@ serve(async (req) => {
       truncatedChars = true;
     }
 
-    if (!text || text.trim().length < 20) {
-      const message = `📄 [PDF]: ${file_name} (${formatBytes(fileSize)}, ${totalPages} pág) — PDF parece ser apenas imagens (escaneado). Texto não extraído.`;
+    const needsOcr = extractionError || !text || text.trim().length < 20;
+    let usedOcr = false;
+    let summary = "";
+
+    if (needsOcr && LOVABLE_API_KEY) {
+      // Fallback: scanned PDF — send entire PDF to Gemini Vision for OCR + summary
+      console.log("Text extraction insufficient, falling back to Gemini Vision OCR");
+      const ocrResult = await ocrWithGeminiVision(pdfBytes, LOVABLE_API_KEY, file_name, totalPages || 0);
+      if (ocrResult.text || ocrResult.summary) {
+        usedOcr = true;
+        text = ocrResult.text || text;
+        if (text.length > MAX_CHARS) {
+          text = text.slice(0, MAX_CHARS);
+          truncatedChars = true;
+        }
+        summary = ocrResult.summary;
+      }
+    }
+
+    if (needsOcr && !usedOcr) {
+      const reason = extractionError
+        ? "Não foi possível ler o conteúdo do PDF (pode ser corrompido)."
+        : "PDF parece ser apenas imagens (escaneado) e o OCR não conseguiu extrair texto.";
+      const message = `📄 [PDF]: ${file_name} (${formatBytes(fileSize)}${totalPages ? `, ${totalPages} pág` : ""}) — ${reason}`;
       return new Response(
         JSON.stringify({
           success: true,
           message,
-          empty: true,
+          empty: !extractionError,
+          extraction_failed: extractionError,
           file_size: fileSize,
           total_pages: totalPages,
         }),
@@ -280,11 +295,14 @@ serve(async (req) => {
       );
     }
 
-    // Summarize via AI
-    const summary = await summarizeWithAI(text, aiKey, aiEndpoint, aiModel, file_name);
+    // If we have text but no summary yet (text-extraction path), summarize now
+    if (!summary) {
+      summary = await summarizeWithAI(text, aiKey, aiEndpoint, aiModel, file_name);
+    }
 
     const truncatedPages = totalPages > MAX_PAGES;
-    const sizeNote = `${formatBytes(fileSize)}, ${totalPages} pág${truncatedPages ? ` (analisadas ${MAX_PAGES})` : ""}${truncatedChars ? ", texto truncado" : ""}`;
+    const ocrTag = usedOcr ? ", OCR" : "";
+    const sizeNote = `${formatBytes(fileSize)}, ${totalPages} pág${truncatedPages ? ` (analisadas ${MAX_PAGES})` : ""}${truncatedChars ? ", texto truncado" : ""}${ocrTag}`;
 
     const message = summary
       ? `📄 [PDF]: ${file_name} (${sizeNote})\n\nResumo: ${summary}`
@@ -300,6 +318,7 @@ serve(async (req) => {
         pages_used: pagesUsed,
         truncated_pages: truncatedPages,
         truncated_chars: truncatedChars,
+        used_ocr: usedOcr,
         file_size: fileSize,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
