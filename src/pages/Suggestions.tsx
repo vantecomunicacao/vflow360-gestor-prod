@@ -989,6 +989,35 @@ const Suggestions = () => {
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!confirmApproveGroup} onOpenChange={(open) => !open && setConfirmApproveGroup(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aceitar todas as sugestões?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmApproveGroup && (
+                <>
+                  Serão executadas <strong>{confirmApproveGroup.suggestions.filter(s => s.status === "pending").length}</strong> sugestão(ões) pendentes de <strong>{confirmApproveGroup.contactName}</strong>, uma por vez (de baixo para cima).
+                  <br /><br />
+                  Se alguma falhar no CRM, o lote continua e as que falharem permanecem pendentes para você revisar.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const g = confirmApproveGroup;
+                setConfirmApproveGroup(null);
+                if (g) handleApproveAllByContact(g);
+              }}
+            >
+              Aceitar todas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
