@@ -10,7 +10,7 @@ const Documentation = () => {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Documentação</h1>
         <p className="text-muted-foreground mt-1">
-          Entenda como o Copiloto GHL funciona por dentro.
+          Entenda como o VFlowGHL funciona por dentro.
         </p>
       </div>
 

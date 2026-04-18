@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const steps = [
   { id: 1, title: "Conectar WhatsApp", icon: MessageSquare, description: "Vincule seu WhatsApp via QR Code para começar a receber mensagens." },
   { id: 2, title: "Conectar GHL", icon: Link2, description: "Insira suas credenciais do Go High Level para conectar seu CRM." },
-  { id: 3, title: "Tudo pronto!", icon: CheckCircle, description: "Seu Copiloto GHL está configurado e pronto para usar." },
+  { id: 3, title: "Tudo pronto!", icon: CheckCircle, description: "Seu VFlowGHL está configurado e pronto para usar." },
 ];
 
 const Onboarding = () => {
@@ -37,7 +37,7 @@ const Onboarding = () => {
       <div className="w-full max-w-lg">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <Bot className="w-8 h-8 text-primary" />
-          <span className="text-2xl font-bold text-foreground">Copiloto GHL</span>
+          <span className="text-2xl font-bold text-foreground">VFlowGHL</span>
         </div>
 
         {/* Progress */}
