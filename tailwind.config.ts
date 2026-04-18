@@ -69,6 +69,17 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "funnel-1": "hsl(var(--funnel-1))",
+        "funnel-2": "hsl(var(--funnel-2))",
+        "funnel-3": "hsl(var(--funnel-3))",
+        "funnel-4": "hsl(var(--funnel-4))",
+        chart: {
+          "1": "hsl(var(--chart-1))",
+          "2": "hsl(var(--chart-2))",
+          "3": "hsl(var(--chart-3))",
+          "4": "hsl(var(--chart-4))",
+          "5": "hsl(var(--chart-5))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
