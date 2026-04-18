@@ -22,7 +22,7 @@ interface Pipeline { id: string; ghl_id: string; name: string; stages: Stage[]; 
 interface CustomField { id: string; ghl_id: string; name: string; field_key: string | null; }
 
 export default function DashboardSettings() {
-  const { currentWorkspace } = useWorkspace();
+  const { activeWorkspace } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -36,19 +36,19 @@ export default function DashboardSettings() {
   const [wonStageKeys, setWonStageKeys] = useState<string[]>(["venda_ganha"]);
 
   useEffect(() => {
-    if (!currentWorkspace?.id) return;
+    if (!activeWorkspace?.id) return;
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentWorkspace?.id]);
+  }, [activeWorkspace?.id]);
 
   const loadAll = async () => {
-    if (!currentWorkspace?.id) return;
+    if (!activeWorkspace?.id) return;
     setLoading(true);
     try {
       const [{ data: pipes }, { data: fields }, { data: settings }] = await Promise.all([
-        supabase.from("ghl_pipelines").select("*").eq("workspace_id", currentWorkspace.id),
-        supabase.from("ghl_custom_fields").select("*").eq("workspace_id", currentWorkspace.id),
-        supabase.from("ghl_dashboard_settings").select("*").eq("workspace_id", currentWorkspace.id).maybeSingle(),
+        supabase.from("ghl_pipelines").select("*").eq("workspace_id", activeWorkspace.id),
+        supabase.from("ghl_custom_fields").select("*").eq("workspace_id", activeWorkspace.id),
+        supabase.from("ghl_dashboard_settings").select("*").eq("workspace_id", activeWorkspace.id).maybeSingle(),
       ]);
       const ps = (pipes || []).map((p: any) => ({
         id: p.id, ghl_id: p.ghl_id, name: p.name,
@@ -72,11 +72,11 @@ export default function DashboardSettings() {
   };
 
   const save = async () => {
-    if (!currentWorkspace?.id) return;
+    if (!activeWorkspace?.id) return;
     setSaving(true);
     try {
       const payload = {
-        workspace_id: currentWorkspace.id,
+        workspace_id: activeWorkspace.id,
         default_pipeline_ids: defaultPipelines,
         funnel_stage_mapping: stageMapping,
         origin_field_name: originField,
@@ -112,7 +112,7 @@ export default function DashboardSettings() {
     return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   }
 
-  if (!currentWorkspace) {
+  if (!activeWorkspace) {
     return <p className="text-muted-foreground">Selecione uma conta primeiro.</p>;
   }
 
