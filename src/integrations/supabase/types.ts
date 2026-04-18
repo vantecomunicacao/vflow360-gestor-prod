@@ -767,6 +767,7 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      trigger_ghl_sync_all: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
