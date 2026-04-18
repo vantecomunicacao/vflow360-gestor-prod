@@ -17,7 +17,9 @@ import Conversations from "./pages/Conversations";
 import Suggestions from "./pages/Suggestions";
 import Integrations from "./pages/Integrations";
 import SettingsPage from "./pages/SettingsPage";
+import DashboardSettings from "./pages/DashboardSettings";
 import Workspaces from "./pages/Workspaces";
+import Admin from "./pages/Admin";
 import Documentation from "./pages/Documentation";
 import NotFound from "./pages/NotFound";
 
@@ -51,7 +53,9 @@ const App = () => (
                 <Route path="/suggestions" element={<Suggestions />} />
                 <Route path="/integrations" element={<Integrations />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/settings/dashboard" element={<DashboardSettings />} />
                 <Route path="/workspaces" element={<Workspaces />} />
+                <Route path="/admin" element={<Admin />} />
                 <Route path="/docs" element={<Documentation />} />
               </Route>
               <Route path="*" element={<NotFound />} />

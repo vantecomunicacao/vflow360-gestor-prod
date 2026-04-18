@@ -1,7 +1,8 @@
-import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen } from "lucide-react";
+import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   Sidebar,
   SidebarContent,
@@ -14,12 +15,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
+const baseNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Conversas", url: "/conversations", icon: MessageSquare },
   { title: "Sugestões IA", url: "/suggestions", icon: Sparkles },
   { title: "Integrações", url: "/integrations", icon: Plug },
   { title: "Configurações", url: "/settings", icon: Settings },
+  { title: "Dashboard config", url: "/settings/dashboard", icon: SlidersHorizontal },
   { title: "Documentação", url: "/docs", icon: BookOpen },
 ];
 
@@ -27,6 +29,10 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { isAdmin } = useIsAdmin();
+  const navItems = isAdmin
+    ? [...baseNavItems, { title: "Admin", url: "/admin", icon: ShieldCheck }]
+    : baseNavItems;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
