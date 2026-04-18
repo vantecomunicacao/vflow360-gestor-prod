@@ -1,0 +1,175 @@
+import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Globe, ChevronUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
+import { Pipeline, User } from "@/hooks/useGhlData";
+import { cn } from "@/lib/utils";
+
+interface HeaderProps {
+  dateRange: DateRange | undefined;
+  onDateRangeChange: (r: DateRange | undefined) => void;
+  onRefresh: (force?: boolean) => void;
+  isLoading?: boolean;
+  pipelines: Pipeline[];
+  users: User[];
+  origins: string[];
+  selectedPipelineId: string | null;
+  selectedSellerId: string | null;
+  selectedOrigin: string | null;
+  onPipelineChange: (id: string | null) => void;
+  onSellerChange: (id: string | null) => void;
+  onOriginChange: (o: string | null) => void;
+  cachedAt?: string | null;
+}
+
+const datePresets = [
+  { label: "Hoje", getValue: () => ({ from: startOfDay(new Date()), to: endOfDay(new Date()) }) },
+  { label: "Ontem", getValue: () => ({ from: startOfDay(subDays(new Date(), 1)), to: endOfDay(subDays(new Date(), 1)) }) },
+  { label: "Últimos 7 dias", getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
+  { label: "Últimos 30 dias", getValue: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
+  { label: "Últimos 90 dias", getValue: () => ({ from: subDays(new Date(), 90), to: new Date() }) },
+  { label: "Este mês", getValue: () => ({ from: startOfMonth(new Date()), to: new Date() }) },
+  { label: "Mês passado", getValue: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
+  { label: "Este ano", getValue: () => ({ from: startOfYear(new Date()), to: new Date() }) },
+];
+
+function DateRangeFilter({ dateRange, onDateRangeChange }: {
+  dateRange: DateRange | undefined; onDateRangeChange: (r: DateRange | undefined) => void;
+}) {
+  const [localRange, setLocalRange] = useState<DateRange | undefined>(dateRange);
+  const [open, setOpen] = useState(false);
+  useEffect(() => setLocalRange(dateRange), [dateRange]);
+
+  const handleConfirm = () => {
+    if (localRange?.from && localRange?.to) {
+      onDateRangeChange(localRange);
+      setOpen(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="gap-2 font-semibold h-10 rounded-xl">
+          <CalendarDays className="w-4 h-4" />
+          {dateRange?.from ? (
+            dateRange.to ? (
+              <>{format(dateRange.from, "dd MMM", { locale: ptBR })} - {format(dateRange.to, "dd MMM", { locale: ptBR })}</>
+            ) : <>{format(dateRange.from, "dd MMM yyyy", { locale: ptBR })}</>
+          ) : <span>Período</span>}
+          <ChevronDown className="w-3 h-3 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 rounded-2xl" align="start">
+        <div className="flex">
+          <div className="border-r border-border p-2 space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground px-2 py-1">Atalhos</p>
+            {datePresets.map((p) => (
+              <Button key={p.label} variant="ghost" size="sm" className="w-full justify-start text-xs h-8 rounded-lg"
+                onClick={() => { const v = p.getValue(); setLocalRange(v); onDateRangeChange(v); setOpen(false); }}>
+                {p.label}
+              </Button>
+            ))}
+          </div>
+          <div className="flex flex-col">
+            <Calendar initialFocus mode="range" defaultMonth={localRange?.from} selected={localRange} onSelect={setLocalRange} numberOfMonths={2} locale={ptBR} className="pointer-events-auto" />
+            <div className="flex justify-end p-3 pt-0">
+              <Button size="sm" className="rounded-xl" disabled={!localRange?.from || !localRange?.to} onClick={handleConfirm}>Feito</Button>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function Header({
+  dateRange, onDateRangeChange, onRefresh, isLoading,
+  pipelines, users, origins,
+  selectedPipelineId, selectedSellerId, selectedOrigin,
+  onPipelineChange, onSellerChange, onOriginChange, cachedAt,
+}: HeaderProps) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = [selectedPipelineId, selectedSellerId, selectedOrigin].filter(Boolean).length;
+
+  return (
+    <header className="mb-5 sm:mb-6">
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {cachedAt && !isLoading && <span>Atualizado às {format(new Date(cachedAt), "HH:mm:ss", { locale: ptBR })}</span>}
+        </div>
+        <Button variant="outline" size="sm" className="shrink-0 gap-2 rounded-xl h-9" onClick={() => onRefresh(true)} disabled={isLoading} title="Forçar atualização (sincroniza com o GHL)">
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          <span>Atualizar agora</span>
+        </Button>
+      </div>
+
+      <div>
+        <button type="button" className="flex sm:hidden items-center justify-between w-full p-3 bg-card rounded-xl border border-border shadow-sm" onClick={() => setFiltersOpen(!filtersOpen)}>
+          <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+            <Filter className="w-4 h-4" />Filtros
+            {activeFilterCount > 0 && <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>}
+          </div>
+          {filtersOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        <div className={cn(
+          "bg-card rounded-2xl border border-border shadow-sm overflow-hidden transition-all duration-200",
+          "sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 sm:p-3.5",
+          filtersOpen ? "flex flex-col gap-2 p-3 mt-1.5" : "hidden sm:flex",
+        )}>
+          <div className="hidden sm:flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+            <Filter className="w-4 h-4" />Filtros
+          </div>
+
+          <DateRangeFilter dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
+
+          <Select value={selectedPipelineId || "all"} onValueChange={(v) => onPipelineChange(v === "all" ? null : v)}>
+            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+              <GitBranch className="w-4 h-4 mr-2 opacity-50" />
+              <SelectValue placeholder="Funil" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="all">Todos os funis</SelectItem>
+              {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedSellerId || "all"} onValueChange={(v) => onSellerChange(v === "all" ? null : v)}>
+            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+              <Users className="w-4 h-4 mr-2 opacity-50" />
+              <SelectValue placeholder="Vendedor" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="all">Todos os vendedores</SelectItem>
+              {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedOrigin || "all"} onValueChange={(v) => onOriginChange(v === "all" ? null : v)}>
+            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+              <Globe className="w-4 h-4 mr-2 opacity-50" />
+              <SelectValue placeholder="Origem" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="all">Todas as origens</SelectItem>
+              {origins.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {(selectedPipelineId || selectedSellerId || selectedOrigin) && (
+            <Button variant="ghost" size="sm" className="h-10 text-muted-foreground hover:text-foreground rounded-xl w-full sm:w-auto"
+              onClick={() => { onPipelineChange(null); onSellerChange(null); onOriginChange(null); }}>
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

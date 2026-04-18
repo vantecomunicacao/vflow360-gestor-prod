@@ -40,6 +40,19 @@
     --info: 210 80% 55%;
     --info-foreground: 0 0% 100%;
 
+    /* Funnel palette (VFlowGHL dashboard) */
+    --funnel-1: 215 50% 45%;
+    --funnel-2: 200 60% 50%;
+    --funnel-3: 160 60% 45%;
+    --funnel-4: 152 60% 45%;
+
+    /* Chart palette */
+    --chart-1: 155 60% 40%;
+    --chart-2: 210 80% 55%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 262 52% 47%;
+    --chart-5: 340 65% 47%;
+
     --gradient-primary: linear-gradient(135deg, hsl(155, 60%, 40%), hsl(170, 60%, 35%));
     --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%), hsl(220, 20%, 98%));
     --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
@@ -75,6 +88,17 @@
     --sidebar-border: 220 20% 12%;
     --sidebar-ring: 155 60% 45%;
 
+    --success: 155 60% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 10%;
+
+    /* Funnel palette dark */
+    --funnel-1: 200 70% 55%;
+    --funnel-2: 185 65% 50%;
+    --funnel-3: 160 60% 50%;
+    --funnel-4: 152 60% 50%;
+
     --gradient-card: linear-gradient(180deg, hsl(220, 25%, 9%), hsl(220, 25%, 7%));
     --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
     --shadow-elevated: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
@@ -93,6 +117,70 @@
   }
 }
 
+@layer components {
+  /* Metric Cards */
+  .metric-card {
+    @apply bg-card rounded-xl lg:rounded-2xl border border-border px-4 py-3.5 sm:px-5 sm:py-4 lg:py-5 shadow-sm transition-all duration-200;
+  }
+  .metric-card:hover {
+    @apply shadow-md border-border/80;
+    transform: translateY(-2px);
+  }
+  .metric-value {
+    @apply text-[1.65rem] font-extrabold text-foreground tracking-tight leading-none;
+  }
+  .metric-label {
+    @apply text-[11px] font-semibold text-muted-foreground uppercase tracking-widest;
+  }
+
+  /* Dashboard Section */
+  .dashboard-section {
+    @apply bg-card rounded-xl lg:rounded-2xl border border-border p-4 sm:p-6 lg:p-7 shadow-sm;
+  }
+  .section-title {
+    @apply text-[15px] font-bold text-foreground mb-5 flex items-center gap-2.5;
+  }
+
+  /* Data Quality Indicators */
+  .quality-good {
+    @apply bg-success/10 text-success border-success/20;
+  }
+  .quality-warning {
+    @apply bg-warning/10 text-warning border-warning/20;
+  }
+  .quality-bad {
+    @apply bg-destructive/10 text-destructive border-destructive/20;
+  }
+
+  /* Table Styles */
+  .data-table {
+    @apply w-full text-sm;
+  }
+  .data-table th {
+    @apply text-left text-[11px] font-bold text-muted-foreground uppercase tracking-widest py-3.5 px-5 border-b border-border;
+  }
+  .data-table td {
+    @apply py-4 px-5 border-b border-border/40;
+  }
+  .data-table tr:hover {
+    @apply bg-muted/40;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/15 rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/25;
+  }
+}
+
 @layer utilities {
   .glass-card {
     @apply bg-card border border-border rounded-lg;
@@ -106,5 +194,13 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 }
