@@ -187,6 +187,332 @@ export type Database = {
           },
         ]
       }
+      ghl_custom_fields: {
+        Row: {
+          created_at: string
+          data_type: string | null
+          field_key: string | null
+          ghl_id: string
+          id: string
+          model: string | null
+          name: string
+          picklist_options: Json | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_type?: string | null
+          field_key?: string | null
+          ghl_id: string
+          id?: string
+          model?: string | null
+          name: string
+          picklist_options?: Json | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          data_type?: string | null
+          field_key?: string | null
+          ghl_id?: string
+          id?: string
+          model?: string | null
+          name?: string
+          picklist_options?: Json | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_custom_fields_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_dashboard_settings: {
+        Row: {
+          additional_date_field: string | null
+          created_at: string
+          default_pipeline_ids: string[] | null
+          funnel_stage_mapping: Json | null
+          origin_field_name: string | null
+          updated_at: string
+          visible_custom_fields: string[] | null
+          won_stage_keys: string[] | null
+          workspace_id: string
+        }
+        Insert: {
+          additional_date_field?: string | null
+          created_at?: string
+          default_pipeline_ids?: string[] | null
+          funnel_stage_mapping?: Json | null
+          origin_field_name?: string | null
+          updated_at?: string
+          visible_custom_fields?: string[] | null
+          won_stage_keys?: string[] | null
+          workspace_id: string
+        }
+        Update: {
+          additional_date_field?: string | null
+          created_at?: string
+          default_pipeline_ids?: string[] | null
+          funnel_stage_mapping?: Json | null
+          origin_field_name?: string | null
+          updated_at?: string
+          visible_custom_fields?: string[] | null
+          won_stage_keys?: string[] | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_dashboard_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_loss_reasons: {
+        Row: {
+          created_at: string
+          ghl_id: string
+          id: string
+          name: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          ghl_id: string
+          id?: string
+          name: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          ghl_id?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_loss_reasons_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_opportunities: {
+        Row: {
+          assigned_to: string | null
+          contact_email: string | null
+          contact_id: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          custom_fields: Json | null
+          ghl_created_at: string | null
+          ghl_id: string
+          ghl_updated_at: string | null
+          id: string
+          last_status_change_at: string | null
+          lost_reason_id: string | null
+          monetary_value: number | null
+          name: string | null
+          pipeline_id: string | null
+          source: string | null
+          stage_id: string | null
+          status: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          contact_email?: string | null
+          contact_id?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          ghl_created_at?: string | null
+          ghl_id: string
+          ghl_updated_at?: string | null
+          id?: string
+          last_status_change_at?: string | null
+          lost_reason_id?: string | null
+          monetary_value?: number | null
+          name?: string | null
+          pipeline_id?: string | null
+          source?: string | null
+          stage_id?: string | null
+          status?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          contact_email?: string | null
+          contact_id?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          ghl_created_at?: string | null
+          ghl_id?: string
+          ghl_updated_at?: string | null
+          id?: string
+          last_status_change_at?: string | null
+          lost_reason_id?: string | null
+          monetary_value?: number | null
+          name?: string | null
+          pipeline_id?: string | null
+          source?: string | null
+          stage_id?: string | null
+          status?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_opportunities_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_pipelines: {
+        Row: {
+          created_at: string
+          ghl_id: string
+          id: string
+          name: string
+          stages: Json
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          ghl_id: string
+          id?: string
+          name: string
+          stages?: Json
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          ghl_id?: string
+          id?: string
+          name?: string
+          stages?: Json
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_pipelines_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_sync_status: {
+        Row: {
+          created_at: string
+          is_running: boolean
+          last_sync_at: string | null
+          last_sync_duration_ms: number | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          opportunities_count: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          is_running?: boolean
+          last_sync_at?: string | null
+          last_sync_duration_ms?: number | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          opportunities_count?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          is_running?: boolean
+          last_sync_at?: string | null
+          last_sync_duration_ms?: number | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          opportunities_count?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_sync_status_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_users: {
+        Row: {
+          created_at: string
+          email: string | null
+          ghl_id: string
+          id: string
+          name: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          ghl_id: string
+          id?: string
+          name: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          ghl_id?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_users_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integrations: {
         Row: {
           config: Json
