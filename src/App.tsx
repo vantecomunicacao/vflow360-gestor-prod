@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import PermissionGuard from "@/components/PermissionGuard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -50,10 +51,10 @@ const App = () => (
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/conversations" element={<Conversations />} />
-                <Route path="/suggestions" element={<Suggestions />} />
-                <Route path="/integrations" element={<Integrations />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/settings/dashboard" element={<DashboardSettings />} />
+                <Route path="/suggestions" element={<PermissionGuard require="viewSuggestions"><Suggestions /></PermissionGuard>} />
+                <Route path="/integrations" element={<PermissionGuard require="viewIntegrations"><Integrations /></PermissionGuard>} />
+                <Route path="/settings" element={<PermissionGuard require="viewSettings"><SettingsPage /></PermissionGuard>} />
+                <Route path="/settings/dashboard" element={<PermissionGuard require="viewSettings"><DashboardSettings /></PermissionGuard>} />
                 <Route path="/workspaces" element={<Workspaces />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/docs" element={<Documentation />} />
