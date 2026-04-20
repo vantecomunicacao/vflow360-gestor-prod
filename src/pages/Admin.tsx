@@ -129,15 +129,34 @@ export default function Admin() {
         full_name: newName || null,
         workspace_id: newWorkspace || null,
         role: newRole,
+        permissions: newPerms,
       });
       toast.success("Usuário criado");
       setCreateOpen(false);
       setNewEmail(""); setNewPassword(""); setNewName(""); setNewWorkspace(""); setNewRole("user");
+      setNewPerms({ view_suggestions: false, view_integrations: false, view_settings: false });
       refresh();
     } catch (e) {
       toast.error("Erro ao criar", { description: (e as Error).message });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openPermsDialog = (u: AdminUser) => {
+    setPermsUser(u);
+    setPermsDraft({ ...u.permissions });
+  };
+
+  const savePermissions = async () => {
+    if (!permsUser) return;
+    try {
+      await callAdmin("set_permissions", { user_id: permsUser.id, permissions: permsDraft });
+      toast.success("Permissões atualizadas");
+      setPermsUser(null);
+      refresh();
+    } catch (e) {
+      toast.error("Erro", { description: (e as Error).message });
     }
   };
 
