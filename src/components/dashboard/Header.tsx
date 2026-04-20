@@ -25,6 +25,9 @@ interface HeaderProps {
   onSellerChange: (id: string | null) => void;
   onOriginChange: (o: string | null) => void;
   cachedAt?: string | null;
+  additionalDateRange?: DateRange | undefined;
+  onAdditionalDateRangeChange?: (r: DateRange | undefined) => void;
+  additionalDateLabel?: string | null;
 }
 
 const datePresets = [
@@ -38,8 +41,9 @@ const datePresets = [
   { label: "Este ano", getValue: () => ({ from: startOfYear(new Date()), to: new Date() }) },
 ];
 
-function DateRangeFilter({ dateRange, onDateRangeChange }: {
+function DateRangeFilter({ dateRange, onDateRangeChange, label, icon: Icon = CalendarDays }: {
   dateRange: DateRange | undefined; onDateRangeChange: (r: DateRange | undefined) => void;
+  label?: string; icon?: typeof CalendarDays;
 }) {
   const [localRange, setLocalRange] = useState<DateRange | undefined>(dateRange);
   const [open, setOpen] = useState(false);
@@ -56,12 +60,12 @@ function DateRangeFilter({ dateRange, onDateRangeChange }: {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="gap-2 font-semibold h-10 rounded-xl">
-          <CalendarDays className="w-4 h-4" />
+          <Icon className="w-4 h-4" />
           {dateRange?.from ? (
             dateRange.to ? (
-              <>{format(dateRange.from, "dd MMM", { locale: ptBR })} - {format(dateRange.to, "dd MMM", { locale: ptBR })}</>
-            ) : <>{format(dateRange.from, "dd MMM yyyy", { locale: ptBR })}</>
-          ) : <span>Período</span>}
+              <>{label ? `${label}: ` : ""}{format(dateRange.from, "dd MMM", { locale: ptBR })} - {format(dateRange.to, "dd MMM", { locale: ptBR })}</>
+            ) : <>{label ? `${label}: ` : ""}{format(dateRange.from, "dd MMM yyyy", { locale: ptBR })}</>
+          ) : <span>{label || "Período"}</span>}
           <ChevronDown className="w-3 h-3 opacity-50" />
         </Button>
       </PopoverTrigger>

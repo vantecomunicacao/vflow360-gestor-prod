@@ -24,6 +24,7 @@ export default function Dashboard() {
     from: subDays(new Date(), 30),
     to: new Date(),
   });
+  const [additionalDateRange, setAdditionalDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
   const [selectedOrigin, setSelectedOrigin] = useState<string | null>(null);
@@ -33,10 +34,22 @@ export default function Dashboard() {
     setSelectedPipelineId(null);
     setSelectedSellerId(null);
     setSelectedOrigin(null);
+    setAdditionalDateRange(undefined);
   }, [activeWorkspace?.id]);
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 30)), [dateRange?.from]);
   const endDate = useMemo(() => endOfDay(dateRange?.to || dateRange?.from || new Date()), [dateRange?.to, dateRange?.from]);
+
+  const additionalStartDate = useMemo(
+    () => (additionalDateRange?.from ? startOfDay(additionalDateRange.from) : null),
+    [additionalDateRange?.from]
+  );
+  const additionalEndDate = useMemo(
+    () => (additionalDateRange?.to || additionalDateRange?.from
+      ? endOfDay(additionalDateRange.to || additionalDateRange.from!)
+      : null),
+    [additionalDateRange?.to, additionalDateRange?.from]
+  );
 
   const filters: DashboardFilters = useMemo(() => ({
     startDate, endDate,
@@ -44,13 +57,17 @@ export default function Dashboard() {
     sellerId: selectedSellerId,
     sourceOrigin: selectedOrigin,
     workspaceId: activeWorkspace?.id || null,
-  }), [startDate, endDate, selectedPipelineId, selectedSellerId, selectedOrigin, activeWorkspace?.id]);
+    additionalStartDate,
+    additionalEndDate,
+  }), [startDate, endDate, selectedPipelineId, selectedSellerId, selectedOrigin, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
 
   const periodDays = useMemo(() => differenceInDays(endDate, startDate) + 1, [startDate, endDate]);
   const prevFilters: DashboardFilters = useMemo(() => ({
     ...filters,
     startDate: startOfDay(subDays(startDate, periodDays)),
     endDate: endOfDay(subDays(startDate, 1)),
+    additionalStartDate: null,
+    additionalEndDate: null,
   }), [filters, startDate, periodDays]);
 
   const { data, isLoading, error, refetch, cachedAt } = useGhlData(filters);
@@ -110,6 +127,9 @@ export default function Dashboard() {
         onSellerChange={setSelectedSellerId}
         onOriginChange={setSelectedOrigin}
         cachedAt={cachedAt}
+        additionalDateRange={additionalDateRange}
+        onAdditionalDateRangeChange={setAdditionalDateRange}
+        additionalDateLabel={data.additionalDateFieldName || null}
       />
 
       <AnimatedSection className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
