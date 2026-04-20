@@ -97,9 +97,12 @@ export function Header({
   pipelines, users, origins,
   selectedPipelineId, selectedSellerId, selectedOrigin,
   onPipelineChange, onSellerChange, onOriginChange, cachedAt,
+  additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const activeFilterCount = [selectedPipelineId, selectedSellerId, selectedOrigin].filter(Boolean).length;
+  const hasAdditionalRange = !!additionalDateRange?.from;
+  const activeFilterCount = [selectedPipelineId, selectedSellerId, selectedOrigin, hasAdditionalRange].filter(Boolean).length;
+  const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
 
   return (
     <header className="mb-5 sm:mb-6">
@@ -132,6 +135,14 @@ export function Header({
           </div>
 
           <DateRangeFilter dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
+
+          {showAdditional && (
+            <DateRangeFilter
+              dateRange={additionalDateRange}
+              onDateRangeChange={onAdditionalDateRangeChange!}
+              label={additionalDateLabel!}
+            />
+          )}
 
           <Select value={selectedPipelineId || "all"} onValueChange={(v) => onPipelineChange(v === "all" ? null : v)}>
             <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
@@ -166,9 +177,12 @@ export function Header({
             </SelectContent>
           </Select>
 
-          {(selectedPipelineId || selectedSellerId || selectedOrigin) && (
+          {(selectedPipelineId || selectedSellerId || selectedOrigin || hasAdditionalRange) && (
             <Button variant="ghost" size="sm" className="h-10 text-muted-foreground hover:text-foreground rounded-xl w-full sm:w-auto"
-              onClick={() => { onPipelineChange(null); onSellerChange(null); onOriginChange(null); }}>
+              onClick={() => {
+                onPipelineChange(null); onSellerChange(null); onOriginChange(null);
+                onAdditionalDateRangeChange?.(undefined);
+              }}>
               Limpar filtros
             </Button>
           )}
