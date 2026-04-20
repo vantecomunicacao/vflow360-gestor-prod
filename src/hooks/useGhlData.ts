@@ -58,6 +58,8 @@ export interface DashboardData {
   totalMonetary?: number;
   wonMonetary?: number;
   cachedAt?: string;
+  additionalDateFieldId?: string | null;
+  additionalDateFieldName?: string | null;
 }
 
 export interface DashboardFilters {
@@ -67,6 +69,8 @@ export interface DashboardFilters {
   sellerId: string | null;
   sourceOrigin: string | null;
   workspaceId: string | null;
+  additionalStartDate?: Date | null;
+  additionalEndDate?: Date | null;
 }
 
 interface UseGhlDataReturn {
@@ -107,6 +111,8 @@ export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
           pipelineId: filters.pipelineId,
           sellerId: filters.sellerId,
           sourceOrigin: filters.sourceOrigin,
+          additionalStartDate: filters.additionalStartDate ? filters.additionalStartDate.toISOString() : null,
+          additionalEndDate: filters.additionalEndDate ? filters.additionalEndDate.toISOString() : null,
         },
       });
 
@@ -123,7 +129,11 @@ export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
       setIsLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.startDate.getTime(), filters.endDate.getTime(), filters.pipelineId, filters.sellerId, filters.sourceOrigin, filters.workspaceId]);
+  }, [
+    filters.startDate.getTime(), filters.endDate.getTime(),
+    filters.pipelineId, filters.sellerId, filters.sourceOrigin, filters.workspaceId,
+    filters.additionalStartDate?.getTime(), filters.additionalEndDate?.getTime(),
+  ]);
 
   useEffect(() => {
     const t = setTimeout(() => fetchData(), 200);
