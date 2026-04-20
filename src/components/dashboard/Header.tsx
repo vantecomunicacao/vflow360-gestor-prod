@@ -25,6 +25,9 @@ interface HeaderProps {
   onSellerChange: (id: string | null) => void;
   onOriginChange: (o: string | null) => void;
   cachedAt?: string | null;
+  additionalDateRange?: DateRange | undefined;
+  onAdditionalDateRangeChange?: (r: DateRange | undefined) => void;
+  additionalDateLabel?: string | null;
 }
 
 const datePresets = [
@@ -38,8 +41,9 @@ const datePresets = [
   { label: "Este ano", getValue: () => ({ from: startOfYear(new Date()), to: new Date() }) },
 ];
 
-function DateRangeFilter({ dateRange, onDateRangeChange }: {
+function DateRangeFilter({ dateRange, onDateRangeChange, label, icon: Icon = CalendarDays }: {
   dateRange: DateRange | undefined; onDateRangeChange: (r: DateRange | undefined) => void;
+  label?: string; icon?: typeof CalendarDays;
 }) {
   const [localRange, setLocalRange] = useState<DateRange | undefined>(dateRange);
   const [open, setOpen] = useState(false);
@@ -56,12 +60,12 @@ function DateRangeFilter({ dateRange, onDateRangeChange }: {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="gap-2 font-semibold h-10 rounded-xl">
-          <CalendarDays className="w-4 h-4" />
+          <Icon className="w-4 h-4" />
           {dateRange?.from ? (
             dateRange.to ? (
-              <>{format(dateRange.from, "dd MMM", { locale: ptBR })} - {format(dateRange.to, "dd MMM", { locale: ptBR })}</>
-            ) : <>{format(dateRange.from, "dd MMM yyyy", { locale: ptBR })}</>
-          ) : <span>Período</span>}
+              <>{label ? `${label}: ` : ""}{format(dateRange.from, "dd MMM", { locale: ptBR })} - {format(dateRange.to, "dd MMM", { locale: ptBR })}</>
+            ) : <>{label ? `${label}: ` : ""}{format(dateRange.from, "dd MMM yyyy", { locale: ptBR })}</>
+          ) : <span>{label || "Período"}</span>}
           <ChevronDown className="w-3 h-3 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -93,9 +97,12 @@ export function Header({
   pipelines, users, origins,
   selectedPipelineId, selectedSellerId, selectedOrigin,
   onPipelineChange, onSellerChange, onOriginChange, cachedAt,
+  additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const activeFilterCount = [selectedPipelineId, selectedSellerId, selectedOrigin].filter(Boolean).length;
+  const hasAdditionalRange = !!additionalDateRange?.from;
+  const activeFilterCount = [selectedPipelineId, selectedSellerId, selectedOrigin, hasAdditionalRange].filter(Boolean).length;
+  const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
 
   return (
     <header className="mb-5 sm:mb-6">
@@ -128,6 +135,14 @@ export function Header({
           </div>
 
           <DateRangeFilter dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
+
+          {showAdditional && (
+            <DateRangeFilter
+              dateRange={additionalDateRange}
+              onDateRangeChange={onAdditionalDateRangeChange!}
+              label={additionalDateLabel!}
+            />
+          )}
 
           <Select value={selectedPipelineId || "all"} onValueChange={(v) => onPipelineChange(v === "all" ? null : v)}>
             <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
@@ -162,9 +177,12 @@ export function Header({
             </SelectContent>
           </Select>
 
-          {(selectedPipelineId || selectedSellerId || selectedOrigin) && (
+          {(selectedPipelineId || selectedSellerId || selectedOrigin || hasAdditionalRange) && (
             <Button variant="ghost" size="sm" className="h-10 text-muted-foreground hover:text-foreground rounded-xl w-full sm:w-auto"
-              onClick={() => { onPipelineChange(null); onSellerChange(null); onOriginChange(null); }}>
+              onClick={() => {
+                onPipelineChange(null); onSellerChange(null); onOriginChange(null);
+                onAdditionalDateRangeChange?.(undefined);
+              }}>
               Limpar filtros
             </Button>
           )}

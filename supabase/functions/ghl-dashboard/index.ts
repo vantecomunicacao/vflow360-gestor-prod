@@ -68,6 +68,8 @@ serve(async (req) => {
     const filterPipelineId: string | null = payload.pipelineId || null;
     const filterUserId: string | null = payload.sellerId || null;
     const filterOrigin: string | null = payload.sourceOrigin || null;
+    const additionalStartDate: string | null = payload.additionalStartDate || null;
+    const additionalEndDate: string | null = payload.additionalEndDate || null;
 
     // ===== Carrega catálogos =====
     const [
@@ -192,6 +194,50 @@ serve(async (req) => {
     // Quando não há filtro de pipeline, restringe aos pipelines ativos (default_pipeline_ids ou todos)
     if (!filterPipelineId && activePipelineIds.size > 0) {
       opps = opps.filter(o => !o.pipeline_id || activePipelineIds.has(o.pipeline_id));
+    }
+
+    // ===== Filtro adicional por campo de data customizado =====
+    const additionalDateFieldId: string | null = settings?.additional_date_field || null;
+    const additionalDateFieldDef = additionalDateFieldId
+      ? customFieldDefs.find(d => d.ghl_id === additionalDateFieldId || d.field_key === additionalDateFieldId)
+      : null;
+    const additionalDateFieldName: string | null = additionalDateFieldDef?.name || null;
+
+    if (additionalDateFieldId && additionalStartDate && additionalEndDate) {
+      const addStart = new Date(additionalStartDate).getTime();
+      const addEnd = new Date(additionalEndDate).getTime();
+      const parseDateVal = (v: any): number | null => {
+        if (v == null || v === "") return null;
+        if (typeof v === "number") {
+          // Heurística: se for em segundos (10 dígitos), converte para ms
+          const ms = v < 1e12 ? v * 1000 : v;
+          const t = new Date(ms).getTime();
+          return isNaN(t) ? null : t;
+        }
+        if (typeof v === "string") {
+          // Tenta número primeiro
+          const asNum = Number(v);
+          if (!isNaN(asNum) && v.trim() !== "") {
+            const ms = asNum < 1e12 ? asNum * 1000 : asNum;
+            const t = new Date(ms).getTime();
+            if (!isNaN(t)) return t;
+          }
+          const t = new Date(v).getTime();
+          return isNaN(t) ? null : t;
+        }
+        return null;
+      };
+      opps = opps.filter((o) => {
+        const cf = o.custom_fields || {};
+        // tenta ghl_id, field_key e name
+        const raw =
+          cf[additionalDateFieldId] ??
+          (additionalDateFieldDef?.field_key ? cf[additionalDateFieldDef.field_key] : undefined) ??
+          (additionalDateFieldDef?.name ? cf[additionalDateFieldDef.name] : undefined);
+        const t = parseDateVal(raw);
+        if (t === null) return false;
+        return t >= addStart && t <= addEnd;
+      });
     }
 
     const totalLeads = opps.length;
@@ -387,6 +433,8 @@ serve(async (req) => {
       // métricas extra (GHL)
       totalMonetary,
       wonMonetary,
+      additionalDateFieldId,
+      additionalDateFieldName,
       cachedAt: new Date().toISOString(),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
