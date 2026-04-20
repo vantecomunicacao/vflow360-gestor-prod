@@ -411,6 +411,46 @@ export default function Admin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Permissions dialog */}
+      <Dialog open={!!permsUser} onOpenChange={(o) => !o && setPermsUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permissões — {permsUser?.full_name || permsUser?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Dashboard e Conversas são liberados para todos os usuários.
+              Ative apenas as áreas extras que este usuário poderá acessar.
+            </p>
+            <div className="flex items-center justify-between">
+              <Label className="font-normal">Ver Sugestões IA</Label>
+              <Switch
+                checked={permsDraft.view_suggestions}
+                onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_suggestions: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="font-normal">Ver Integrações</Label>
+              <Switch
+                checked={permsDraft.view_integrations}
+                onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_integrations: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="font-normal">Ver Configurações</Label>
+              <Switch
+                checked={permsDraft.view_settings}
+                onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_settings: v }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPermsUser(null)}>Cancelar</Button>
+            <Button onClick={savePermissions}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
