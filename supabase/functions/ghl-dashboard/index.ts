@@ -90,26 +90,63 @@ serve(async (req) => {
     const lossReasonsList = (lossReasonsRows || []) as Array<{ ghl_id: string; name: string }>;
     const settings = settingsRow as any;
 
-    // Pipeline ativo (filtro ou primeiro)
+    // Pipelines ativos: se filtrado, só esse; senão TODOS (multi-pipeline)
+    // Aplica default_pipeline_ids das settings quando usuário não filtrou
+    const defaultPipelineIds: string[] = Array.isArray(settings?.default_pipeline_ids) ? settings.default_pipeline_ids : [];
     const activePipelines = filterPipelineId
       ? allPipelines.filter(p => p.ghl_id === filterPipelineId)
-      : allPipelines;
-    const activePipeline = activePipelines[0];
-    const activeStages: Array<{ id: string; name: string }> = activePipeline?.stages || [];
-
-    // Funnel mapping (settings ou inferido) — sempre garante os 4 buckets como arrays
-    const inferred = inferFunnelMapping(activeStages);
-    const fromSettings = (settings?.funnel_stage_mapping || {}) as Partial<FunnelMapping>;
-    const stageMap: FunnelMapping = {
-      contato_inicial: Array.isArray(fromSettings.contato_inicial) && fromSettings.contato_inicial.length ? fromSettings.contato_inicial : inferred.contato_inicial,
-      proposta_enviada: Array.isArray(fromSettings.proposta_enviada) && fromSettings.proposta_enviada.length ? fromSettings.proposta_enviada : inferred.proposta_enviada,
-      fechamento: Array.isArray(fromSettings.fechamento) && fromSettings.fechamento.length ? fromSettings.fechamento : inferred.fechamento,
-      venda_ganha: Array.isArray(fromSettings.venda_ganha) && fromSettings.venda_ganha.length ? fromSettings.venda_ganha : inferred.venda_ganha,
-    };
-
-    const wonStageIds = new Set<string>(
-      settings?.won_stage_keys?.length ? settings.won_stage_keys : stageMap.venda_ganha
+      : (defaultPipelineIds.length
+          ? allPipelines.filter(p => defaultPipelineIds.includes(p.ghl_id))
+          : allPipelines);
+    // Agrega stages de TODOS os pipelines ativos
+    const activeStages: Array<{ id: string; name: string }> = activePipelines.flatMap(
+      (p) => (Array.isArray(p.stages) ? p.stages : []) as Array<{ id: string; name: string }>
     );
+    const activePipelineIds = new Set(activePipelines.map(p => p.ghl_id));
+
+    // Funnel mapping: aceita 2 formatos salvos
+    //   A) {bucket: [stageIds]}  (legado)
+    //   B) {stageId: "bucket"}    (formato salvo pela UI atual)
+    const inferred = inferFunnelMapping(activeStages);
+    const rawMapping = (settings?.funnel_stage_mapping || {}) as Record<string, any>;
+    const VALID_BUCKETS = ["contato_inicial", "proposta_enviada", "fechamento", "venda_ganha"] as const;
+    type BucketKey = typeof VALID_BUCKETS[number];
+
+    const stageMap: FunnelMapping = { contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
+    let hasUserMapping = false;
+
+    // Tenta formato A
+    for (const b of VALID_BUCKETS) {
+      const v = rawMapping[b];
+      if (Array.isArray(v) && v.length) {
+        stageMap[b] = v.filter((x) => typeof x === "string");
+        hasUserMapping = true;
+      }
+    }
+    // Se não veio nada de A, tenta formato B (stageId → bucketKey)
+    if (!hasUserMapping) {
+      for (const [stageId, bucket] of Object.entries(rawMapping)) {
+        if (typeof bucket === "string" && (VALID_BUCKETS as readonly string[]).includes(bucket)) {
+          stageMap[bucket as BucketKey].push(stageId);
+          hasUserMapping = true;
+        }
+      }
+    }
+    // Para qualquer bucket vazio, completa com inferência
+    for (const b of VALID_BUCKETS) {
+      if (!stageMap[b].length) stageMap[b] = inferred[b];
+    }
+
+    // won_stage_keys: aceita stage IDs OU bucket keys (ex: "venda_ganha")
+    const rawWonKeys: string[] = Array.isArray(settings?.won_stage_keys) ? settings.won_stage_keys : [];
+    const wonStageIds = new Set<string>(stageMap.venda_ganha);
+    for (const k of rawWonKeys) {
+      if ((VALID_BUCKETS as readonly string[]).includes(k)) {
+        for (const sid of stageMap[k as BucketKey]) wonStageIds.add(sid);
+      } else if (typeof k === "string") {
+        wonStageIds.add(k);
+      }
+    }
 
     // Origin field name from settings (fallback "source")
     const originFieldName: string | null = settings?.origin_field_name || null;
@@ -152,6 +189,11 @@ serve(async (req) => {
       opps = opps.filter(o => getOrigin(o) === filterOrigin);
     }
 
+    // Quando não há filtro de pipeline, restringe aos pipelines ativos (default_pipeline_ids ou todos)
+    if (!filterPipelineId && activePipelineIds.size > 0) {
+      opps = opps.filter(o => !o.pipeline_id || activePipelineIds.has(o.pipeline_id));
+    }
+
     const totalLeads = opps.length;
     const wonOpps = opps.filter(o => wonStageIds.has(o.stage_id) || (o.status || "").toLowerCase() === "won");
     const lostOpps = opps.filter(o => (o.status || "").toLowerCase() === "lost");
@@ -166,12 +208,13 @@ serve(async (req) => {
       return null;
     };
 
-    // ===== Funnel stages (4 buckets) =====
+    // ===== Funnel stages (4 buckets) — exclui perdidos do funil =====
     const counts = { contato_inicial: 0, proposta_enviada: 0, fechamento: 0, venda_ganha: 0 };
     const leadsByBucket: Record<keyof FunnelMapping, Array<{ id: number; name: string }>> = {
       contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [],
     };
     for (const o of opps) {
+      if ((o.status || "").toLowerCase() === "lost") continue; // perdidos saem do funil
       const b = stageBucket(o.stage_id);
       if (b) {
         counts[b]++;
