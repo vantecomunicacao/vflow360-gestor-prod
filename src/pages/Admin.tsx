@@ -12,7 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Trash2, KeyRound, Shield, ShieldOff, UserPlus, Loader2 } from "lucide-react";
+import { Plus, Trash2, KeyRound, Shield, ShieldOff, UserPlus, Loader2, Lock } from "lucide-react";
+
+interface UserPerms {
+  view_suggestions: boolean;
+  view_integrations: boolean;
+  view_settings: boolean;
+}
 
 interface AdminUser {
   id: string;
@@ -22,6 +28,7 @@ interface AdminUser {
   last_sign_in_at: string | null;
   roles: string[];
   workspaces: { workspace_id: string; role: string; name: string }[];
+  permissions: UserPerms;
 }
 
 interface Workspace { id: string; name: string; owner_id: string; }
@@ -41,6 +48,11 @@ export default function Admin() {
   const [newName, setNewName] = useState("");
   const [newWorkspace, setNewWorkspace] = useState<string>("");
   const [newRole, setNewRole] = useState<"user" | "admin">("user");
+  const [newPerms, setNewPerms] = useState<UserPerms>({
+    view_suggestions: false,
+    view_integrations: false,
+    view_settings: false,
+  });
   const [creating, setCreating] = useState(false);
 
   // password dialog
@@ -50,6 +62,14 @@ export default function Admin() {
   // workspace assignment dialog
   const [wsUser, setWsUser] = useState<AdminUser | null>(null);
   const [wsToAdd, setWsToAdd] = useState<string>("");
+
+  // permissions dialog
+  const [permsUser, setPermsUser] = useState<AdminUser | null>(null);
+  const [permsDraft, setPermsDraft] = useState<UserPerms>({
+    view_suggestions: false,
+    view_integrations: false,
+    view_settings: false,
+  });
 
   const callAdmin = async (action: string, payload: Record<string, unknown> = {}) => {
     const { data, error } = await supabase.functions.invoke("admin-users", {
