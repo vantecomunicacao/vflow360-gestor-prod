@@ -433,6 +433,8 @@ serve(async (req) => {
       // métricas extra (GHL)
       totalMonetary,
       wonMonetary,
+      additionalDateFieldId,
+      additionalDateFieldName,
       cachedAt: new Date().toISOString(),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
