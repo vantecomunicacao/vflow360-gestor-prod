@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,7 +19,9 @@ const FUNNEL_BUCKETS = [
 
 interface Stage { id: string; name: string; }
 interface Pipeline { id: string; ghl_id: string; name: string; stages: Stage[]; }
-interface CustomField { id: string; ghl_id: string; name: string; field_key: string | null; }
+interface CustomField { id: string; ghl_id: string; name: string; field_key: string | null; data_type?: string | null; }
+
+const DATE_TYPES = ["DATE", "DATETIME", "DATE_TIME", "date", "datetime", "Date", "DateTime"];
 
 export default function DashboardSettings() {
   const { activeWorkspace } = useWorkspace();
@@ -47,7 +49,7 @@ export default function DashboardSettings() {
     try {
       const [{ data: pipes }, { data: fields }, { data: settings }] = await Promise.all([
         supabase.from("ghl_pipelines").select("*").eq("workspace_id", activeWorkspace.id),
-        supabase.from("ghl_custom_fields").select("*").eq("workspace_id", activeWorkspace.id),
+        supabase.from("ghl_custom_fields").select("id,ghl_id,name,field_key,data_type").eq("workspace_id", activeWorkspace.id),
         supabase.from("ghl_dashboard_settings").select("*").eq("workspace_id", activeWorkspace.id).maybeSingle(),
       ]);
       const ps = (pipes || []).map((p: any) => ({
@@ -259,14 +261,34 @@ export default function DashboardSettings() {
       <Card>
         <CardHeader>
           <CardTitle>Campo de data adicional (opcional)</CardTitle>
-          <CardDescription>Campo customizado de data para filtros secundários</CardDescription>
+          <CardDescription>
+            Quando configurado, o dashboard ganha um segundo filtro de período baseado nesse campo (ex: data de fechamento).
+            Apenas campos do tipo data do GHL são listados.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Input
-            placeholder="ex: data_agendamento"
-            value={additionalDateField}
-            onChange={(e) => setAdditionalDateField(e.target.value)}
-          />
+          {(() => {
+            const dateFields = customFields.filter((f) =>
+              f.data_type ? DATE_TYPES.includes(f.data_type) : false
+            );
+            if (dateFields.length === 0) {
+              return <p className="text-sm text-muted-foreground">Nenhum campo de data sincronizado do GHL.</p>;
+            }
+            return (
+              <Select
+                value={additionalDateField || "__none__"}
+                onValueChange={(v) => setAdditionalDateField(v === "__none__" ? "" : v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum</SelectItem>
+                  {dateFields.map((f) => (
+                    <SelectItem key={f.id} value={f.ghl_id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
