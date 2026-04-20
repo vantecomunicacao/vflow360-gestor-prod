@@ -272,6 +272,34 @@ export default function Admin() {
                 <Label>Promover a admin</Label>
                 <Switch checked={newRole === "admin"} onCheckedChange={(v) => setNewRole(v ? "admin" : "user")} />
               </div>
+
+              <div className="space-y-2 pt-2 border-t border-border">
+                <Label className="text-sm font-semibold">Permissões de acesso</Label>
+                <p className="text-xs text-muted-foreground">
+                  Dashboard e Conversas são liberados para todos. Marque as áreas extras que este usuário poderá acessar.
+                </p>
+                <div className="flex items-center justify-between pt-1">
+                  <Label className="font-normal">Ver Sugestões IA</Label>
+                  <Switch
+                    checked={newPerms.view_suggestions}
+                    onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_suggestions: v }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="font-normal">Ver Integrações</Label>
+                  <Switch
+                    checked={newPerms.view_integrations}
+                    onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_integrations: v }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="font-normal">Ver Configurações</Label>
+                  <Switch
+                    checked={newPerms.view_settings}
+                    onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_settings: v }))}
+                  />
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
@@ -311,6 +339,9 @@ export default function Admin() {
                 <div className="flex gap-2 flex-wrap">
                   <Button size="sm" variant="outline" onClick={() => setWsUser(u)}>
                     <Plus className="w-3 h-3 mr-1" />Conta
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => openPermsDialog(u)} disabled={u.roles.includes("admin")}>
+                    <Lock className="w-3 h-3 mr-1" />Permissões
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => toggleAdminRole(u)} disabled={u.id === user?.id}>
                     {u.roles.includes("admin") ? <ShieldOff className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
