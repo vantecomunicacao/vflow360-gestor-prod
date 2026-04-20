@@ -97,10 +97,15 @@ serve(async (req) => {
     const activePipeline = activePipelines[0];
     const activeStages: Array<{ id: string; name: string }> = activePipeline?.stages || [];
 
-    // Funnel mapping (settings ou inferido)
-    const stageMap: FunnelMapping = settings?.funnel_stage_mapping
-      ? settings.funnel_stage_mapping
-      : inferFunnelMapping(activeStages);
+    // Funnel mapping (settings ou inferido) — sempre garante os 4 buckets como arrays
+    const inferred = inferFunnelMapping(activeStages);
+    const fromSettings = (settings?.funnel_stage_mapping || {}) as Partial<FunnelMapping>;
+    const stageMap: FunnelMapping = {
+      contato_inicial: Array.isArray(fromSettings.contato_inicial) && fromSettings.contato_inicial.length ? fromSettings.contato_inicial : inferred.contato_inicial,
+      proposta_enviada: Array.isArray(fromSettings.proposta_enviada) && fromSettings.proposta_enviada.length ? fromSettings.proposta_enviada : inferred.proposta_enviada,
+      fechamento: Array.isArray(fromSettings.fechamento) && fromSettings.fechamento.length ? fromSettings.fechamento : inferred.fechamento,
+      venda_ganha: Array.isArray(fromSettings.venda_ganha) && fromSettings.venda_ganha.length ? fromSettings.venda_ganha : inferred.venda_ganha,
+    };
 
     const wonStageIds = new Set<string>(
       settings?.won_stage_keys?.length ? settings.won_stage_keys : stageMap.venda_ganha
