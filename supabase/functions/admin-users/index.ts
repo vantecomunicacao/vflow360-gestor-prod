@@ -36,25 +36,34 @@ Deno.serve(async (req) => {
         const { data: list, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
         if (error) throw error;
         const ids = list.users.map((u) => u.id);
-        const [{ data: roles }, { data: profiles }, { data: members }] = await Promise.all([
+        const [{ data: roles }, { data: profiles }, { data: members }, { data: perms }] = await Promise.all([
           admin.from("user_roles").select("user_id, role").in("user_id", ids),
           admin.from("profiles").select("user_id, full_name").in("user_id", ids),
           admin.from("workspace_members").select("user_id, workspace_id, role, workspaces(name)").in("user_id", ids),
+          admin.from("user_permissions").select("user_id, view_suggestions, view_integrations, view_settings").in("user_id", ids),
         ]);
         return json({
-          users: list.users.map((u) => ({
-            id: u.id,
-            email: u.email,
-            created_at: u.created_at,
-            last_sign_in_at: u.last_sign_in_at,
-            full_name: profiles?.find((p) => p.user_id === u.id)?.full_name || null,
-            roles: roles?.filter((r) => r.user_id === u.id).map((r) => r.role) || [],
-            workspaces: (members?.filter((m) => m.user_id === u.id) || []).map((m: any) => ({
-              workspace_id: m.workspace_id,
-              role: m.role,
-              name: m.workspaces?.name,
-            })),
-          })),
+          users: list.users.map((u) => {
+            const p = perms?.find((x) => x.user_id === u.id);
+            return {
+              id: u.id,
+              email: u.email,
+              created_at: u.created_at,
+              last_sign_in_at: u.last_sign_in_at,
+              full_name: profiles?.find((p) => p.user_id === u.id)?.full_name || null,
+              roles: roles?.filter((r) => r.user_id === u.id).map((r) => r.role) || [],
+              workspaces: (members?.filter((m) => m.user_id === u.id) || []).map((m: any) => ({
+                workspace_id: m.workspace_id,
+                role: m.role,
+                name: m.workspaces?.name,
+              })),
+              permissions: {
+                view_suggestions: !!p?.view_suggestions,
+                view_integrations: !!p?.view_integrations,
+                view_settings: !!p?.view_settings,
+              },
+            };
+          }),
         });
       }
 
@@ -65,7 +74,7 @@ Deno.serve(async (req) => {
       }
 
       case "create_user": {
-        const { email, password, full_name, workspace_id, role = "user" } = body;
+        const { email, password, full_name, workspace_id, role = "user", permissions } = body;
         if (!email || !password) return json({ error: "email e password obrigatórios" }, 400);
         const { data: created, error } = await admin.auth.admin.createUser({
           email,
@@ -81,7 +90,26 @@ Deno.serve(async (req) => {
         if (workspace_id) {
           await admin.from("workspace_members").insert({ user_id: newId, workspace_id, role: "member" });
         }
+        await admin.from("user_permissions").upsert({
+          user_id: newId,
+          view_suggestions: !!permissions?.view_suggestions,
+          view_integrations: !!permissions?.view_integrations,
+          view_settings: !!permissions?.view_settings,
+        });
         return json({ ok: true, user_id: newId });
+      }
+
+      case "set_permissions": {
+        const { user_id, permissions } = body;
+        if (!user_id || !permissions) return json({ error: "user_id e permissions obrigatórios" }, 400);
+        const { error } = await admin.from("user_permissions").upsert({
+          user_id,
+          view_suggestions: !!permissions.view_suggestions,
+          view_integrations: !!permissions.view_integrations,
+          view_settings: !!permissions.view_settings,
+        });
+        if (error) throw error;
+        return json({ ok: true });
       }
 
       case "update_password": {

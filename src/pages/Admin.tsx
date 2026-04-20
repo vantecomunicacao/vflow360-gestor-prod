@@ -12,7 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Trash2, KeyRound, Shield, ShieldOff, UserPlus, Loader2 } from "lucide-react";
+import { Plus, Trash2, KeyRound, Shield, ShieldOff, UserPlus, Loader2, Lock } from "lucide-react";
+
+interface UserPerms {
+  view_suggestions: boolean;
+  view_integrations: boolean;
+  view_settings: boolean;
+}
 
 interface AdminUser {
   id: string;
@@ -22,6 +28,7 @@ interface AdminUser {
   last_sign_in_at: string | null;
   roles: string[];
   workspaces: { workspace_id: string; role: string; name: string }[];
+  permissions: UserPerms;
 }
 
 interface Workspace { id: string; name: string; owner_id: string; }
@@ -41,6 +48,11 @@ export default function Admin() {
   const [newName, setNewName] = useState("");
   const [newWorkspace, setNewWorkspace] = useState<string>("");
   const [newRole, setNewRole] = useState<"user" | "admin">("user");
+  const [newPerms, setNewPerms] = useState<UserPerms>({
+    view_suggestions: false,
+    view_integrations: false,
+    view_settings: false,
+  });
   const [creating, setCreating] = useState(false);
 
   // password dialog
@@ -50,6 +62,14 @@ export default function Admin() {
   // workspace assignment dialog
   const [wsUser, setWsUser] = useState<AdminUser | null>(null);
   const [wsToAdd, setWsToAdd] = useState<string>("");
+
+  // permissions dialog
+  const [permsUser, setPermsUser] = useState<AdminUser | null>(null);
+  const [permsDraft, setPermsDraft] = useState<UserPerms>({
+    view_suggestions: false,
+    view_integrations: false,
+    view_settings: false,
+  });
 
   const callAdmin = async (action: string, payload: Record<string, unknown> = {}) => {
     const { data, error } = await supabase.functions.invoke("admin-users", {
@@ -109,15 +129,34 @@ export default function Admin() {
         full_name: newName || null,
         workspace_id: newWorkspace || null,
         role: newRole,
+        permissions: newPerms,
       });
       toast.success("Usuário criado");
       setCreateOpen(false);
       setNewEmail(""); setNewPassword(""); setNewName(""); setNewWorkspace(""); setNewRole("user");
+      setNewPerms({ view_suggestions: false, view_integrations: false, view_settings: false });
       refresh();
     } catch (e) {
       toast.error("Erro ao criar", { description: (e as Error).message });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openPermsDialog = (u: AdminUser) => {
+    setPermsUser(u);
+    setPermsDraft({ ...u.permissions });
+  };
+
+  const savePermissions = async () => {
+    if (!permsUser) return;
+    try {
+      await callAdmin("set_permissions", { user_id: permsUser.id, permissions: permsDraft });
+      toast.success("Permissões atualizadas");
+      setPermsUser(null);
+      refresh();
+    } catch (e) {
+      toast.error("Erro", { description: (e as Error).message });
     }
   };
 
@@ -233,6 +272,34 @@ export default function Admin() {
                 <Label>Promover a admin</Label>
                 <Switch checked={newRole === "admin"} onCheckedChange={(v) => setNewRole(v ? "admin" : "user")} />
               </div>
+
+              <div className="space-y-2 pt-2 border-t border-border">
+                <Label className="text-sm font-semibold">Permissões de acesso</Label>
+                <p className="text-xs text-muted-foreground">
+                  Dashboard e Conversas são liberados para todos. Marque as áreas extras que este usuário poderá acessar.
+                </p>
+                <div className="flex items-center justify-between pt-1">
+                  <Label className="font-normal">Ver Sugestões IA</Label>
+                  <Switch
+                    checked={newPerms.view_suggestions}
+                    onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_suggestions: v }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="font-normal">Ver Integrações</Label>
+                  <Switch
+                    checked={newPerms.view_integrations}
+                    onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_integrations: v }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="font-normal">Ver Configurações</Label>
+                  <Switch
+                    checked={newPerms.view_settings}
+                    onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_settings: v }))}
+                  />
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
@@ -272,6 +339,9 @@ export default function Admin() {
                 <div className="flex gap-2 flex-wrap">
                   <Button size="sm" variant="outline" onClick={() => setWsUser(u)}>
                     <Plus className="w-3 h-3 mr-1" />Conta
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => openPermsDialog(u)} disabled={u.roles.includes("admin")}>
+                    <Lock className="w-3 h-3 mr-1" />Permissões
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => toggleAdminRole(u)} disabled={u.id === user?.id}>
                     {u.roles.includes("admin") ? <ShieldOff className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
@@ -338,6 +408,46 @@ export default function Admin() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setWsUser(null)}>Cancelar</Button>
             <Button onClick={addToWorkspace} disabled={!wsToAdd}>Adicionar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permissions dialog */}
+      <Dialog open={!!permsUser} onOpenChange={(o) => !o && setPermsUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permissões — {permsUser?.full_name || permsUser?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Dashboard e Conversas são liberados para todos os usuários.
+              Ative apenas as áreas extras que este usuário poderá acessar.
+            </p>
+            <div className="flex items-center justify-between">
+              <Label className="font-normal">Ver Sugestões IA</Label>
+              <Switch
+                checked={permsDraft.view_suggestions}
+                onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_suggestions: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="font-normal">Ver Integrações</Label>
+              <Switch
+                checked={permsDraft.view_integrations}
+                onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_integrations: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="font-normal">Ver Configurações</Label>
+              <Switch
+                checked={permsDraft.view_settings}
+                onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_settings: v }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPermsUser(null)}>Cancelar</Button>
+            <Button onClick={savePermissions}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

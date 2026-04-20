@@ -676,6 +676,33 @@ export type Database = {
           },
         ]
       }
+      user_permissions: {
+        Row: {
+          created_at: string
+          updated_at: string
+          user_id: string
+          view_integrations: boolean
+          view_settings: boolean
+          view_suggestions: boolean
+        }
+        Insert: {
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          view_integrations?: boolean
+          view_settings?: boolean
+          view_suggestions?: boolean
+        }
+        Update: {
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          view_integrations?: boolean
+          view_settings?: boolean
+          view_suggestions?: boolean
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -756,6 +783,15 @@ export type Database = {
     }
     Functions: {
       create_workspace: { Args: { _name: string }; Returns: string }
+      get_my_permissions: {
+        Args: never
+        Returns: {
+          is_admin: boolean
+          view_integrations: boolean
+          view_settings: boolean
+          view_suggestions: boolean
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

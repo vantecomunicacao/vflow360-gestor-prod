@@ -2,7 +2,7 @@ import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, 
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   Sidebar,
   SidebarContent,
@@ -15,24 +15,23 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const baseNavItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Conversas", url: "/conversations", icon: MessageSquare },
-  { title: "Sugestões IA", url: "/suggestions", icon: Sparkles },
-  { title: "Integrações", url: "/integrations", icon: Plug },
-  { title: "Configurações", url: "/settings", icon: Settings },
-  { title: "Dashboard config", url: "/settings/dashboard", icon: SlidersHorizontal },
-  { title: "Documentação", url: "/docs", icon: BookOpen },
-];
-
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { isAdmin } = useIsAdmin();
-  const navItems = isAdmin
-    ? [...baseNavItems, { title: "Admin", url: "/admin", icon: ShieldCheck }]
-    : baseNavItems;
+  const { permissions } = usePermissions();
+  const { isAdmin, viewSuggestions, viewIntegrations, viewSettings } = permissions;
+
+  const navItems = [
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, show: true },
+    { title: "Conversas", url: "/conversations", icon: MessageSquare, show: true },
+    { title: "Sugestões IA", url: "/suggestions", icon: Sparkles, show: viewSuggestions },
+    { title: "Integrações", url: "/integrations", icon: Plug, show: viewIntegrations },
+    { title: "Configurações", url: "/settings", icon: Settings, show: viewSettings },
+    { title: "Dashboard config", url: "/settings/dashboard", icon: SlidersHorizontal, show: viewSettings },
+    { title: "Documentação", url: "/docs", icon: BookOpen, show: true },
+    { title: "Admin", url: "/admin", icon: ShieldCheck, show: isAdmin },
+  ].filter((i) => i.show);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
