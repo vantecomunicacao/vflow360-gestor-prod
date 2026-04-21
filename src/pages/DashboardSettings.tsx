@@ -29,6 +29,8 @@ export default function DashboardSettings() {
   const { activeWorkspace } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ last_sync_at: string | null; last_sync_status: string | null; opportunities_count: number | null } | null>(null);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
 
