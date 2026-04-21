@@ -170,23 +170,38 @@ export default function DashboardSettings() {
         </div>
       </div>
 
-      {/* Pipelines padrão */}
+      {/* Pipeline padrão */}
       <Card>
         <CardHeader>
-          <CardTitle>Pipelines padrão</CardTitle>
-          <CardDescription>Marque os pipelines incluídos no dashboard por padrão. Vazio = todos.</CardDescription>
+          <CardTitle>Funil padrão</CardTitle>
+          <CardDescription>Selecione o funil que será aberto automaticamente no Dashboard.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {pipelines.map((p) => (
             <label key={p.id} className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={defaultPipelines.includes(p.ghl_id)}
-                onCheckedChange={() => togglePipeline(p.ghl_id)}
+              <input
+                type="radio"
+                name="defaultPipeline"
+                className="accent-primary"
+                checked={defaultPipelines[0] === p.ghl_id}
+                onChange={() => setDefaultPipelines([p.ghl_id])}
               />
               <span>{p.name}</span>
               <span className="text-xs text-muted-foreground">({p.stages.length} etapas)</span>
             </label>
           ))}
+          {pipelines.length > 0 && (
+            <label className="flex items-center gap-2 cursor-pointer pt-1">
+              <input
+                type="radio"
+                name="defaultPipeline"
+                className="accent-primary"
+                checked={defaultPipelines.length === 0}
+                onChange={() => setDefaultPipelines([])}
+              />
+              <span className="text-sm text-muted-foreground">Sem padrão (mostrar todos)</span>
+            </label>
+          )}
           {pipelines.length === 0 && <p className="text-sm text-muted-foreground">Nenhum pipeline sincronizado.</p>}
         </CardContent>
       </Card>
