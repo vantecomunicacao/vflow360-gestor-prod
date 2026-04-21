@@ -145,15 +145,29 @@ export default function DashboardSettings() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Configurações do Dashboard</h1>
           <p className="text-muted-foreground text-sm">Personalize agregações e campos exibidos por conta</p>
+          {syncStatus?.last_sync_at && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Última sincronização:{" "}
+              {formatDistanceToNow(new Date(syncStatus.last_sync_at), { addSuffix: true, locale: ptBR })}
+              {typeof syncStatus.opportunities_count === "number" && ` · ${syncStatus.opportunities_count} oportunidades`}
+              {syncStatus.last_sync_status === "error" && " · ⚠️ erro"}
+            </p>
+          )}
         </div>
-        <Button onClick={save} disabled={saving}>
-          {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-          Salvar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={syncNow} disabled={syncing || saving}>
+            {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            Sincronizar agora
+          </Button>
+          <Button onClick={save} disabled={saving || syncing}>
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Salvar
+          </Button>
+        </div>
       </div>
 
       {/* Pipelines padrão */}
