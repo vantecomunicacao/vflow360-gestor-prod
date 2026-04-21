@@ -51,11 +51,13 @@ export default function DashboardSettings() {
     if (!activeWorkspace?.id) return;
     setLoading(true);
     try {
-      const [{ data: pipes }, { data: fields }, { data: settings }] = await Promise.all([
+      const [{ data: pipes }, { data: fields }, { data: settings }, { data: status }] = await Promise.all([
         supabase.from("ghl_pipelines").select("*").eq("workspace_id", activeWorkspace.id),
         supabase.from("ghl_custom_fields").select("id,ghl_id,name,field_key,data_type").eq("workspace_id", activeWorkspace.id),
         supabase.from("ghl_dashboard_settings").select("*").eq("workspace_id", activeWorkspace.id).maybeSingle(),
+        supabase.from("ghl_sync_status").select("last_sync_at,last_sync_status,opportunities_count").eq("workspace_id", activeWorkspace.id).maybeSingle(),
       ]);
+      setSyncStatus(status as any);
       const ps = (pipes || []).map((p: any) => ({
         id: p.id, ghl_id: p.ghl_id, name: p.name,
         stages: Array.isArray(p.stages) ? p.stages : [],
