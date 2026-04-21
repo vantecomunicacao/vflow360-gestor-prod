@@ -143,17 +143,30 @@ serve(async (req) => {
       console.warn("users sync failed:", (e as Error).message);
     }
 
-    // === 3. Custom fields ===
+    // === 3. Custom fields (contact + opportunity) ===
     try {
-      const cfResp = await ghlFetch(`/locations/${locationId}/customFields`, creds);
-      const fields = cfResp?.customFields || [];
-      if (fields.length) {
-        const rows = fields.map((f: any) => ({
+      const allFields: any[] = [];
+      for (const model of ["contact", "opportunity"]) {
+        try {
+          const cfResp = await ghlFetch(
+            `/locations/${locationId}/customFields?model=${model}`,
+            creds,
+          );
+          const fields = cfResp?.customFields || [];
+          for (const f of fields) {
+            allFields.push({ ...f, _model: f.model || model });
+          }
+        } catch (e) {
+          console.warn(`custom fields sync (${model}) failed:`, (e as Error).message);
+        }
+      }
+      if (allFields.length) {
+        const rows = allFields.map((f: any) => ({
           workspace_id: workspaceId,
           ghl_id: f.id,
           name: f.name || "Sem nome",
           field_key: f.fieldKey || null,
-          model: f.model || null,
+          model: f._model || f.model || null,
           data_type: f.dataType || null,
           picklist_options: f.picklistOptions || null,
           updated_at: new Date().toISOString(),
