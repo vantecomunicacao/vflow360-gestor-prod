@@ -22,7 +22,7 @@ import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
 export default function Dashboard() {
   const { activeWorkspace } = useWorkspace();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
+    from: subDays(new Date(), 6),
     to: new Date(),
   });
   const [additionalDateRange, setAdditionalDateRange] = useState<DateRange | undefined>(undefined);
@@ -52,7 +52,7 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, [activeWorkspace?.id]);
 
-  const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 30)), [dateRange?.from]);
+  const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 6)), [dateRange?.from]);
   const endDate = useMemo(() => endOfDay(dateRange?.to || dateRange?.from || new Date()), [dateRange?.to, dateRange?.from]);
 
   const additionalStartDate = useMemo(
