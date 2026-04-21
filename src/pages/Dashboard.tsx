@@ -30,12 +30,26 @@ export default function Dashboard() {
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
   const [selectedOrigin, setSelectedOrigin] = useState<string | null>(null);
 
-  // Reset filtros ao trocar de workspace
+  // Reset filtros + carregar pipeline padrão ao trocar de workspace
   useEffect(() => {
-    setSelectedPipelineId(null);
     setSelectedSellerId(null);
     setSelectedOrigin(null);
     setAdditionalDateRange(undefined);
+    setSelectedPipelineId(null);
+
+    if (!activeWorkspace?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("ghl_dashboard_settings")
+        .select("default_pipeline_ids")
+        .eq("workspace_id", activeWorkspace.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const def = (data?.default_pipeline_ids || [])[0];
+      if (def) setSelectedPipelineId(def);
+    })();
+    return () => { cancelled = true; };
   }, [activeWorkspace?.id]);
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 30)), [dateRange?.from]);
