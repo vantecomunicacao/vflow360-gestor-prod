@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, RefreshCw } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const FUNNEL_BUCKETS = [
   { key: "contato_inicial", label: "Contato Inicial" },
@@ -27,6 +29,8 @@ export default function DashboardSettings() {
   const { activeWorkspace } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ last_sync_at: string | null; last_sync_status: string | null; opportunities_count: number | null } | null>(null);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
 
@@ -47,11 +51,13 @@ export default function DashboardSettings() {
     if (!activeWorkspace?.id) return;
     setLoading(true);
     try {
-      const [{ data: pipes }, { data: fields }, { data: settings }] = await Promise.all([
+      const [{ data: pipes }, { data: fields }, { data: settings }, { data: status }] = await Promise.all([
         supabase.from("ghl_pipelines").select("*").eq("workspace_id", activeWorkspace.id),
         supabase.from("ghl_custom_fields").select("id,ghl_id,name,field_key,data_type").eq("workspace_id", activeWorkspace.id),
         supabase.from("ghl_dashboard_settings").select("*").eq("workspace_id", activeWorkspace.id).maybeSingle(),
+        supabase.from("ghl_sync_status").select("last_sync_at,last_sync_status,opportunities_count").eq("workspace_id", activeWorkspace.id).maybeSingle(),
       ]);
+      setSyncStatus(status as any);
       const ps = (pipes || []).map((p: any) => ({
         id: p.id, ghl_id: p.ghl_id, name: p.name,
         stages: Array.isArray(p.stages) ? p.stages : [],
@@ -98,6 +104,23 @@ export default function DashboardSettings() {
     }
   };
 
+  const syncNow = async () => {
+    if (!activeWorkspace?.id) return;
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke("ghl-sync", {
+        body: { workspace_id: activeWorkspace.id },
+      });
+      if (error) throw error;
+      toast.success("Sincronização concluída", { description: "Pipelines, campos, usuários e oportunidades atualizados." });
+      await loadAll();
+    } catch (e) {
+      toast.error("Erro ao sincronizar", { description: (e as Error).message });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const togglePipeline = (ghl_id: string) => {
     setDefaultPipelines((prev) =>
       prev.includes(ghl_id) ? prev.filter((p) => p !== ghl_id) : [...prev, ghl_id]
@@ -122,15 +145,29 @@ export default function DashboardSettings() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Configurações do Dashboard</h1>
           <p className="text-muted-foreground text-sm">Personalize agregações e campos exibidos por conta</p>
+          {syncStatus?.last_sync_at && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Última sincronização:{" "}
+              {formatDistanceToNow(new Date(syncStatus.last_sync_at), { addSuffix: true, locale: ptBR })}
+              {typeof syncStatus.opportunities_count === "number" && ` · ${syncStatus.opportunities_count} oportunidades`}
+              {syncStatus.last_sync_status === "error" && " · ⚠️ erro"}
+            </p>
+          )}
         </div>
-        <Button onClick={save} disabled={saving}>
-          {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-          Salvar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={syncNow} disabled={syncing || saving}>
+            {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            Sincronizar agora
+          </Button>
+          <Button onClick={save} disabled={saving || syncing}>
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Salvar
+          </Button>
+        </div>
       </div>
 
       {/* Pipelines padrão */}
