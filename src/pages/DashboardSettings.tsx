@@ -104,6 +104,23 @@ export default function DashboardSettings() {
     }
   };
 
+  const syncNow = async () => {
+    if (!activeWorkspace?.id) return;
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke("ghl-sync", {
+        body: { workspace_id: activeWorkspace.id },
+      });
+      if (error) throw error;
+      toast.success("Sincronização concluída", { description: "Pipelines, campos, usuários e oportunidades atualizados." });
+      await loadAll();
+    } catch (e) {
+      toast.error("Erro ao sincronizar", { description: (e as Error).message });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const togglePipeline = (ghl_id: string) => {
     setDefaultPipelines((prev) =>
       prev.includes(ghl_id) ? prev.filter((p) => p !== ghl_id) : [...prev, ghl_id]
