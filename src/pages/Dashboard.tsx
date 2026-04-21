@@ -22,7 +22,7 @@ import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
 export default function Dashboard() {
   const { activeWorkspace } = useWorkspace();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
+    from: subDays(new Date(), 6),
     to: new Date(),
   });
   const [additionalDateRange, setAdditionalDateRange] = useState<DateRange | undefined>(undefined);
