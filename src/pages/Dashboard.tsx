@@ -4,6 +4,7 @@ import { DateRange } from "react-day-picker";
 import { Users, TrendingUp, Target, BarChart3, DollarSign, Receipt } from "lucide-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useGhlData, DashboardFilters } from "@/hooks/useGhlData";
+import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/dashboard/Header";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization";
