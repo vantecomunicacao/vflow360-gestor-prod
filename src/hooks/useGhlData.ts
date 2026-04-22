@@ -97,10 +97,32 @@ export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
     setError(null);
     try {
       if (forceRefresh) {
-        const { error: syncError } = await supabase.functions.invoke("ghl-sync", {
+        // Cooldown client-side de 2min para sync manual por workspace
+        const ckey = `ghl-sync-last:${filters.workspaceId}`;
+        const lastStr = localStorage.getItem(ckey);
+        const last = lastStr ? Number(lastStr) : 0;
+        const elapsed = Date.now() - last;
+        const COOLDOWN = 2 * 60 * 1000;
+        if (last && elapsed < COOLDOWN) {
+          const wait = Math.ceil((COOLDOWN - elapsed) / 1000);
+          toast({
+            title: "Aguarde para sincronizar novamente",
+            description: `Você pode sincronizar novamente em ${wait}s.`,
+          });
+          setIsLoading(false);
+          return;
+        }
+        localStorage.setItem(ckey, String(Date.now()));
+
+        const { data: syncData, error: syncError } = await supabase.functions.invoke("ghl-sync", {
           body: { workspace_id: filters.workspaceId },
         });
-        if (syncError) console.warn("Sync warning:", syncError.message);
+        const syncErrMsg = (syncData as any)?.error;
+        if (syncErrMsg) {
+          toast({ title: "Sincronização", description: syncErrMsg });
+        } else if (syncError) {
+          console.warn("Sync warning:", syncError.message);
+        }
       }
 
       const { data: responseData, error: functionError } = await supabase.functions.invoke("ghl-dashboard", {
