@@ -167,22 +167,66 @@ serve(async (req) => {
     if (oppsErr) throw oppsErr;
     let opps = (oppsRows || []) as any[];
 
+    // GHL custom_fields pode vir como:
+    //   A) Array: [{id, type, fieldValue, fieldValueString, fieldValueArray, fieldValueNumber, ...}]
+    //   B) Objeto: {ghl_id: value} ou {field_key: value} (legado)
+    // Esta função extrai o valor "bruto" de um campo dado um set de chaves possíveis.
+    const extractCfValue = (cf: any, keys: Array<string | null | undefined>): any => {
+      if (!cf) return undefined;
+      const validKeys = keys.filter((k): k is string => !!k && k.length > 0);
+      if (validKeys.length === 0) return undefined;
+
+      if (Array.isArray(cf)) {
+        for (const item of cf) {
+          if (!item || typeof item !== "object") continue;
+          const itemId = item.id || item.fieldId || item.customFieldId || item.key;
+          if (!validKeys.some(k => k === itemId || k === item.fieldKey || k === item.name)) continue;
+          // tenta vários formatos de valor
+          const v =
+            item.fieldValueString ??
+            item.fieldValueArray ??
+            item.fieldValueNumber ??
+            item.fieldValueDate ??
+            item.fieldValue ??
+            item.value;
+          if (v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0) && String(v).trim() !== "") {
+            return v;
+          }
+        }
+        return undefined;
+      }
+
+      // formato objeto
+      for (const k of validKeys) {
+        const v = cf[k];
+        if (v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0) && String(v).trim() !== "") {
+          return v;
+        }
+      }
+      return undefined;
+    };
+
+    const cfValueToString = (v: any): string | null => {
+      if (v == null) return null;
+      if (Array.isArray(v)) return v.length ? v.join(", ") : null;
+      const s = String(v).trim();
+      return s === "" ? null : s;
+    };
+
     // Origem: source nativo ou custom field configurado
     const getOrigin = (o: any): string | null => {
-      if (originFieldName && o.custom_fields) {
-        const cf = o.custom_fields;
-        // procura por id, fieldKey, ou name (case-insensitive)
-        const direct = cf[originFieldName];
-        if (direct) return String(direct);
+      if (originFieldName) {
         const def = customFieldDefs.find(d =>
           d.name?.toLowerCase() === originFieldName.toLowerCase() ||
           d.field_key === originFieldName ||
           d.ghl_id === originFieldName
         );
-        if (def) {
-          const v = cf[def.ghl_id] || cf[def.field_key || ""] || cf[def.name];
-          if (v) return String(v);
-        }
+        const keys = def
+          ? [def.ghl_id, def.field_key, def.name, originFieldName]
+          : [originFieldName];
+        const v = extractCfValue(o.custom_fields, keys);
+        const s = cfValueToString(v);
+        if (s) return s;
       }
       return o.source || null;
     };
