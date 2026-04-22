@@ -106,13 +106,34 @@ export default function DashboardSettings() {
 
   const syncNow = async () => {
     if (!activeWorkspace?.id) return;
+
+    // Cooldown client-side de 2min por workspace
+    const ckey = `ghl-sync-last:${activeWorkspace.id}`;
+    const lastStr = localStorage.getItem(ckey);
+    const last = lastStr ? Number(lastStr) : 0;
+    const elapsed = Date.now() - last;
+    const COOLDOWN = 2 * 60 * 1000;
+    if (last && elapsed < COOLDOWN) {
+      const wait = Math.ceil((COOLDOWN - elapsed) / 1000);
+      toast.warning("Aguarde para sincronizar", {
+        description: `Você pode sincronizar novamente em ${wait}s.`,
+      });
+      return;
+    }
+    localStorage.setItem(ckey, String(Date.now()));
+
     setSyncing(true);
     try {
-      const { error } = await supabase.functions.invoke("ghl-sync", {
+      const { data, error } = await supabase.functions.invoke("ghl-sync", {
         body: { workspace_id: activeWorkspace.id },
       });
       if (error) throw error;
-      toast.success("Sincronização concluída", { description: "Pipelines, campos, usuários e oportunidades atualizados." });
+      const errMsg = (data as any)?.error;
+      if (errMsg) {
+        toast.warning("Sincronização", { description: errMsg });
+      } else {
+        toast.success("Sincronização concluída", { description: "Pipelines, campos, usuários e oportunidades atualizados." });
+      }
       await loadAll();
     } catch (e) {
       toast.error("Erro ao sincronizar", { description: (e as Error).message });
