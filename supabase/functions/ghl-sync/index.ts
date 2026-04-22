@@ -234,10 +234,10 @@ serve(async (req) => {
           (Array.isArray(lrResp) ? lrResp : []);
         if (Array.isArray(reasons) && reasons.length) {
           const rows = reasons
-            .filter((r: any) => r && r.id)
+            .filter((r: any) => r && (r.id || r._id))
             .map((r: any) => ({
               workspace_id: workspaceId,
-              ghl_id: r.id,
+              ghl_id: r.id || r._id,
               name: r.name || r.reason || "Sem nome",
               updated_at: new Date().toISOString(),
             }));
