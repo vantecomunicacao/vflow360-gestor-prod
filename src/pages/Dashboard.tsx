@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { subDays, startOfDay, endOfDay, differenceInDays } from "date-fns";
 import { DateRange } from "react-day-picker";
-import { Users, TrendingUp, Target, BarChart3, DollarSign, Receipt } from "lucide-react";
+import { Users, TrendingUp, Target, BarChart3 } from "lucide-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useGhlData, DashboardFilters } from "@/hooks/useGhlData";
 import { supabase } from "@/integrations/supabase/client";
@@ -96,8 +96,6 @@ export default function Dashboard() {
   if (!data) return <ErrorState error="Sem dados. Clique em Atualizar agora para sincronizar com o GHL." onRetry={() => refetch(true)} />;
 
   const formatPercentage = (v: number) => `${v.toFixed(1)}%`;
-  const formatCurrency = (v: number) =>
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
   const calcTrend = (cur: number, prev: number) => {
     if (prev === 0) return cur > 0 ? { value: 100, isPositive: true } : undefined;
     const ch = ((cur - prev) / prev) * 100;
@@ -152,25 +150,6 @@ export default function Dashboard() {
         <MetricCard title="Vendas Ganhas" value={currentWon} subtitle="no período" icon={Target} variant="success" tooltip="Oportunidades que chegaram à etapa de venda ganha no período." trend={wonTrend} />
         <MetricCard title="Em Negociação" value={currentNeg} subtitle="propostas + fechamento" icon={BarChart3} variant="accent" tooltip="Soma das oportunidades nas etapas de proposta e fechamento." trend={negTrend} />
         <MetricCard title="Taxa de Conversão" value={formatPercentage(data.conversionRates.overallConversion)} subtitle="do funil completo" icon={TrendingUp} variant="accent" tooltip="Percentual da primeira etapa até venda ganha." trend={convTrend} />
-      </AnimatedSection>
-
-      <AnimatedSection className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-5" delay={0.03}>
-        <MetricCard
-          title="Receita Ganha"
-          value={formatCurrency(data.wonMonetary || 0)}
-          subtitle={`${currentWon} ${currentWon === 1 ? "venda" : "vendas"} no período`}
-          icon={DollarSign}
-          variant="success"
-          tooltip="Soma do valor monetário das oportunidades ganhas no período."
-        />
-        <MetricCard
-          title="Ticket Médio"
-          value={formatCurrency(currentWon > 0 ? (data.wonMonetary || 0) / currentWon : 0)}
-          subtitle="por venda ganha"
-          icon={Receipt}
-          variant="accent"
-          tooltip="Receita ganha dividida pelo número de vendas ganhas."
-        />
       </AnimatedSection>
 
       <AnimatedSection className="grid grid-cols-1 gap-5 lg:gap-6" delay={0.05}>
