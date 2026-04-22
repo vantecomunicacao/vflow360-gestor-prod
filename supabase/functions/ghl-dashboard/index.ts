@@ -378,9 +378,19 @@ serve(async (req) => {
 
     // ===== Custom fields fill rate =====
     // visible_custom_fields pode conter ghl_id, field_key ou name (legado)
-    const visibleFieldKeys: string[] = settings?.visible_custom_fields?.length
+    // visible_custom_fields pode conter ghl_id, field_key ou name (legado)
+    // Filtra apenas campos do modelo "opportunity" — campos de contato não são salvos em ghl_opportunities.custom_fields
+    const isOpportunityField = (key: string) => {
+      const def = customFieldDefs.find(d => d.ghl_id === key)
+        || customFieldDefs.find(d => d.field_key === key)
+        || customFieldDefs.find(d => d.name === key);
+      if (!def) return false;
+      return (def.model || "").toLowerCase() === "opportunity";
+    };
+    const rawVisibleFieldKeys: string[] = settings?.visible_custom_fields?.length
       ? settings.visible_custom_fields
-      : customFieldDefs.slice(0, 8).map(f => f.ghl_id);
+      : customFieldDefs.filter(f => (f.model || "").toLowerCase() === "opportunity").slice(0, 8).map(f => f.ghl_id);
+    const visibleFieldKeys = rawVisibleFieldKeys.filter(isOpportunityField);
     const customFields = visibleFieldKeys.map((key) => {
       const def = customFieldDefs.find(d => d.ghl_id === key)
         || customFieldDefs.find(d => d.field_key === key)
