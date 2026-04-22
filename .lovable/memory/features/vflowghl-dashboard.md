@@ -20,7 +20,7 @@ type: feature
 - `admin-users` (admin only): list_users, create_user, update_password, delete_user, set_role, add_to_workspace, remove_from_workspace.
 - `admin-bootstrap`: usuário autenticado se promove a admin master se nenhum existir.
 
-**Cron**: pg_cron schedules `ghl-sync-morning` (06h UTC) e `ghl-sync-evening` (18h UTC) chamando `trigger_ghl_sync_all()` que lê `service_role_key` do vault e dispara `ghl-sync` para cada workspace com integration GHL conectada.
+**Cron**: pg_cron schedules `ghl-sync-midnight` (00h UTC) e `ghl-sync-noon` (12h UTC) chamando `trigger_ghl_sync_all()` que lê `service_role_key` do vault e dispara `ghl-sync` para cada workspace com integration GHL conectada. Sync manual tem cooldown de 2min (client-side localStorage + server-side via `last_sync_at`) e bloqueio se `is_running` (auto-recovery após 10min travado). Retorna 429 com `code: COOLDOWN | ALREADY_RUNNING`.
 
 **Páginas**:
 - `/dashboard` — lê de `ghl_opportunities` via `ghl-dashboard`. Botão "Atualizar agora" invoca `ghl-sync`. Health badge baseado em idade do `last_sync_at`.
