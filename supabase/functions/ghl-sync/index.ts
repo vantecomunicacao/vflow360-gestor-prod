@@ -216,22 +216,48 @@ serve(async (req) => {
     }
 
     // === 4. Lost reasons ===
-    try {
-      const lrResp = await ghlFetch(`/opportunities/loss-reason?locationId=${locationId}`, creds);
-      const reasons = lrResp?.lostReasons || lrResp?.loss_reasons || lrResp?.lossReasons || [];
-      if (reasons.length) {
-        const rows = reasons.map((r: any) => ({
-          workspace_id: workspaceId,
-          ghl_id: r.id,
-          name: r.name || r.reason || "Sem nome",
-          updated_at: new Date().toISOString(),
-        }));
-        const { error } = await supabase.from("ghl_loss_reasons")
-          .upsert(rows, { onConflict: "workspace_id,ghl_id" });
-        if (error) throw error;
+    // GHL API v2 endpoint correto: /opportunities/loss-reasons (plural) com location_id
+    // Tentamos várias variações por compatibilidade.
+    const lossReasonEndpoints = [
+      `/opportunities/loss-reasons?location_id=${locationId}`,
+      `/opportunities/loss-reasons?locationId=${locationId}`,
+      `/opportunities/lost-reasons?location_id=${locationId}`,
+      `/opportunities/lost-reasons?locationId=${locationId}`,
+    ];
+    let lossReasonsFetched = false;
+    for (const ep of lossReasonEndpoints) {
+      try {
+        const lrResp = await ghlFetch(ep, creds);
+        const reasons =
+          lrResp?.lostReasons ||
+          lrResp?.loss_reasons ||
+          lrResp?.lossReasons ||
+          lrResp?.data ||
+          (Array.isArray(lrResp) ? lrResp : []);
+        if (Array.isArray(reasons) && reasons.length) {
+          const rows = reasons
+            .filter((r: any) => r && r.id)
+            .map((r: any) => ({
+              workspace_id: workspaceId,
+              ghl_id: r.id,
+              name: r.name || r.reason || "Sem nome",
+              updated_at: new Date().toISOString(),
+            }));
+          if (rows.length) {
+            const { error } = await supabase.from("ghl_loss_reasons")
+              .upsert(rows, { onConflict: "workspace_id,ghl_id" });
+            if (error) throw error;
+            console.log(`loss reasons synced via ${ep}: ${rows.length}`);
+            lossReasonsFetched = true;
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn(`loss reasons attempt failed (${ep}):`, (e as Error).message);
       }
-    } catch (e) {
-      console.warn("loss reasons sync failed:", (e as Error).message);
+    }
+    if (!lossReasonsFetched) {
+      console.warn("loss reasons: nenhum endpoint funcionou — fallback usará nomes vindos das oportunidades.");
     }
 
     // === 5. Opportunities (paginação) ===
