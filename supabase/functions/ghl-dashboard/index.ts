@@ -272,12 +272,11 @@ serve(async (req) => {
         return null;
       };
       opps = opps.filter((o) => {
-        const cf = o.custom_fields || {};
-        // tenta ghl_id, field_key e name
-        const raw =
-          cf[additionalDateFieldId] ??
-          (additionalDateFieldDef?.field_key ? cf[additionalDateFieldDef.field_key] : undefined) ??
-          (additionalDateFieldDef?.name ? cf[additionalDateFieldDef.name] : undefined);
+        const raw = extractCfValue(o.custom_fields, [
+          additionalDateFieldId,
+          additionalDateFieldDef?.field_key,
+          additionalDateFieldDef?.name,
+        ]);
         const t = parseDateVal(raw);
         if (t === null) return false;
         return t >= addStart && t <= addEnd;
