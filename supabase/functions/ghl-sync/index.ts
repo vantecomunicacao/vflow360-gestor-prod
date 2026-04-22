@@ -216,13 +216,13 @@ serve(async (req) => {
     }
 
     // === 4. Lost reasons ===
-    // GHL API v2 endpoint correto: /opportunities/loss-reasons (plural) com location_id
-    // Tentamos várias variações por compatibilidade.
+    // GHL API v2 endpoint correto: /opportunities/lost-reason (SINGULAR!)
+    // Doc: https://marketplace.gohighlevel.com/docs/ghl/opportunities/get-lost-reason
     const lossReasonEndpoints = [
+      `/opportunities/lost-reason?location_id=${locationId}`,
+      `/opportunities/lost-reason?locationId=${locationId}`,
       `/opportunities/loss-reasons?location_id=${locationId}`,
       `/opportunities/loss-reasons?locationId=${locationId}`,
-      `/opportunities/lost-reasons?location_id=${locationId}`,
-      `/opportunities/lost-reasons?locationId=${locationId}`,
     ];
     let lossReasonsFetched = false;
     for (const ep of lossReasonEndpoints) {
