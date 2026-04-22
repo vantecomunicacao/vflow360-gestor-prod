@@ -96,8 +96,6 @@ export default function Dashboard() {
   if (!data) return <ErrorState error="Sem dados. Clique em Atualizar agora para sincronizar com o GHL." onRetry={() => refetch(true)} />;
 
   const formatPercentage = (v: number) => `${v.toFixed(1)}%`;
-  const formatCurrency = (v: number) =>
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
   const calcTrend = (cur: number, prev: number) => {
     if (prev === 0) return cur > 0 ? { value: 100, isPositive: true } : undefined;
     const ch = ((cur - prev) / prev) * 100;
