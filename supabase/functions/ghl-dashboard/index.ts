@@ -388,11 +388,13 @@ serve(async (req) => {
       const displayName = def?.name || key;
       let filled = 0;
       for (const o of opps) {
-        const cf = o.custom_fields || {};
-        const val =
-          (def && (cf[def.ghl_id] || cf[def.field_key || ""] || cf[def.name])) ||
-          cf[key];
-        if (val != null && String(val).trim() !== "") filled++;
+        const val = extractCfValue(o.custom_fields, [
+          def?.ghl_id,
+          def?.field_key,
+          def?.name,
+          key,
+        ]);
+        if (cfValueToString(val) !== null) filled++;
       }
       const filledPercentage = safeRate(filled, totalLeads);
       return {
