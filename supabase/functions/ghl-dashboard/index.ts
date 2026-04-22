@@ -334,22 +334,26 @@ serve(async (req) => {
     const wonOrigemFillRate = safeRate(wonOriginsFilled, wonOpps.length);
 
     // ===== Custom fields fill rate =====
-    const visibleFields: string[] = settings?.visible_custom_fields?.length
+    // visible_custom_fields pode conter ghl_id, field_key ou name (legado)
+    const visibleFieldKeys: string[] = settings?.visible_custom_fields?.length
       ? settings.visible_custom_fields
-      : customFieldDefs.slice(0, 8).map(f => f.name);
-    const customFields = visibleFields.map((fname) => {
-      const def = customFieldDefs.find(d => d.name === fname);
+      : customFieldDefs.slice(0, 8).map(f => f.ghl_id);
+    const customFields = visibleFieldKeys.map((key) => {
+      const def = customFieldDefs.find(d => d.ghl_id === key)
+        || customFieldDefs.find(d => d.field_key === key)
+        || customFieldDefs.find(d => d.name === key);
+      const displayName = def?.name || key;
       let filled = 0;
       for (const o of opps) {
         const cf = o.custom_fields || {};
         const val =
           (def && (cf[def.ghl_id] || cf[def.field_key || ""] || cf[def.name])) ||
-          cf[fname];
+          cf[key];
         if (val != null && String(val).trim() !== "") filled++;
       }
       const filledPercentage = safeRate(filled, totalLeads);
       return {
-        name: fname,
+        name: displayName,
         filledPercentage,
         emptyPercentage: 100 - filledPercentage,
         totalLeads,
