@@ -216,13 +216,13 @@ serve(async (req) => {
     }
 
     // === 4. Lost reasons ===
-    // GHL API v2 endpoint correto: /opportunities/loss-reasons (plural) com location_id
-    // Tentamos várias variações por compatibilidade.
+    // GHL API v2 endpoint correto: /opportunities/lost-reason (SINGULAR!)
+    // Doc: https://marketplace.gohighlevel.com/docs/ghl/opportunities/get-lost-reason
     const lossReasonEndpoints = [
+      `/opportunities/lost-reason?location_id=${locationId}`,
+      `/opportunities/lost-reason?locationId=${locationId}`,
       `/opportunities/loss-reasons?location_id=${locationId}`,
       `/opportunities/loss-reasons?locationId=${locationId}`,
-      `/opportunities/lost-reasons?location_id=${locationId}`,
-      `/opportunities/lost-reasons?locationId=${locationId}`,
     ];
     let lossReasonsFetched = false;
     for (const ep of lossReasonEndpoints) {
@@ -325,49 +325,9 @@ serve(async (req) => {
       else console.log(`loss reasons fallback from opps: ${fallbackRows.length}`);
     }
 
-    // === 7. Para os IDs ainda sem nome, busca individualmente cada motivo ===
-    try {
-      const { data: missing } = await supabase
-        .from("ghl_opportunities")
-        .select("lost_reason_id")
-        .eq("workspace_id", workspaceId)
-        .not("lost_reason_id", "is", null);
-      const allIds = Array.from(new Set((missing || []).map((m: any) => m.lost_reason_id).filter(Boolean)));
-      const { data: existing } = await supabase
-        .from("ghl_loss_reasons")
-        .select("ghl_id")
-        .eq("workspace_id", workspaceId);
-      const existingSet = new Set((existing || []).map((r: any) => r.ghl_id));
-      const toFetch = allIds.filter((id) => !existingSet.has(id));
-      if (toFetch.length) {
-        console.log(`Fetching ${toFetch.length} loss reasons individually...`);
-        const fetchedRows: any[] = [];
-        for (const id of toFetch.slice(0, 50)) { // safety cap
-          try {
-            const r: any = await ghlFetch(`/opportunities/loss-reasons/${id}?location_id=${locationId}`, creds);
-            const data = r?.lossReason || r?.lostReason || r?.data || r;
-            const nm = data?.name || data?.reason;
-            if (nm) {
-              fetchedRows.push({
-                workspace_id: workspaceId,
-                ghl_id: id,
-                name: nm,
-                updated_at: new Date().toISOString(),
-              });
-            }
-          } catch (_) {
-            // ignore individual failures
-          }
-        }
-        if (fetchedRows.length) {
-          await supabase.from("ghl_loss_reasons")
-            .upsert(fetchedRows, { onConflict: "workspace_id,ghl_id" });
-          console.log(`Fetched ${fetchedRows.length} loss reasons individually.`);
-        }
-      }
-    } catch (e) {
-      console.warn("individual loss reason fetch failed:", (e as Error).message);
-    }
+    // === 7. (removido) ===
+    // O endpoint individual /opportunities/lost-reason/{id} não existe na API GHL v2.
+    // Os motivos vêm pela listagem (passo 4) e pelo fallback dos próprios opportunities (passo 6).
 
     const duration = Date.now() - startTs;
     await supabase.from("ghl_sync_status").upsert({
