@@ -84,6 +84,42 @@ serve(async (req) => {
       if (!isMember) throw new Error("Forbidden: not a member of this workspace");
     }
 
+    // Rate limiting: bloqueia se já está rodando OU se sync manual foi há menos de 2min
+    // (cron via SERVICE_ROLE ignora o cooldown de 2min)
+    const { data: currentStatus } = await supabase
+      .from("ghl_sync_status")
+      .select("is_running, last_sync_at, updated_at")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+
+    if (currentStatus?.is_running) {
+      // Auto-recovery: se está "rodando" há mais de 10min, considera travado e libera
+      const updatedAt = currentStatus.updated_at ? new Date(currentStatus.updated_at).getTime() : 0;
+      const stuckMs = Date.now() - updatedAt;
+      if (stuckMs < 10 * 60 * 1000) {
+        return new Response(
+          JSON.stringify({ error: "Sincronização já em andamento. Aguarde a conclusão.", code: "ALREADY_RUNNING" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    if (!isServiceRole && currentStatus?.last_sync_at) {
+      const elapsedMs = Date.now() - new Date(currentStatus.last_sync_at).getTime();
+      const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutos
+      if (elapsedMs < COOLDOWN_MS) {
+        const waitSec = Math.ceil((COOLDOWN_MS - elapsedMs) / 1000);
+        return new Response(
+          JSON.stringify({
+            error: `Aguarde ${waitSec}s antes de sincronizar novamente.`,
+            code: "COOLDOWN",
+            retryAfterSec: waitSec,
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     // Marca sync como rodando
     await supabase.from("ghl_sync_status").upsert({
       workspace_id: workspaceId,
