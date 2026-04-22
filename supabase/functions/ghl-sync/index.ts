@@ -216,13 +216,11 @@ serve(async (req) => {
     }
 
     // === 4. Lost reasons ===
-    // GHL API v2 endpoint correto: /opportunities/lost-reason (SINGULAR!)
+    // GHL API v2 endpoint: /opportunities/lost-reason?locationId=XXX (camelCase!)
     // Doc: https://marketplace.gohighlevel.com/docs/ghl/opportunities/get-lost-reason
+    // Importante: o parâmetro DEVE ser locationId (camelCase). location_id retorna 400.
     const lossReasonEndpoints = [
-      `/opportunities/lost-reason?location_id=${locationId}`,
       `/opportunities/lost-reason?locationId=${locationId}`,
-      `/opportunities/loss-reasons?location_id=${locationId}`,
-      `/opportunities/loss-reasons?locationId=${locationId}`,
     ];
     let lossReasonsFetched = false;
     for (const ep of lossReasonEndpoints) {
@@ -236,10 +234,10 @@ serve(async (req) => {
           (Array.isArray(lrResp) ? lrResp : []);
         if (Array.isArray(reasons) && reasons.length) {
           const rows = reasons
-            .filter((r: any) => r && r.id)
+            .filter((r: any) => r && (r.id || r._id))
             .map((r: any) => ({
               workspace_id: workspaceId,
-              ghl_id: r.id,
+              ghl_id: r.id || r._id,
               name: r.name || r.reason || "Sem nome",
               updated_at: new Date().toISOString(),
             }));
