@@ -266,6 +266,8 @@ serve(async (req) => {
     const maxPages = 50; // safety: 5000 opportunities
     let nextPageUrl: string | null = null;
     let page = 0;
+    // Fallback: coleta nomes de motivos de perda direto das oportunidades
+    const lostReasonsFromOpps = new Map<string, string>();
 
     do {
       page++;
@@ -275,27 +277,32 @@ serve(async (req) => {
       const resp: any = await ghlFetch(url, creds);
       const opps: any[] = resp?.opportunities || [];
       if (opps.length) {
-        const rows = opps.map((o: any) => ({
-          workspace_id: workspaceId,
-          ghl_id: o.id,
-          name: o.name || null,
-          pipeline_id: o.pipelineId || null,
-          stage_id: o.pipelineStageId || o.stageId || null,
-          status: o.status || null,
-          monetary_value: typeof o.monetaryValue === "number" ? o.monetaryValue : null,
-          source: o.source || null,
-          contact_id: o.contactId || o.contact?.id || null,
-          contact_name: o.contact?.name || null,
-          contact_phone: o.contact?.phone || null,
-          contact_email: o.contact?.email || null,
-          assigned_to: o.assignedTo || null,
-          lost_reason_id: o.lostReasonId || null,
-          custom_fields: o.customFields || {},
-          ghl_created_at: o.createdAt || o.dateAdded || null,
-          ghl_updated_at: o.updatedAt || null,
-          last_status_change_at: o.lastStatusChangeAt || o.lastStageChangeAt || null,
-          updated_at: new Date().toISOString(),
-        }));
+        const rows = opps.map((o: any) => {
+          const lostId = o.lostReasonId || o.lost_reason_id || o.lostReason?.id || null;
+          const lostName = o.lostReasonName || o.lost_reason_name || o.lostReason?.name || null;
+          if (lostId && lostName) lostReasonsFromOpps.set(lostId, lostName);
+          return {
+            workspace_id: workspaceId,
+            ghl_id: o.id,
+            name: o.name || null,
+            pipeline_id: o.pipelineId || null,
+            stage_id: o.pipelineStageId || o.stageId || null,
+            status: o.status || null,
+            monetary_value: typeof o.monetaryValue === "number" ? o.monetaryValue : null,
+            source: o.source || null,
+            contact_id: o.contactId || o.contact?.id || null,
+            contact_name: o.contact?.name || null,
+            contact_phone: o.contact?.phone || null,
+            contact_email: o.contact?.email || null,
+            assigned_to: o.assignedTo || null,
+            lost_reason_id: lostId,
+            custom_fields: o.customFields || {},
+            ghl_created_at: o.createdAt || o.dateAdded || null,
+            ghl_updated_at: o.updatedAt || null,
+            last_status_change_at: o.lastStatusChangeAt || o.lastStageChangeAt || null,
+            updated_at: new Date().toISOString(),
+          };
+        });
         const { error } = await supabase.from("ghl_opportunities")
           .upsert(rows, { onConflict: "workspace_id,ghl_id" });
         if (error) throw error;
@@ -303,6 +310,64 @@ serve(async (req) => {
       }
       nextPageUrl = resp?.meta?.nextPageUrl || null;
     } while (nextPageUrl && page < maxPages);
+
+    // === 6. Persiste motivos de perda capturados das oportunidades (fallback) ===
+    if (lostReasonsFromOpps.size > 0) {
+      const fallbackRows = Array.from(lostReasonsFromOpps.entries()).map(([id, name]) => ({
+        workspace_id: workspaceId,
+        ghl_id: id,
+        name,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error: lrErr } = await supabase.from("ghl_loss_reasons")
+        .upsert(fallbackRows, { onConflict: "workspace_id,ghl_id" });
+      if (lrErr) console.warn("loss reasons fallback upsert failed:", lrErr.message);
+      else console.log(`loss reasons fallback from opps: ${fallbackRows.length}`);
+    }
+
+    // === 7. Para os IDs ainda sem nome, busca individualmente cada motivo ===
+    try {
+      const { data: missing } = await supabase
+        .from("ghl_opportunities")
+        .select("lost_reason_id")
+        .eq("workspace_id", workspaceId)
+        .not("lost_reason_id", "is", null);
+      const allIds = Array.from(new Set((missing || []).map((m: any) => m.lost_reason_id).filter(Boolean)));
+      const { data: existing } = await supabase
+        .from("ghl_loss_reasons")
+        .select("ghl_id")
+        .eq("workspace_id", workspaceId);
+      const existingSet = new Set((existing || []).map((r: any) => r.ghl_id));
+      const toFetch = allIds.filter((id) => !existingSet.has(id));
+      if (toFetch.length) {
+        console.log(`Fetching ${toFetch.length} loss reasons individually...`);
+        const fetchedRows: any[] = [];
+        for (const id of toFetch.slice(0, 50)) { // safety cap
+          try {
+            const r: any = await ghlFetch(`/opportunities/loss-reasons/${id}?location_id=${locationId}`, creds);
+            const data = r?.lossReason || r?.lostReason || r?.data || r;
+            const nm = data?.name || data?.reason;
+            if (nm) {
+              fetchedRows.push({
+                workspace_id: workspaceId,
+                ghl_id: id,
+                name: nm,
+                updated_at: new Date().toISOString(),
+              });
+            }
+          } catch (_) {
+            // ignore individual failures
+          }
+        }
+        if (fetchedRows.length) {
+          await supabase.from("ghl_loss_reasons")
+            .upsert(fetchedRows, { onConflict: "workspace_id,ghl_id" });
+          console.log(`Fetched ${fetchedRows.length} loss reasons individually.`);
+        }
+      }
+    } catch (e) {
+      console.warn("individual loss reason fetch failed:", (e as Error).message);
+    }
 
     const duration = Date.now() - startTs;
     await supabase.from("ghl_sync_status").upsert({
