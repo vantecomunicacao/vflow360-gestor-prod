@@ -21,7 +21,7 @@ const FUNNEL_BUCKETS = [
 
 interface Stage { id: string; name: string; }
 interface Pipeline { id: string; ghl_id: string; name: string; stages: Stage[]; }
-interface CustomField { id: string; ghl_id: string; name: string; field_key: string | null; data_type?: string | null; }
+interface CustomField { id: string; ghl_id: string; name: string; field_key: string | null; data_type?: string | null; model?: string | null; }
 
 const DATE_TYPES = ["DATE", "DATETIME", "DATE_TIME", "date", "datetime", "Date", "DateTime"];
 
@@ -53,7 +53,7 @@ export default function DashboardSettings() {
     try {
       const [{ data: pipes }, { data: fields }, { data: settings }, { data: status }] = await Promise.all([
         supabase.from("ghl_pipelines").select("*").eq("workspace_id", activeWorkspace.id),
-        supabase.from("ghl_custom_fields").select("id,ghl_id,name,field_key,data_type").eq("workspace_id", activeWorkspace.id),
+        supabase.from("ghl_custom_fields").select("id,ghl_id,name,field_key,data_type,model").eq("workspace_id", activeWorkspace.id),
         supabase.from("ghl_dashboard_settings").select("*").eq("workspace_id", activeWorkspace.id).maybeSingle(),
         supabase.from("ghl_sync_status").select("last_sync_at,last_sync_status,opportunities_count").eq("workspace_id", activeWorkspace.id).maybeSingle(),
       ]);
@@ -313,20 +313,37 @@ export default function DashboardSettings() {
       <Card>
         <CardHeader>
           <CardTitle>Campos customizados visíveis</CardTitle>
-          <CardDescription>Quais campos contam na seção de Qualidade dos Dados</CardDescription>
+          <CardDescription>
+            Quais campos contam na seção de Qualidade dos Dados. Apenas campos de <strong>Oportunidade</strong> são exibidos
+            — campos de Contato não são salvos nas oportunidades do GHL e apareceriam sempre como 0% preenchidos.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 max-h-96 overflow-y-auto">
-          {customFields.map((f) => (
-            <label key={f.id} className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={visibleFields.includes(f.ghl_id)}
-                onCheckedChange={() => toggleField(f.ghl_id)}
-              />
-              <span>{f.name}</span>
-              {f.field_key && <span className="text-xs text-muted-foreground">({f.field_key})</span>}
-            </label>
-          ))}
-          {customFields.length === 0 && <p className="text-sm text-muted-foreground">Nenhum campo customizado sincronizado.</p>}
+          {(() => {
+            const oppFields = customFields.filter((f) => (f.model || "").toLowerCase() === "opportunity");
+            if (oppFields.length === 0) {
+              return <p className="text-sm text-muted-foreground">Nenhum campo customizado de oportunidade sincronizado.</p>;
+            }
+            return oppFields.map((f) => (
+              <label key={f.id} className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={visibleFields.includes(f.ghl_id)}
+                  onCheckedChange={() => toggleField(f.ghl_id)}
+                />
+                <span>{f.name}</span>
+                {f.field_key && <span className="text-xs text-muted-foreground">({f.field_key})</span>}
+                {f.data_type && <span className="text-xs text-muted-foreground">[{f.data_type}]</span>}
+              </label>
+            ));
+          })()}
+          {visibleFields.some((id) => {
+            const f = customFields.find((c) => c.ghl_id === id);
+            return f && (f.model || "").toLowerCase() !== "opportunity";
+          }) && (
+            <p className="text-xs text-warning mt-3">
+              ⚠ Há campos de Contato selecionados nas suas configurações antigas. Eles aparecerão sempre como 0%. Remova-os e selecione campos de Oportunidade.
+            </p>
+          )}
         </CardContent>
       </Card>
 
