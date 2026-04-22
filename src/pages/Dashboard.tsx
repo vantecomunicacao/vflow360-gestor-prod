@@ -15,6 +15,7 @@ import { SalesOrigins } from "@/components/dashboard/SalesOrigins";
 import { DataQuality } from "@/components/dashboard/DataQuality";
 import { LossReasons } from "@/components/dashboard/LossReasons";
 import { DailyLeads } from "@/components/dashboard/DailyLeads";
+import { AIInsights } from "@/components/dashboard/AIInsights";
 import { LoadingState } from "@/components/dashboard/LoadingState";
 import { ErrorState } from "@/components/dashboard/ErrorState";
 import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
@@ -152,13 +153,18 @@ export default function Dashboard() {
         <MetricCard title="Taxa de Conversão" value={formatPercentage(data.conversionRates.overallConversion)} subtitle="do funil completo" icon={TrendingUp} variant="accent" tooltip="Percentual da primeira etapa até venda ganha." trend={convTrend} />
       </AnimatedSection>
 
-      <AnimatedSection className="grid grid-cols-1 gap-5 lg:gap-6" delay={0.05}>
-        <FunnelVisualization
-          funnelStages={data.funnelStages}
-          conversionRates={data.conversionRates}
-          lostLeads={data.lostLeads || 0}
-          lostLeadsDetail={data.lostLeadsDetail || []}
-        />
+      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
+        <div className="lg:col-span-2">
+          <FunnelVisualization
+            funnelStages={data.funnelStages}
+            conversionRates={data.conversionRates}
+            lostLeads={data.lostLeads || 0}
+            lostLeadsDetail={data.lostLeadsDetail || []}
+          />
+        </div>
+        <div className="lg:col-span-1">
+          <AIInsights />
+        </div>
       </AnimatedSection>
 
       <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
