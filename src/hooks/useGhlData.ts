@@ -30,7 +30,8 @@ export interface AverageTimePerStage {
   propostaEnviada: number;
   fechamento: number;
 }
-export interface Pipeline { id: string; name: string; }
+export interface PipelineStage { id: string; name: string; }
+export interface Pipeline { id: string; name: string; stages?: PipelineStage[]; }
 export interface User { id: string; name: string; }
 export interface DailyLead { date: string; count: number; dayName: string; }
 export interface LossReason { reason: string; count: number; }
@@ -74,6 +75,7 @@ export interface DashboardFilters {
   startDate: Date;
   endDate: Date;
   pipelineId: string | null;
+  stageId: string | null;
   sellerId: string | null;
   sourceOrigin: string | null;
   workspaceId: string | null;
@@ -139,6 +141,7 @@ export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
           startDate: filters.startDate.toISOString(),
           endDate: filters.endDate.toISOString(),
           pipelineId: filters.pipelineId,
+          stageId: filters.stageId,
           sellerId: filters.sellerId,
           sourceOrigin: filters.sourceOrigin,
           additionalStartDate: filters.additionalStartDate ? filters.additionalStartDate.toISOString() : null,
@@ -161,7 +164,7 @@ export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.startDate.getTime(), filters.endDate.getTime(),
-    filters.pipelineId, filters.sellerId, filters.sourceOrigin, filters.workspaceId,
+    filters.pipelineId, filters.stageId, filters.sellerId, filters.sourceOrigin, filters.workspaceId,
     filters.additionalStartDate?.getTime(), filters.additionalEndDate?.getTime(),
   ]);
 
