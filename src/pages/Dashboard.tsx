@@ -168,18 +168,18 @@ export default function Dashboard() {
         </div>
       </AnimatedSection>
 
-      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
+      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
         <LeadOrigins leadOrigins={data.origemDistribution} fillRate={data.origemFillRate} />
         <SalesOrigins
           wonOrigins={data.wonOrigemDistribution || []}
           fillRate={data.wonOrigemFillRate || 0}
           totalWon={data.funnelStages.find((s) => s.id === "venda_ganha")?.count || 0}
         />
+        <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
       </AnimatedSection>
 
-      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
+      <AnimatedSection delay={0.05}>
         <DataQuality customFields={data.customFields} overallFillRate={data.overallFillRate} />
-        <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
       </AnimatedSection>
 
       {data.customFieldDistributions && data.customFieldDistributions.length > 0 && (
