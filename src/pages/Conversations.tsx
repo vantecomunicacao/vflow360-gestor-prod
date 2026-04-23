@@ -3,6 +3,7 @@ import { MessageSquare, Search, Link2, Phone, Sparkles, Loader2, Trash2, Refresh
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,7 @@ interface Message {
 const Conversations = () => {
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [search, setSearch] = useState("");
+  const [integrationFilter, setIntegrationFilter] = useState<string>("all");
   const [analyzing, setAnalyzing] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,10 +182,32 @@ const Conversations = () => {
     }
   };
 
+  // Lista de instâncias (números conectados) com base nas conversas atuais do workspace
+  const integrationOptions = Array.from(
+    new Set(
+      conversations
+        .map((c) => c.integration_label || (c.integration_type === "stevo" ? "Stevo" : c.integration_type === "uazap" ? "Uazap" : null))
+        .filter((v): v is string => !!v)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  const matchesIntegration = (c: Conversation) => {
+    if (integrationFilter === "all") return true;
+    const label = c.integration_label || (c.integration_type === "stevo" ? "Stevo" : c.integration_type === "uazap" ? "Uazap" : null);
+    return label === integrationFilter;
+  };
+
   const filtered = conversations.filter(c =>
-    (c.contact_name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (c.contact_phone || "").includes(search)
+    matchesIntegration(c) &&
+    ((c.contact_name || "").toLowerCase().includes(search.toLowerCase()) ||
+     (c.contact_phone || "").includes(search))
   );
+
+  // Reset seleção se a conversa selecionada não pertencer à instância filtrada
+  useEffect(() => {
+    if (selected && !matchesIntegration(selected)) setSelected(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [integrationFilter]);
 
   const formatTime = (dateStr: string | null) => {
     if (!dateStr) return "";
@@ -227,11 +251,24 @@ const Conversations = () => {
       <div className="flex gap-4 h-[calc(100%-4rem)]">
         {/* Contact List */}
         <div className="w-80 shrink-0 glass-card flex flex-col">
-          <div className="p-3 border-b border-border">
+          <div className="p-3 border-b border-border space-y-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input placeholder="Buscar contato..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+            {integrationOptions.length > 0 && (
+              <Select value={integrationFilter} onValueChange={setIntegrationFilter}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Todos os números" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os números</SelectItem>
+                  {integrationOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="flex-1 overflow-auto">
             {filtered.length === 0 ? (
