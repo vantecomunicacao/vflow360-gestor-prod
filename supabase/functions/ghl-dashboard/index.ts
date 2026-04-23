@@ -66,6 +66,7 @@ serve(async (req) => {
     const startDate: string | null = payload.startDate || null;
     const endDate: string | null = payload.endDate || null;
     const filterPipelineId: string | null = payload.pipelineId || null;
+    const filterStageId: string | null = payload.stageId || null;
     const filterUserId: string | null = payload.sellerId || null;
     const filterOrigin: string | null = payload.sourceOrigin || null;
     const additionalStartDate: string | null = payload.additionalStartDate || null;
@@ -160,6 +161,7 @@ serve(async (req) => {
       .eq("workspace_id", workspaceId)
       .limit(10000);
     if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
+    if (filterStageId) q = q.eq("stage_id", filterStageId);
     if (filterUserId) q = q.eq("assigned_to", filterUserId);
     if (startDate) q = q.gte("ghl_created_at", startDate);
     if (endDate) q = q.lte("ghl_created_at", endDate);
@@ -495,7 +497,7 @@ serve(async (req) => {
       .sort((a, b) => b.count - a.count);
 
     // ===== Listas auxiliares =====
-    const pipelines = allPipelines.map(p => ({ id: p.ghl_id, name: p.name }));
+    const pipelines = allPipelines.map(p => ({ id: p.ghl_id, name: p.name, stages: Array.isArray(p.stages) ? p.stages : [] }));
     const usersOut = usersList.map(u => ({ id: u.ghl_id, name: u.name }));
     const origins = Array.from(originsCount.keys()).sort();
 

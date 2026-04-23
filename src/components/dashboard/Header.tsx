@@ -1,4 +1,4 @@
-import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Globe, ChevronUp } from "lucide-react";
+import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Globe, ChevronUp, Layers } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -19,9 +19,11 @@ interface HeaderProps {
   users: User[];
   origins: string[];
   selectedPipelineId: string | null;
+  selectedStageId?: string | null;
   selectedSellerId: string | null;
   selectedOrigin: string | null;
   onPipelineChange: (id: string | null) => void;
+  onStageChange?: (id: string | null) => void;
   onSellerChange: (id: string | null) => void;
   onOriginChange: (o: string | null) => void;
   cachedAt?: string | null;
@@ -95,14 +97,16 @@ function DateRangeFilter({ dateRange, onDateRangeChange, label, icon: Icon = Cal
 export function Header({
   dateRange, onDateRangeChange, onRefresh, isLoading,
   pipelines, users, origins,
-  selectedPipelineId, selectedSellerId, selectedOrigin,
-  onPipelineChange, onSellerChange, onOriginChange, cachedAt,
+  selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin,
+  onPipelineChange, onStageChange, onSellerChange, onOriginChange, cachedAt,
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const hasAdditionalRange = !!additionalDateRange?.from;
-  const activeFilterCount = [selectedPipelineId, selectedSellerId, selectedOrigin, hasAdditionalRange].filter(Boolean).length;
+  const activeFilterCount = [selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin, hasAdditionalRange].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
+  const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
+  const stages = selectedPipeline?.stages || [];
 
   return (
     <header className="mb-5 sm:mb-6">
@@ -155,6 +159,19 @@ export function Header({
             </SelectContent>
           </Select>
 
+          {selectedPipelineId && stages.length > 0 && onStageChange && (
+            <Select value={selectedStageId || "all"} onValueChange={(v) => onStageChange(v === "all" ? null : v)}>
+              <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+                <Layers className="w-4 h-4 mr-2 opacity-50" />
+                <SelectValue placeholder="Etapa" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">Todas as etapas</SelectItem>
+                {stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+
           <Select value={selectedSellerId || "all"} onValueChange={(v) => onSellerChange(v === "all" ? null : v)}>
             <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
               <Users className="w-4 h-4 mr-2 opacity-50" />
@@ -177,10 +194,10 @@ export function Header({
             </SelectContent>
           </Select>
 
-          {(selectedPipelineId || selectedSellerId || selectedOrigin || hasAdditionalRange) && (
+          {(selectedPipelineId || selectedStageId || selectedSellerId || selectedOrigin || hasAdditionalRange) && (
             <Button variant="ghost" size="sm" className="h-10 text-muted-foreground hover:text-foreground rounded-xl w-full sm:w-auto"
               onClick={() => {
-                onPipelineChange(null); onSellerChange(null); onOriginChange(null);
+                onPipelineChange(null); onStageChange?.(null); onSellerChange(null); onOriginChange(null);
                 onAdditionalDateRangeChange?.(undefined);
               }}>
               Limpar filtros
