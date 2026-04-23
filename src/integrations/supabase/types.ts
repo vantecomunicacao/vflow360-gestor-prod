@@ -237,6 +237,8 @@ export type Database = {
       ghl_dashboard_settings: {
         Row: {
           additional_date_field: string | null
+          business_hours_end: string
+          business_hours_start: string
           chart_custom_fields: string[]
           created_at: string
           default_pipeline_ids: string[] | null
@@ -249,6 +251,8 @@ export type Database = {
         }
         Insert: {
           additional_date_field?: string | null
+          business_hours_end?: string
+          business_hours_start?: string
           chart_custom_fields?: string[]
           created_at?: string
           default_pipeline_ids?: string[] | null
@@ -261,6 +265,8 @@ export type Database = {
         }
         Update: {
           additional_date_field?: string | null
+          business_hours_end?: string
+          business_hours_start?: string
           chart_custom_fields?: string[]
           created_at?: string
           default_pipeline_ids?: string[] | null
