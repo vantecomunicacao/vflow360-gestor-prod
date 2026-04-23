@@ -40,6 +40,8 @@ export default function DashboardSettings() {
   const [additionalDateField, setAdditionalDateField] = useState<string>("");
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [chartFields, setChartFields] = useState<string[]>([]);
+  const [businessStart, setBusinessStart] = useState<string>("09:00");
+  const [businessEnd, setBusinessEnd] = useState<string>("18:00");
   const [wonStageKeys, setWonStageKeys] = useState<string[]>(["venda_ganha"]);
 
   useEffect(() => {
@@ -72,6 +74,8 @@ export default function DashboardSettings() {
         setAdditionalDateField(settings.additional_date_field || "");
         setVisibleFields(settings.visible_custom_fields || []);
         setChartFields((settings as any).chart_custom_fields || []);
+        setBusinessStart((settings as any).business_hours_start || "09:00");
+        setBusinessEnd((settings as any).business_hours_end || "18:00");
         setWonStageKeys(settings.won_stage_keys || ["venda_ganha"]);
       }
     } catch (e) {
@@ -93,6 +97,8 @@ export default function DashboardSettings() {
         additional_date_field: additionalDateField || null,
         visible_custom_fields: visibleFields,
         chart_custom_fields: chartFields.filter((id) => visibleFields.includes(id)),
+        business_hours_start: businessStart || "09:00",
+        business_hours_end: businessEnd || "18:00",
         won_stage_keys: wonStageKeys,
       };
       const { error } = await supabase
