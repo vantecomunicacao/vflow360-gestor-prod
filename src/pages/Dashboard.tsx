@@ -13,6 +13,7 @@ import { TimePerStage } from "@/components/dashboard/TimePerStage";
 import { LeadOrigins } from "@/components/dashboard/LeadOrigins";
 import { SalesOrigins } from "@/components/dashboard/SalesOrigins";
 import { DataQuality } from "@/components/dashboard/DataQuality";
+import { CustomFieldCharts } from "@/components/dashboard/CustomFieldCharts";
 import { LossReasons } from "@/components/dashboard/LossReasons";
 import { DailyLeads } from "@/components/dashboard/DailyLeads";
 import { AIInsights } from "@/components/dashboard/AIInsights";
@@ -180,6 +181,12 @@ export default function Dashboard() {
         <DataQuality customFields={data.customFields} overallFillRate={data.overallFillRate} />
         <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
       </AnimatedSection>
+
+      {data.customFieldDistributions && data.customFieldDistributions.length > 0 && (
+        <AnimatedSection delay={0.05}>
+          <CustomFieldCharts fields={data.customFieldDistributions} />
+        </AnimatedSection>
+      )}
 
       <AnimatedSection delay={0.05}>
         <DailyLeads dailyLeads={data.dailyLeads || []} />

@@ -34,6 +34,13 @@ export interface Pipeline { id: string; name: string; }
 export interface User { id: string; name: string; }
 export interface DailyLead { date: string; count: number; dayName: string; }
 export interface LossReason { reason: string; count: number; }
+export interface CustomFieldDistribution {
+  key: string;
+  name: string;
+  totalLeads: number;
+  filledCount: number;
+  distribution: { name: string; count: number; percentage: number }[];
+}
 
 export interface DashboardData {
   totalLeads: number;
@@ -48,6 +55,7 @@ export interface DashboardData {
   wonOrigemDistribution: LeadOrigin[];
   wonOrigemFillRate: number;
   customFields: CustomField[];
+  customFieldDistributions?: CustomFieldDistribution[];
   averageTimePerStage: AverageTimePerStage;
   dailyLeads: DailyLead[];
   pipelines: Pipeline[];

@@ -237,6 +237,7 @@ export type Database = {
       ghl_dashboard_settings: {
         Row: {
           additional_date_field: string | null
+          chart_custom_fields: string[]
           created_at: string
           default_pipeline_ids: string[] | null
           funnel_stage_mapping: Json | null
@@ -248,6 +249,7 @@ export type Database = {
         }
         Insert: {
           additional_date_field?: string | null
+          chart_custom_fields?: string[]
           created_at?: string
           default_pipeline_ids?: string[] | null
           funnel_stage_mapping?: Json | null
@@ -259,6 +261,7 @@ export type Database = {
         }
         Update: {
           additional_date_field?: string | null
+          chart_custom_fields?: string[]
           created_at?: string
           default_pipeline_ids?: string[] | null
           funnel_stage_mapping?: Json | null

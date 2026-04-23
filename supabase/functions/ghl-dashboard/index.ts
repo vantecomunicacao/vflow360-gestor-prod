@@ -419,6 +419,39 @@ serve(async (req) => {
       ? 0
       : customFields.reduce((a, b) => a + b.filledPercentage, 0) / customFields.length;
 
+    // ===== Custom field distributions (mini pie charts) =====
+    const rawChartFieldKeys: string[] = Array.isArray(settings?.chart_custom_fields) ? settings.chart_custom_fields : [];
+    const chartFieldKeys = rawChartFieldKeys.filter(isOpportunityField);
+    const customFieldDistributions = chartFieldKeys.map((key) => {
+      const def = customFieldDefs.find(d => d.ghl_id === key)
+        || customFieldDefs.find(d => d.field_key === key)
+        || customFieldDefs.find(d => d.name === key);
+      const displayName = def?.name || key;
+      const counts = new Map<string, number>();
+      let filled = 0;
+      for (const o of opps) {
+        const val = extractCfValue(o.custom_fields, [def?.ghl_id, def?.field_key, def?.name, key]);
+        const s = cfValueToString(val);
+        if (s === null) continue;
+        filled++;
+        // Se o valor é array (multi-select), conta cada item
+        const items = Array.isArray(val) ? val.map((x) => String(x).trim()).filter(Boolean) : [s];
+        for (const item of items) {
+          counts.set(item, (counts.get(item) || 0) + 1);
+        }
+      }
+      const distribution = Array.from(counts.entries())
+        .map(([name, count]) => ({ name, count, percentage: safeRate(count, filled) }))
+        .sort((a, b) => b.count - a.count);
+      return {
+        key,
+        name: displayName,
+        totalLeads,
+        filledCount: filled,
+        distribution,
+      };
+    });
+
     // ===== Tempo médio por etapa (proxy) =====
     // Sem histórico, usamos média de (now - last_status_change_at) por bucket atual
     const now = Date.now();
@@ -482,6 +515,7 @@ serve(async (req) => {
       wonOrigemDistribution,
       wonOrigemFillRate,
       customFields,
+      customFieldDistributions,
       averageTimePerStage,
       dailyLeads,
       pipelines,
