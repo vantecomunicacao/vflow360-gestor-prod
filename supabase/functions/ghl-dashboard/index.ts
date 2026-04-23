@@ -549,6 +549,80 @@ serve(async (req) => {
     const totalMonetary = opps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
     const wonMonetary = wonOpps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
 
+    // ===== Tempo médio de resposta do vendedor =====
+    // Filtra conversations + messages do workspace dentro do período. Para cada conversa,
+    // mede o tempo (em minutos úteis) entre cada mensagem inbound (cliente) e a próxima
+    // outbound (vendedor) — apenas o primeiro outbound após cada inbound conta.
+    const businessStartStr: string = settings?.business_hours_start || "09:00";
+    const businessEndStr: string = settings?.business_hours_end || "18:00";
+    const startMin = parseHHMM(businessStartStr, 9 * 60);
+    const endMin = parseHHMM(businessEndStr, 18 * 60);
+
+    const { data: convsRows } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .gte("last_message_at", startDate || new Date(0).toISOString())
+      .lte("last_message_at", endDate || new Date().toISOString());
+    const convIds = (convsRows || []).map((c: any) => c.id);
+
+    let totalResponseMinutes = 0;
+    let responseCount = 0;
+    let conversationsWithResponse = 0;
+
+    if (convIds.length > 0) {
+      // Limita a 5000 mensagens para evitar timeouts em workspaces grandes
+      const { data: msgsRows } = await supabase
+        .from("messages")
+        .select("conversation_id,direction,created_at")
+        .in("conversation_id", convIds)
+        .gte("created_at", startDate || new Date(0).toISOString())
+        .lte("created_at", endDate || new Date().toISOString())
+        .order("created_at", { ascending: true })
+        .limit(5000);
+
+      const byConv = new Map<string, Array<{ dir: string; t: number }>>();
+      for (const m of (msgsRows || [])) {
+        const arr = byConv.get((m as any).conversation_id) || [];
+        arr.push({ dir: (m as any).direction, t: new Date((m as any).created_at).getTime() });
+        byConv.set((m as any).conversation_id, arr);
+      }
+
+      for (const [, msgs] of byConv) {
+        let lastInbound: number | null = null;
+        let convHadResponse = false;
+        for (const m of msgs) {
+          if (m.dir === "inbound") {
+            // só guarda o primeiro inbound de uma sequência (até o vendedor responder)
+            if (lastInbound === null) lastInbound = m.t;
+          } else if (m.dir === "outbound" && lastInbound !== null) {
+            const minutes = businessMinutesBetween(lastInbound, m.t, startMin, endMin);
+            // ignora respostas de 0 minutos úteis (foram inteiramente fora do expediente)
+            if (minutes > 0) {
+              totalResponseMinutes += minutes;
+              responseCount++;
+              convHadResponse = true;
+            } else if (m.t - lastInbound > 0) {
+              // resposta inteiramente fora do expediente — ainda conta como respondida
+              totalResponseMinutes += 0;
+              responseCount++;
+              convHadResponse = true;
+            }
+            lastInbound = null;
+          }
+        }
+        if (convHadResponse) conversationsWithResponse++;
+      }
+    }
+
+    const responseTime = {
+      averageMinutes: responseCount > 0 ? totalResponseMinutes / responseCount : 0,
+      responseCount,
+      conversationsAnalyzed: conversationsWithResponse,
+      businessHoursStart: businessStartStr,
+      businessHoursEnd: businessEndStr,
+    };
+
     return new Response(JSON.stringify({
       totalLeads,
       lostLeads,
@@ -575,6 +649,7 @@ serve(async (req) => {
       wonMonetary,
       additionalDateFieldId,
       additionalDateFieldName,
+      responseTime,
       cachedAt: new Date().toISOString(),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
