@@ -19,6 +19,51 @@ interface FunnelMapping {
 }
 
 const DAY_MS = 86_400_000;
+const MIN_MS = 60_000;
+
+// Calcula minutos "úteis" entre dois timestamps, considerando apenas o intervalo de expediente
+// startMin/endMin em minutos desde 00:00 UTC-3 (Brasília). Se start > end, expediente vira a noite.
+function businessMinutesBetween(fromMs: number, toMs: number, startMin: number, endMin: number): number {
+  if (toMs <= fromMs) return 0;
+  // 24h = expediente integral
+  if (startMin === endMin) return Math.round((toMs - fromMs) / MIN_MS);
+
+  // Trabalhar em fuso de Brasília (UTC-3) para alinhar com horário comercial local
+  const TZ_OFFSET_MS = 3 * 60 * MIN_MS;
+  const wraps = startMin > endMin; // expediente atravessa meia-noite
+
+  const inBusiness = (ms: number): boolean => {
+    const local = ms - TZ_OFFSET_MS;
+    const dayMs = ((local % DAY_MS) + DAY_MS) % DAY_MS;
+    const min = dayMs / MIN_MS;
+    return wraps ? (min >= startMin || min < endMin) : (min >= startMin && min < endMin);
+  };
+
+  // Caminhar minuto a minuto seria pesado em diffs grandes. Subdividimos por blocos de 15 min
+  // e ajustamos com varredura fina nos limites. Para diffs muito grandes (>30 dias), aproximamos.
+  const totalMin = (toMs - fromMs) / MIN_MS;
+  if (totalMin > 60 * 24 * 30) {
+    // aproximação: razão de minutos úteis no dia
+    const dailyBusinessMin = wraps ? (1440 - startMin + endMin) : (endMin - startMin);
+    return Math.round(totalMin * (dailyBusinessMin / 1440));
+  }
+
+  let count = 0;
+  // step de 1 min é exato; cap a 60*24*30 já evita explosão
+  for (let t = fromMs; t < toMs; t += MIN_MS) {
+    if (inBusiness(t)) count++;
+  }
+  return count;
+}
+
+function parseHHMM(s: string | null | undefined, fallbackMin: number): number {
+  if (!s || typeof s !== "string") return fallbackMin;
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return fallbackMin;
+  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+  const mm = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+  return h * 60 + mm;
+}
 
 function inferFunnelMapping(stages: Array<{ id: string; name: string }>): FunnelMapping {
   const out: FunnelMapping = { contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
