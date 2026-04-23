@@ -19,6 +19,51 @@ interface FunnelMapping {
 }
 
 const DAY_MS = 86_400_000;
+const MIN_MS = 60_000;
+
+// Calcula minutos "úteis" entre dois timestamps, considerando apenas o intervalo de expediente
+// startMin/endMin em minutos desde 00:00 UTC-3 (Brasília). Se start > end, expediente vira a noite.
+function businessMinutesBetween(fromMs: number, toMs: number, startMin: number, endMin: number): number {
+  if (toMs <= fromMs) return 0;
+  // 24h = expediente integral
+  if (startMin === endMin) return Math.round((toMs - fromMs) / MIN_MS);
+
+  // Trabalhar em fuso de Brasília (UTC-3) para alinhar com horário comercial local
+  const TZ_OFFSET_MS = 3 * 60 * MIN_MS;
+  const wraps = startMin > endMin; // expediente atravessa meia-noite
+
+  const inBusiness = (ms: number): boolean => {
+    const local = ms - TZ_OFFSET_MS;
+    const dayMs = ((local % DAY_MS) + DAY_MS) % DAY_MS;
+    const min = dayMs / MIN_MS;
+    return wraps ? (min >= startMin || min < endMin) : (min >= startMin && min < endMin);
+  };
+
+  // Caminhar minuto a minuto seria pesado em diffs grandes. Subdividimos por blocos de 15 min
+  // e ajustamos com varredura fina nos limites. Para diffs muito grandes (>30 dias), aproximamos.
+  const totalMin = (toMs - fromMs) / MIN_MS;
+  if (totalMin > 60 * 24 * 30) {
+    // aproximação: razão de minutos úteis no dia
+    const dailyBusinessMin = wraps ? (1440 - startMin + endMin) : (endMin - startMin);
+    return Math.round(totalMin * (dailyBusinessMin / 1440));
+  }
+
+  let count = 0;
+  // step de 1 min é exato; cap a 60*24*30 já evita explosão
+  for (let t = fromMs; t < toMs; t += MIN_MS) {
+    if (inBusiness(t)) count++;
+  }
+  return count;
+}
+
+function parseHHMM(s: string | null | undefined, fallbackMin: number): number {
+  if (!s || typeof s !== "string") return fallbackMin;
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return fallbackMin;
+  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+  const mm = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+  return h * 60 + mm;
+}
 
 function inferFunnelMapping(stages: Array<{ id: string; name: string }>): FunnelMapping {
   const out: FunnelMapping = { contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
@@ -504,6 +549,80 @@ serve(async (req) => {
     const totalMonetary = opps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
     const wonMonetary = wonOpps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
 
+    // ===== Tempo médio de resposta do vendedor =====
+    // Filtra conversations + messages do workspace dentro do período. Para cada conversa,
+    // mede o tempo (em minutos úteis) entre cada mensagem inbound (cliente) e a próxima
+    // outbound (vendedor) — apenas o primeiro outbound após cada inbound conta.
+    const businessStartStr: string = settings?.business_hours_start || "09:00";
+    const businessEndStr: string = settings?.business_hours_end || "18:00";
+    const startMin = parseHHMM(businessStartStr, 9 * 60);
+    const endMin = parseHHMM(businessEndStr, 18 * 60);
+
+    const { data: convsRows } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .gte("last_message_at", startDate || new Date(0).toISOString())
+      .lte("last_message_at", endDate || new Date().toISOString());
+    const convIds = (convsRows || []).map((c: any) => c.id);
+
+    let totalResponseMinutes = 0;
+    let responseCount = 0;
+    let conversationsWithResponse = 0;
+
+    if (convIds.length > 0) {
+      // Limita a 5000 mensagens para evitar timeouts em workspaces grandes
+      const { data: msgsRows } = await supabase
+        .from("messages")
+        .select("conversation_id,direction,created_at")
+        .in("conversation_id", convIds)
+        .gte("created_at", startDate || new Date(0).toISOString())
+        .lte("created_at", endDate || new Date().toISOString())
+        .order("created_at", { ascending: true })
+        .limit(5000);
+
+      const byConv = new Map<string, Array<{ dir: string; t: number }>>();
+      for (const m of (msgsRows || [])) {
+        const arr = byConv.get((m as any).conversation_id) || [];
+        arr.push({ dir: (m as any).direction, t: new Date((m as any).created_at).getTime() });
+        byConv.set((m as any).conversation_id, arr);
+      }
+
+      for (const [, msgs] of byConv) {
+        let lastInbound: number | null = null;
+        let convHadResponse = false;
+        for (const m of msgs) {
+          if (m.dir === "inbound") {
+            // só guarda o primeiro inbound de uma sequência (até o vendedor responder)
+            if (lastInbound === null) lastInbound = m.t;
+          } else if (m.dir === "outbound" && lastInbound !== null) {
+            const minutes = businessMinutesBetween(lastInbound, m.t, startMin, endMin);
+            // ignora respostas de 0 minutos úteis (foram inteiramente fora do expediente)
+            if (minutes > 0) {
+              totalResponseMinutes += minutes;
+              responseCount++;
+              convHadResponse = true;
+            } else if (m.t - lastInbound > 0) {
+              // resposta inteiramente fora do expediente — ainda conta como respondida
+              totalResponseMinutes += 0;
+              responseCount++;
+              convHadResponse = true;
+            }
+            lastInbound = null;
+          }
+        }
+        if (convHadResponse) conversationsWithResponse++;
+      }
+    }
+
+    const responseTime = {
+      averageMinutes: responseCount > 0 ? totalResponseMinutes / responseCount : 0,
+      responseCount,
+      conversationsAnalyzed: conversationsWithResponse,
+      businessHoursStart: businessStartStr,
+      businessHoursEnd: businessEndStr,
+    };
+
     return new Response(JSON.stringify({
       totalLeads,
       lostLeads,
@@ -530,6 +649,7 @@ serve(async (req) => {
       wonMonetary,
       additionalDateFieldId,
       additionalDateFieldName,
+      responseTime,
       cachedAt: new Date().toISOString(),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {

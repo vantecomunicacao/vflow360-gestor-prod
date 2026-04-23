@@ -42,6 +42,13 @@ export interface CustomFieldDistribution {
   filledCount: number;
   distribution: { name: string; count: number; percentage: number }[];
 }
+export interface ResponseTime {
+  averageMinutes: number;
+  responseCount: number;
+  conversationsAnalyzed: number;
+  businessHoursStart: string;
+  businessHoursEnd: string;
+}
 
 export interface DashboardData {
   totalLeads: number;
@@ -69,6 +76,7 @@ export interface DashboardData {
   cachedAt?: string;
   additionalDateFieldId?: string | null;
   additionalDateFieldName?: string | null;
+  responseTime?: ResponseTime | null;
 }
 
 export interface DashboardFilters {

@@ -40,6 +40,8 @@ export default function DashboardSettings() {
   const [additionalDateField, setAdditionalDateField] = useState<string>("");
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [chartFields, setChartFields] = useState<string[]>([]);
+  const [businessStart, setBusinessStart] = useState<string>("09:00");
+  const [businessEnd, setBusinessEnd] = useState<string>("18:00");
   const [wonStageKeys, setWonStageKeys] = useState<string[]>(["venda_ganha"]);
 
   useEffect(() => {
@@ -72,6 +74,8 @@ export default function DashboardSettings() {
         setAdditionalDateField(settings.additional_date_field || "");
         setVisibleFields(settings.visible_custom_fields || []);
         setChartFields((settings as any).chart_custom_fields || []);
+        setBusinessStart((settings as any).business_hours_start || "09:00");
+        setBusinessEnd((settings as any).business_hours_end || "18:00");
         setWonStageKeys(settings.won_stage_keys || ["venda_ganha"]);
       }
     } catch (e) {
@@ -93,6 +97,8 @@ export default function DashboardSettings() {
         additional_date_field: additionalDateField || null,
         visible_custom_fields: visibleFields,
         chart_custom_fields: chartFields.filter((id) => visibleFields.includes(id)),
+        business_hours_start: businessStart || "09:00",
+        business_hours_end: businessEnd || "18:00",
         won_stage_keys: wonStageKeys,
       };
       const { error } = await supabase
@@ -372,6 +378,43 @@ export default function DashboardSettings() {
               ⚠ Há campos de Contato selecionados nas suas configurações antigas. Eles aparecerão sempre como 0%. Remova-os e selecione campos de Oportunidade.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Horário comercial (tempo de resposta) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Horário comercial (tempo de resposta)</CardTitle>
+          <CardDescription>
+            Período em que sua equipe está disponível. O cálculo de "Tempo médio de resposta" do dashboard
+            ignora o tempo fora desse intervalo (ex: cliente manda mensagem de madrugada e o vendedor responde de manhã).
+            Para expediente que vira a noite (ex: 18h às 09h), basta inverter os horários.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="bh-start" className="text-xs">Início</Label>
+            <input
+              id="bh-start"
+              type="time"
+              value={businessStart}
+              onChange={(e) => setBusinessStart(e.target.value)}
+              className="h-10 px-3 rounded-xl border border-input bg-background text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="bh-end" className="text-xs">Fim</Label>
+            <input
+              id="bh-end"
+              type="time"
+              value={businessEnd}
+              onChange={(e) => setBusinessEnd(e.target.value)}
+              className="h-10 px-3 rounded-xl border border-input bg-background text-sm"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground basis-full">
+            Atual: <span className="font-bold">{businessStart || "09:00"}</span> às <span className="font-bold">{businessEnd || "18:00"}</span>
+          </p>
         </CardContent>
       </Card>
 
