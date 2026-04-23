@@ -39,6 +39,7 @@ export default function DashboardSettings() {
   const [originField, setOriginField] = useState<string>("__source__");
   const [additionalDateField, setAdditionalDateField] = useState<string>("");
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
+  const [chartFields, setChartFields] = useState<string[]>([]);
   const [wonStageKeys, setWonStageKeys] = useState<string[]>(["venda_ganha"]);
 
   useEffect(() => {
@@ -70,6 +71,7 @@ export default function DashboardSettings() {
         setOriginField(settings.origin_field_name || "__source__");
         setAdditionalDateField(settings.additional_date_field || "");
         setVisibleFields(settings.visible_custom_fields || []);
+        setChartFields((settings as any).chart_custom_fields || []);
         setWonStageKeys(settings.won_stage_keys || ["venda_ganha"]);
       }
     } catch (e) {
@@ -90,6 +92,7 @@ export default function DashboardSettings() {
         origin_field_name: originField,
         additional_date_field: additionalDateField || null,
         visible_custom_fields: visibleFields,
+        chart_custom_fields: chartFields.filter((id) => visibleFields.includes(id)),
         won_stage_keys: wonStageKeys,
       };
       const { error } = await supabase
@@ -149,7 +152,18 @@ export default function DashboardSettings() {
   };
 
   const toggleField = (ghl_id: string) => {
-    setVisibleFields((prev) =>
+    setVisibleFields((prev) => {
+      const next = prev.includes(ghl_id) ? prev.filter((p) => p !== ghl_id) : [...prev, ghl_id];
+      // se removeu o campo, remove também do gráfico
+      if (!next.includes(ghl_id)) {
+        setChartFields((cp) => cp.filter((p) => p !== ghl_id));
+      }
+      return next;
+    });
+  };
+
+  const toggleChartField = (ghl_id: string) => {
+    setChartFields((prev) =>
       prev.includes(ghl_id) ? prev.filter((p) => p !== ghl_id) : [...prev, ghl_id]
     );
   };
@@ -324,17 +338,31 @@ export default function DashboardSettings() {
             if (oppFields.length === 0) {
               return <p className="text-sm text-muted-foreground">Nenhum campo customizado de oportunidade sincronizado.</p>;
             }
-            return oppFields.map((f) => (
-              <label key={f.id} className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={visibleFields.includes(f.ghl_id)}
-                  onCheckedChange={() => toggleField(f.ghl_id)}
-                />
-                <span>{f.name}</span>
-                {f.field_key && <span className="text-xs text-muted-foreground">({f.field_key})</span>}
-                {f.data_type && <span className="text-xs text-muted-foreground">[{f.data_type}]</span>}
-              </label>
-            ));
+            return oppFields.map((f) => {
+              const isVisible = visibleFields.includes(f.ghl_id);
+              return (
+                <div key={f.id} className="flex items-center justify-between gap-4 py-1">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                    <Checkbox
+                      checked={isVisible}
+                      onCheckedChange={() => toggleField(f.ghl_id)}
+                    />
+                    <span className="truncate">{f.name}</span>
+                    {f.field_key && <span className="text-xs text-muted-foreground hidden sm:inline">({f.field_key})</span>}
+                    {f.data_type && <span className="text-xs text-muted-foreground hidden sm:inline">[{f.data_type}]</span>}
+                  </label>
+                  {isVisible && (
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground shrink-0">
+                      <Checkbox
+                        checked={chartFields.includes(f.ghl_id)}
+                        onCheckedChange={() => toggleChartField(f.ghl_id)}
+                      />
+                      <span>Mostrar gráfico no dashboard</span>
+                    </label>
+                  )}
+                </div>
+              );
+            });
           })()}
           {visibleFields.some((id) => {
             const f = customFields.find((c) => c.ghl_id === id);
