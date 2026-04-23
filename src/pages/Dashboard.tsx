@@ -29,6 +29,7 @@ export default function Dashboard() {
   });
   const [additionalDateRange, setAdditionalDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
   const [selectedOrigin, setSelectedOrigin] = useState<string | null>(null);
 
@@ -36,6 +37,7 @@ export default function Dashboard() {
   useEffect(() => {
     setSelectedSellerId(null);
     setSelectedOrigin(null);
+    setSelectedStageId(null);
     setAdditionalDateRange(undefined);
     setSelectedPipelineId(null);
 
@@ -71,12 +73,13 @@ export default function Dashboard() {
   const filters: DashboardFilters = useMemo(() => ({
     startDate, endDate,
     pipelineId: selectedPipelineId,
+    stageId: selectedStageId,
     sellerId: selectedSellerId,
     sourceOrigin: selectedOrigin,
     workspaceId: activeWorkspace?.id || null,
     additionalStartDate,
     additionalEndDate,
-  }), [startDate, endDate, selectedPipelineId, selectedSellerId, selectedOrigin, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
+  }), [startDate, endDate, selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
 
   const periodDays = useMemo(() => differenceInDays(endDate, startDate) + 1, [startDate, endDate]);
   const prevFilters: DashboardFilters = useMemo(() => ({
@@ -136,9 +139,11 @@ export default function Dashboard() {
         users={data.users}
         origins={data.origins}
         selectedPipelineId={selectedPipelineId}
+        selectedStageId={selectedStageId}
         selectedSellerId={selectedSellerId}
         selectedOrigin={selectedOrigin}
-        onPipelineChange={setSelectedPipelineId}
+        onPipelineChange={(id) => { setSelectedPipelineId(id); setSelectedStageId(null); }}
+        onStageChange={setSelectedStageId}
         onSellerChange={setSelectedSellerId}
         onOriginChange={setSelectedOrigin}
         cachedAt={cachedAt}
