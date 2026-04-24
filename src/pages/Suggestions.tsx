@@ -539,7 +539,7 @@ const Suggestions = () => {
             <PopoverContent className="w-80" align="end">
               <p className="text-sm font-semibold text-foreground mb-3">Configuração da IA</p>
               <div className="space-y-4">
-                {suggestionTypeOptions.map(opt => (
+                {aiConfigOptions.map(opt => (
                   <div key={opt.key} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-foreground">{opt.label}</span>
