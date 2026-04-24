@@ -550,21 +550,49 @@ serve(async (req) => {
     const wonMonetary = wonOpps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
 
     // ===== Tempo médio de resposta do vendedor =====
-    // Filtra conversations + messages do workspace dentro do período. Para cada conversa,
-    // mede o tempo (em minutos úteis) entre cada mensagem inbound (cliente) e a próxima
-    // outbound (vendedor) — apenas o primeiro outbound após cada inbound conta.
+    // Considera APENAS conversas de leads das oportunidades filtradas pelo header.
+    // Fallback: se nenhum pipeline foi selecionado, restringe a oportunidades
+    // cujo stage_id esteja em algum bucket mapeado do funil (ou em won_stage_keys).
     const businessStartStr: string = settings?.business_hours_start || "09:00";
     const businessEndStr: string = settings?.business_hours_end || "18:00";
     const startMin = parseHHMM(businessStartStr, 9 * 60);
     const endMin = parseHHMM(businessEndStr, 18 * 60);
 
-    const { data: convsRows } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("workspace_id", workspaceId)
-      .gte("last_message_at", startDate || new Date(0).toISOString())
-      .lte("last_message_at", endDate || new Date().toISOString());
-    const convIds = (convsRows || []).map((c: any) => c.id);
+    // Conjunto de stage_ids "comerciais" (todos os buckets + won)
+    const mappedStageIds = new Set<string>([
+      ...stageMap.contato_inicial,
+      ...stageMap.proposta_enviada,
+      ...stageMap.fechamento,
+      ...stageMap.venda_ganha,
+      ...wonStageIds,
+    ]);
+
+    // Base de oportunidades para o cálculo
+    let oppsForResponse = opps;
+    if (!filterPipelineId && mappedStageIds.size > 0) {
+      oppsForResponse = opps.filter((o) => o.stage_id && mappedStageIds.has(o.stage_id));
+    }
+
+    // Normaliza telefones (mantém apenas dígitos) para casar com conversations
+    const normalizePhone = (p: string | null | undefined) => (p || "").replace(/\D+/g, "");
+    const phoneSet = new Set<string>();
+    for (const o of oppsForResponse) {
+      const np = normalizePhone(o.contact_phone);
+      if (np) phoneSet.add(np);
+    }
+
+    let convIds: string[] = [];
+    if (phoneSet.size > 0) {
+      const { data: convsRows } = await supabase
+        .from("conversations")
+        .select("id,contact_phone")
+        .eq("workspace_id", workspaceId)
+        .gte("last_message_at", startDate || new Date(0).toISOString())
+        .lte("last_message_at", endDate || new Date().toISOString());
+      convIds = (convsRows || [])
+        .filter((c: any) => phoneSet.has(normalizePhone(c.contact_phone)))
+        .map((c: any) => c.id);
+    }
 
     let totalResponseMinutes = 0;
     let responseCount = 0;
