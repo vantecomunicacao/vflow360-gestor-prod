@@ -99,9 +99,11 @@ export function WorkspaceSelector({ collapsed }: WorkspaceSelectorProps) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setShowCreate(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Nova conta
-          </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem onClick={() => setShowCreate(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Nova conta
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => navigate("/workspaces")}>
             <Settings2 className="w-4 h-4 mr-2" /> Gerenciar contas
           </DropdownMenuItem>
