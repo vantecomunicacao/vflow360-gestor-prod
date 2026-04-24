@@ -3,6 +3,7 @@ import { Building2, Plus, Pencil, Trash2, Check, X, Crown } from "lucide-react";
 import { motion } from "framer-motion";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,7 @@ import { toast } from "sonner";
 const Workspaces = () => {
   const { workspaces, activeWorkspace, createWorkspace, renameWorkspace, deleteWorkspace } = useWorkspace();
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -103,12 +105,16 @@ const Workspaces = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Gerenciar Contas</h1>
           <p className="text-muted-foreground">
-            Crie, renomeie e exclua suas contas (workspaces). Cada conta tem dados e integrações isolados.
+            {isAdmin 
+              ? "Crie, renomeie e exclua suas contas (workspaces). Cada conta tem dados e integrações isolados."
+              : "Visualize e gerencie suas contas. Apenas administradores podem criar novas contas."}
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="w-4 h-4 mr-2" /> Nova conta
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="w-4 h-4 mr-2" /> Nova conta
+          </Button>
+        )}
       </div>
 
       <div className="space-y-3">

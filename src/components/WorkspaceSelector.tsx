@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Building2, Plus, ChevronDown, Check, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,7 @@ interface WorkspaceSelectorProps {
 
 export function WorkspaceSelector({ collapsed }: WorkspaceSelectorProps) {
   const { workspaces, activeWorkspace, setActiveWorkspaceId, createWorkspace } = useWorkspace();
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -64,9 +66,11 @@ export function WorkspaceSelector({ collapsed }: WorkspaceSelectorProps) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setShowCreate(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Nova conta
-          </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem onClick={() => setShowCreate(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Nova conta
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => navigate("/workspaces")}>
             <Settings2 className="w-4 h-4 mr-2" /> Gerenciar contas
           </DropdownMenuItem>
@@ -95,9 +99,11 @@ export function WorkspaceSelector({ collapsed }: WorkspaceSelectorProps) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setShowCreate(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Nova conta
-          </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem onClick={() => setShowCreate(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Nova conta
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => navigate("/workspaces")}>
             <Settings2 className="w-4 h-4 mr-2" /> Gerenciar contas
           </DropdownMenuItem>
