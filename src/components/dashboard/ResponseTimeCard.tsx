@@ -33,7 +33,7 @@ export function ResponseTimeCard({ responseTime }: ResponseTimeCardProps) {
       <h2 className="section-title">
         <Clock className="w-5 h-5 text-primary" />
         Tempo médio de resposta
-        <SectionTooltip text={`Tempo médio que o vendedor (número conectado) leva para responder o cliente. Considera apenas o expediente: ${start} às ${end}.`} />
+        <SectionTooltip text={`Tempo médio que o vendedor (número conectado) leva para responder o cliente. Considera conversas dos leads do funil/etapa filtrado(a). Sem pipeline selecionado, restringe às etapas mapeadas no funil comercial. Expediente: ${start} às ${end}.`} />
       </h2>
 
       <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
