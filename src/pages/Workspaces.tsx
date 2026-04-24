@@ -105,7 +105,9 @@ const Workspaces = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Gerenciar Contas</h1>
           <p className="text-muted-foreground">
-            Crie, renomeie e exclua suas contas (workspaces). Cada conta tem dados e integrações isolados.
+            {isAdmin 
+              ? "Crie, renomeie e exclua suas contas (workspaces). Cada conta tem dados e integrações isolados."
+              : "Visualize e gerencie suas contas. Apenas administradores podem criar novas contas."}
           </p>
         </div>
         {isAdmin && (
