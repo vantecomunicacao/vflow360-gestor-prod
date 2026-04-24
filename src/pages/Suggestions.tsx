@@ -108,7 +108,7 @@ const Suggestions = () => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [filter, setFilter] = useState<SuggestionStatus | "all">("all");
   const [aiConfig, setAiConfig] = useState<Record<string, { enabled: boolean; autoApprove: boolean }>>(
-    Object.fromEntries(suggestionTypeOptions.map(o => [o.key, { enabled: true, autoApprove: false }]))
+    Object.fromEntries(aiConfigOptions.map(o => [o.key, { enabled: true, autoApprove: false }]))
   );
   const [openContacts, setOpenContacts] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
