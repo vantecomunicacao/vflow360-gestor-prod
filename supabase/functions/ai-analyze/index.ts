@@ -146,7 +146,7 @@ serve(async (req) => {
     const enabledActions = new Map<string, { enabled: boolean; autoApprove: boolean }>();
     const defaultActions = [
       "mover_funil", "campo_personalizado", "adicionar_nota",
-      "valor_negociacao", "agendar_lembrete", "ganho_perdido"
+      "valor_negociacao", "agendar_lembrete", "marcar_ganho", "marcar_perdido"
     ];
     for (const a of defaultActions) {
       enabledActions.set(a, { enabled: true, autoApprove: false });
@@ -157,9 +157,19 @@ serve(async (req) => {
       }
     }
 
+    // Backwards-compat virtual "ganho_perdido" — enabled if EITHER split toggle is on.
+    // Auto-approve is decided per-suggestion later (see insert loop) based on won/lost value.
+    const ganhoCfg = enabledActions.get("marcar_ganho") || { enabled: true, autoApprove: false };
+    const perdidoCfg = enabledActions.get("marcar_perdido") || { enabled: true, autoApprove: false };
+    enabledActions.set("ganho_perdido", {
+      enabled: ganhoCfg.enabled || perdidoCfg.enabled,
+      autoApprove: false, // handled per suggestion
+    });
+
     const activeActionTypes = [...enabledActions.entries()]
       .filter(([, v]) => v.enabled)
-      .map(([k]) => k);
+      .map(([k]) => k)
+      .filter((k) => k !== "marcar_ganho" && k !== "marcar_perdido"); // these are virtual splits, not AI types
 
     if (activeActionTypes.length === 0) {
       return new Response(JSON.stringify({ success: true, data: { suggestions: [] } }), {
