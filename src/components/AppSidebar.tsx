@@ -80,15 +80,12 @@ export function AppSidebar() {
       <SidebarFooter className="p-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <NavLink
-                to="/login"
-                className="flex items-center gap-3 px-3 py-2 rounded-md text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                activeClassName=""
-              >
-                <LogOut className="w-5 h-5 shrink-0" />
-                {!collapsed && <span>Sair</span>}
-              </NavLink>
+            <SidebarMenuButton
+              onClick={handleSignOut}
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-sidebar-foreground hover:bg-sidebar-accent transition-colors w-full"
+            >
+              <LogOut className="w-5 h-5 shrink-0" />
+              {!collapsed && <span>Sair</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
