@@ -525,7 +525,18 @@ REGRAS OBRIGATÓRIAS:
     // 10. Save suggestions to database
     const insertedSuggestions = [];
     for (const s of suggestions) {
-      const autoApprove = enabledActions.get(s.type)?.autoApprove || false;
+      // For ganho_perdido, route to the right split config (marcar_ganho / marcar_perdido).
+      // Skip the suggestion entirely if the corresponding split is disabled.
+      let effectiveCfg = enabledActions.get(s.type);
+      if (s.type === "ganho_perdido") {
+        const isWon = (s.value || "").toLowerCase().includes("ganh");
+        effectiveCfg = isWon ? ganhoCfg : perdidoCfg;
+        if (!effectiveCfg.enabled) {
+          console.log(`Skipping ganho_perdido suggestion (${isWon ? "ganho" : "perdido"} disabled)`);
+          continue;
+        }
+      }
+      const autoApprove = effectiveCfg?.autoApprove || false;
       const { data: inserted, error: insertErr } = await supabase
         .from("suggestions")
         .insert({
