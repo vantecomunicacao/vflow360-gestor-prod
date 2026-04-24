@@ -93,6 +93,17 @@ const suggestionTypeOptions = [
   { key: "ganho_perdido", label: "Marcar como ganho ou perdido" },
 ];
 
+// AI configuration options — "ganho_perdido" is split into two independent toggles
+const aiConfigOptions = [
+  { key: "mover_funil", label: "Mover funil" },
+  { key: "campo_personalizado", label: "Preencher campo personalizado" },
+  { key: "adicionar_nota", label: "Adicionar nota" },
+  { key: "valor_negociacao", label: "Valor da negociação R$" },
+  { key: "agendar_lembrete", label: "Agendar lembrete" },
+  { key: "marcar_ganho", label: "Marcar como ganho" },
+  { key: "marcar_perdido", label: "Marcar como perdido" },
+];
+
 const Suggestions = () => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [filter, setFilter] = useState<SuggestionStatus | "all">("all");
