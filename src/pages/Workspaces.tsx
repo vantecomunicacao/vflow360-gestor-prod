@@ -108,9 +108,11 @@ const Workspaces = () => {
             Crie, renomeie e exclua suas contas (workspaces). Cada conta tem dados e integrações isolados.
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="w-4 h-4 mr-2" /> Nova conta
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="w-4 h-4 mr-2" /> Nova conta
+          </Button>
+        )}
       </div>
 
       <div className="space-y-3">
