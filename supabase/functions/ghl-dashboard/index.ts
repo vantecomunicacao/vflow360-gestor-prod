@@ -202,7 +202,7 @@ serve(async (req) => {
     // ===== Query opportunities com filtros =====
     let q = supabase
       .from("ghl_opportunities")
-      .select("ghl_id,name,pipeline_id,stage_id,status,monetary_value,source,assigned_to,lost_reason_id,custom_fields,ghl_created_at,last_status_change_at")
+      .select("ghl_id,name,pipeline_id,stage_id,status,monetary_value,source,assigned_to,lost_reason_id,custom_fields,ghl_created_at,last_status_change_at,contact_phone")
       .eq("workspace_id", workspaceId)
       .limit(10000);
     if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
