@@ -28,6 +28,7 @@ interface WorkspaceSelectorProps {
 
 export function WorkspaceSelector({ collapsed }: WorkspaceSelectorProps) {
   const { workspaces, activeWorkspace, setActiveWorkspaceId, createWorkspace } = useWorkspace();
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
