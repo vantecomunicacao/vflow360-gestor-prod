@@ -31,6 +31,7 @@ import { toast } from "sonner";
 const Workspaces = () => {
   const { workspaces, activeWorkspace, createWorkspace, renameWorkspace, deleteWorkspace } = useWorkspace();
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
