@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Building2, Plus, ChevronDown, Check, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   DropdownMenu,
   DropdownMenuContent,
