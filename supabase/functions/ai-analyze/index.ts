@@ -146,7 +146,7 @@ serve(async (req) => {
     const enabledActions = new Map<string, { enabled: boolean; autoApprove: boolean }>();
     const defaultActions = [
       "mover_funil", "campo_personalizado", "adicionar_nota",
-      "valor_negociacao", "agendar_lembrete", "ganho_perdido"
+      "valor_negociacao", "agendar_lembrete", "marcar_ganho", "marcar_perdido"
     ];
     for (const a of defaultActions) {
       enabledActions.set(a, { enabled: true, autoApprove: false });
@@ -157,9 +157,19 @@ serve(async (req) => {
       }
     }
 
+    // Backwards-compat virtual "ganho_perdido" — enabled if EITHER split toggle is on.
+    // Auto-approve is decided per-suggestion later (see insert loop) based on won/lost value.
+    const ganhoCfg = enabledActions.get("marcar_ganho") || { enabled: true, autoApprove: false };
+    const perdidoCfg = enabledActions.get("marcar_perdido") || { enabled: true, autoApprove: false };
+    enabledActions.set("ganho_perdido", {
+      enabled: ganhoCfg.enabled || perdidoCfg.enabled,
+      autoApprove: false, // handled per suggestion
+    });
+
     const activeActionTypes = [...enabledActions.entries()]
       .filter(([, v]) => v.enabled)
-      .map(([k]) => k);
+      .map(([k]) => k)
+      .filter((k) => k !== "marcar_ganho" && k !== "marcar_perdido"); // these are virtual splits, not AI types
 
     if (activeActionTypes.length === 0) {
       return new Response(JSON.stringify({ success: true, data: { suggestions: [] } }), {
@@ -243,7 +253,15 @@ ${filteredActionTypes.includes("campo_personalizado") ? "- campo_personalizado: 
 ${filteredActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
 ${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor monetário da oportunidade/negociação no CRM. SEMPRE que o lead mencionar preço, orçamento, valor, custo ou qualquer quantia monetária, use ESTE tipo (NÃO use campo_personalizado para valores monetários). O campo 'value' deve conter APENAS o número (ex: '1500' ou '1500.00'), sem 'R$' ou texto." : ""}
 ${filteredActionTypes.includes("agendar_lembrete") ? `- agendar_lembrete: Criar uma TAREFA no CRM com data de vencimento. Use 'task_title' para o título (ex: 'Retornar ligação', 'Enviar proposta') e 'due_date' no formato ISO 8601 com offset -03:00 (ex: '${new Date(Date.now() + 24*60*60*1000).toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).replace(" ", "T")}-03:00'). A data DEVE estar no fuso UTC-03 (horário de Brasília) e SEMPRE no futuro relativo à data atual informada acima. NUNCA use anos passados. Se a mensagem mencionar uma data/hora específica, use essa (sempre no futuro). Caso contrário, defina para 24 horas a partir de agora. O título deve refletir a ação mencionada na conversa ou 'Entrar em contato' como padrão.` : ""}
-${filteredActionTypes.includes("ganho_perdido") ? `- ganho_perdido: Sugerir marcar oportunidade como ganha ou perdida. Para "perdido", é OBRIGATÓRIO incluir o campo "lost_reason_id" com o ID exato de um dos motivos de perda listados abaixo. Analise o contexto da conversa para escolher o motivo mais adequado.${lostReasonsDescription}` : ""}`.replace(/\n\n+/g, "\n");
+${filteredActionTypes.includes("ganho_perdido") ? (() => {
+  const allowWon = ganhoCfg.enabled;
+  const allowLost = perdidoCfg.enabled;
+  let directions = "";
+  if (allowWon && allowLost) directions = `Sugerir marcar oportunidade como ganha ou perdida. Para "perdido", é OBRIGATÓRIO incluir o campo "lost_reason_id" com o ID exato de um dos motivos de perda listados abaixo.`;
+  else if (allowWon) directions = `Sugerir marcar oportunidade APENAS como ganha (status "ganho"). NUNCA sugira "perdido" — esse tipo está desativado.`;
+  else if (allowLost) directions = `Sugerir marcar oportunidade APENAS como perdida (status "perdido"). NUNCA sugira "ganho" — esse tipo está desativado. É OBRIGATÓRIO incluir o campo "lost_reason_id" com o ID exato de um dos motivos de perda listados abaixo.`;
+  return `- ganho_perdido: ${directions} Analise o contexto da conversa para escolher o motivo mais adequado.${allowLost ? lostReasonsDescription : ""}`;
+})() : ""}`.replace(/\n\n+/g, "\n");
 
     // Build valid field keys set for validation
     const validFieldKeys = new Set(selectedFields.map((f: any) => f.fieldKey));
@@ -507,7 +525,18 @@ REGRAS OBRIGATÓRIAS:
     // 10. Save suggestions to database
     const insertedSuggestions = [];
     for (const s of suggestions) {
-      const autoApprove = enabledActions.get(s.type)?.autoApprove || false;
+      // For ganho_perdido, route to the right split config (marcar_ganho / marcar_perdido).
+      // Skip the suggestion entirely if the corresponding split is disabled.
+      let effectiveCfg = enabledActions.get(s.type);
+      if (s.type === "ganho_perdido") {
+        const isWon = (s.value || "").toLowerCase().includes("ganh");
+        effectiveCfg = isWon ? ganhoCfg : perdidoCfg;
+        if (!effectiveCfg.enabled) {
+          console.log(`Skipping ganho_perdido suggestion (${isWon ? "ganho" : "perdido"} disabled)`);
+          continue;
+        }
+      }
+      const autoApprove = effectiveCfg?.autoApprove || false;
       const { data: inserted, error: insertErr } = await supabase
         .from("suggestions")
         .insert({

@@ -93,11 +93,22 @@ const suggestionTypeOptions = [
   { key: "ganho_perdido", label: "Marcar como ganho ou perdido" },
 ];
 
+// AI configuration options — "ganho_perdido" is split into two independent toggles
+const aiConfigOptions = [
+  { key: "mover_funil", label: "Mover funil" },
+  { key: "campo_personalizado", label: "Preencher campo personalizado" },
+  { key: "adicionar_nota", label: "Adicionar nota" },
+  { key: "valor_negociacao", label: "Valor da negociação R$" },
+  { key: "agendar_lembrete", label: "Agendar lembrete" },
+  { key: "marcar_ganho", label: "Marcar como ganho" },
+  { key: "marcar_perdido", label: "Marcar como perdido" },
+];
+
 const Suggestions = () => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [filter, setFilter] = useState<SuggestionStatus | "all">("all");
   const [aiConfig, setAiConfig] = useState<Record<string, { enabled: boolean; autoApprove: boolean }>>(
-    Object.fromEntries(suggestionTypeOptions.map(o => [o.key, { enabled: true, autoApprove: false }]))
+    Object.fromEntries(aiConfigOptions.map(o => [o.key, { enabled: true, autoApprove: false }]))
   );
   const [openContacts, setOpenContacts] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -528,7 +539,7 @@ const Suggestions = () => {
             <PopoverContent className="w-80" align="end">
               <p className="text-sm font-semibold text-foreground mb-3">Configuração da IA</p>
               <div className="space-y-4">
-                {suggestionTypeOptions.map(opt => (
+                {aiConfigOptions.map(opt => (
                   <div key={opt.key} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-foreground">{opt.label}</span>
