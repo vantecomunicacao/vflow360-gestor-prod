@@ -20,8 +20,15 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const { permissions } = usePermissions();
   const { isAdmin, viewSuggestions, viewIntegrations, viewSettings } = permissions;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login", { replace: true });
+  };
 
   const navItems = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, show: true },
