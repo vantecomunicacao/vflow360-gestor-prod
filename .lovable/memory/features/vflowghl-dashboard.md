@@ -30,3 +30,5 @@ type: feature
 **Roles**: `app_role` enum (admin/user). Política `Admins can view all roles/profiles/workspaces` + `Admins can manage all workspace_members`. Hook `useIsAdmin` para sidebar/guards.
 
 **Regra preservada**: NÃO alterar Suggestions, ai-analyze, analyze-scheduler, tabela suggestions/ai_config.
+
+**ResponseTime (Tempo médio de resposta)**: usa o MESMO conjunto de oportunidades já filtrado pelo header (pipeline/etapa/vendedor/data). Cruza `opps.contact_phone` (normalizado p/ dígitos) com `conversations.contact_phone` do workspace. Fallback: quando `pipelineId` é null, restringe oportunidades a `stage_id ∈ (buckets mapeados ∪ won_stage_keys)`. Expediente configurável em `ghl_dashboard_settings.business_hours_{start,end}` (suporta noturno).
