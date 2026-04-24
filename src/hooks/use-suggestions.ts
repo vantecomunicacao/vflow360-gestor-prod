@@ -40,7 +40,8 @@ export function useAiConfig() {
         adicionar_nota: { enabled: true, autoApprove: false },
         valor_negociacao: { enabled: true, autoApprove: false },
         agendar_lembrete: { enabled: true, autoApprove: false },
-        ganho_perdido: { enabled: true, autoApprove: false },
+        marcar_ganho: { enabled: true, autoApprove: false },
+        marcar_perdido: { enabled: true, autoApprove: false },
       };
       if (data) {
         for (const c of data) {
