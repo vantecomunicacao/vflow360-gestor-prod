@@ -1,8 +1,9 @@
 import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -19,8 +20,15 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const { permissions } = usePermissions();
   const { isAdmin, viewSuggestions, viewIntegrations, viewSettings } = permissions;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login", { replace: true });
+  };
 
   const navItems = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, show: true },
@@ -72,15 +80,12 @@ export function AppSidebar() {
       <SidebarFooter className="p-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <NavLink
-                to="/login"
-                className="flex items-center gap-3 px-3 py-2 rounded-md text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                activeClassName=""
-              >
-                <LogOut className="w-5 h-5 shrink-0" />
-                {!collapsed && <span>Sair</span>}
-              </NavLink>
+            <SidebarMenuButton
+              onClick={handleSignOut}
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-sidebar-foreground hover:bg-sidebar-accent transition-colors w-full"
+            >
+              <LogOut className="w-5 h-5 shrink-0" />
+              {!collapsed && <span>Sair</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
