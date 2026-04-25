@@ -109,7 +109,7 @@ export function Header({
   const stages = selectedPipeline?.stages || [];
 
   return (
-    <header className="mb-5 sm:mb-6">
+    <header className="sticky top-0 z-30 -mx-6 px-6 py-3 mb-5 sm:mb-6 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 border-b border-border/60">
       <div className="flex items-center justify-between gap-4 mb-3">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {cachedAt && !isLoading && <span>Atualizado às {format(new Date(cachedAt), "HH:mm:ss", { locale: ptBR })}</span>}
