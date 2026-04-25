@@ -148,11 +148,11 @@ export function Header({
           )}
 
           <Select value={selectedPipelineId || "all"} onValueChange={(v) => onPipelineChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+            <SelectTrigger className="w-full sm:w-[180px] h-9 rounded-lg text-sm">
               <GitBranch className="w-4 h-4 mr-2 opacity-50" />
               <SelectValue placeholder="Funil" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
+            <SelectContent className="rounded-lg">
               <SelectItem value="all">Todos os funis</SelectItem>
               {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
             </SelectContent>
@@ -160,11 +160,11 @@ export function Header({
 
           {selectedPipelineId && stages.length > 0 && onStageChange && (
             <Select value={selectedStageId || "all"} onValueChange={(v) => onStageChange(v === "all" ? null : v)}>
-              <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+              <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
                 <Layers className="w-4 h-4 mr-2 opacity-50" />
                 <SelectValue placeholder="Etapa" />
               </SelectTrigger>
-              <SelectContent className="rounded-xl">
+              <SelectContent className="rounded-lg">
                 <SelectItem value="all">Todas as etapas</SelectItem>
                 {stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
               </SelectContent>
@@ -172,22 +172,22 @@ export function Header({
           )}
 
           <Select value={selectedSellerId || "all"} onValueChange={(v) => onSellerChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+            <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
               <Users className="w-4 h-4 mr-2 opacity-50" />
               <SelectValue placeholder="Vendedor" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
+            <SelectContent className="rounded-lg">
               <SelectItem value="all">Todos os vendedores</SelectItem>
               {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={selectedOrigin || "all"} onValueChange={(v) => onOriginChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+            <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
               <Globe className="w-4 h-4 mr-2 opacity-50" />
               <SelectValue placeholder="Origem" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
+            <SelectContent className="rounded-lg">
               <SelectItem value="all">Todas as origens</SelectItem>
               {origins.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
