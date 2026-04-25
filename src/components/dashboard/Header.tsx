@@ -109,14 +109,14 @@ export function Header({
   const stages = selectedPipeline?.stages || [];
 
   return (
-    <header className="sticky top-0 z-30 -mx-6 px-6 py-3 mb-5 sm:mb-6 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 border-b border-border/60">
-      <div className="flex items-center justify-between gap-4 mb-3">
+    <header className="sticky top-0 z-30 bg-card border-b border-border">
+      <div className="flex items-center justify-between gap-4 px-4 py-2">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {cachedAt && !isLoading && <span>Atualizado às {format(new Date(cachedAt), "HH:mm:ss", { locale: ptBR })}</span>}
         </div>
-        <Button variant="outline" size="sm" className="shrink-0 gap-2 rounded-xl h-9" onClick={() => onRefresh(true)} disabled={isLoading} title="Forçar atualização (sincroniza com o GHL)">
+        <Button variant="ghost" size="sm" className="shrink-0 gap-1.5 h-8 px-2" onClick={() => onRefresh(true)} disabled={isLoading} title="Forçar atualização">
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          <span>Atualizar agora</span>
+          <span className="hidden sm:inline">Atualizar</span>
         </Button>
       </div>
 
