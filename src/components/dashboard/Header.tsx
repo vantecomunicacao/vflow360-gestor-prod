@@ -194,12 +194,12 @@ export function Header({
           </Select>
 
           {(selectedPipelineId || selectedStageId || selectedSellerId || selectedOrigin || hasAdditionalRange) && (
-            <Button variant="ghost" size="sm" className="h-10 text-muted-foreground hover:text-foreground rounded-xl w-full sm:w-auto"
+            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground rounded-lg text-sm"
               onClick={() => {
                 onPipelineChange(null); onStageChange?.(null); onSellerChange(null); onOriginChange(null);
                 onAdditionalDateRangeChange?.(undefined);
               }}>
-              Limpar filtros
+              Limpar
             </Button>
           )}
         </div>
