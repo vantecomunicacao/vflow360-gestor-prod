@@ -61,7 +61,7 @@ function DateRangeFilter({ dateRange, onDateRangeChange, label, icon: Icon = Cal
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="gap-2 font-semibold h-10 rounded-xl">
+        <Button variant="outline" className="gap-2 h-9 rounded-lg text-sm">
           <Icon className="w-4 h-4" />
           {dateRange?.from ? (
             dateRange.to ? (
