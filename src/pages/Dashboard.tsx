@@ -22,8 +22,22 @@ import { LoadingState } from "@/components/dashboard/LoadingState";
 import { ErrorState } from "@/components/dashboard/ErrorState";
 import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
 
+type SavedFilters = {
+  from?: string;
+  to?: string;
+  addFrom?: string;
+  addTo?: string;
+  pipelineId?: string | null;
+  stageId?: string | null;
+  sellerId?: string | null;
+  origin?: string | null;
+};
+
+const filtersStorageKey = (workspaceId: string) => `dashboard:filters:${workspaceId}`;
+
 export default function Dashboard() {
   const { activeWorkspace } = useWorkspace();
+  const [hydrated, setHydrated] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 6),
     to: new Date(),
@@ -34,28 +48,88 @@ export default function Dashboard() {
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
   const [selectedOrigin, setSelectedOrigin] = useState<string | null>(null);
 
-  // Reset filtros + carregar pipeline padrão ao trocar de workspace
+  // Hidratar filtros salvos por workspace (ou aplicar pipeline padrão)
   useEffect(() => {
-    setSelectedSellerId(null);
-    setSelectedOrigin(null);
-    setSelectedStageId(null);
-    setAdditionalDateRange(undefined);
-    setSelectedPipelineId(null);
-
+    setHydrated(false);
     if (!activeWorkspace?.id) return;
     let cancelled = false;
+
     (async () => {
-      const { data } = await supabase
-        .from("ghl_dashboard_settings")
-        .select("default_pipeline_ids")
-        .eq("workspace_id", activeWorkspace.id)
-        .maybeSingle();
-      if (cancelled) return;
-      const def = (data?.default_pipeline_ids || [])[0];
-      if (def) setSelectedPipelineId(def);
+      // 1) Tentar restaurar filtros salvos
+      let restored = false;
+      try {
+        const raw = localStorage.getItem(filtersStorageKey(activeWorkspace.id));
+        if (raw) {
+          const saved = JSON.parse(raw) as SavedFilters;
+          if (saved.from) {
+            setDateRange({
+              from: new Date(saved.from),
+              to: saved.to ? new Date(saved.to) : undefined,
+            });
+          } else {
+            setDateRange({ from: subDays(new Date(), 6), to: new Date() });
+          }
+          setAdditionalDateRange(
+            saved.addFrom
+              ? { from: new Date(saved.addFrom), to: saved.addTo ? new Date(saved.addTo) : undefined }
+              : undefined
+          );
+          setSelectedPipelineId(saved.pipelineId ?? null);
+          setSelectedStageId(saved.stageId ?? null);
+          setSelectedSellerId(saved.sellerId ?? null);
+          setSelectedOrigin(saved.origin ?? null);
+          restored = true;
+        }
+      } catch {
+        // ignora storage corrompido
+      }
+
+      if (!restored) {
+        // Reset padrão
+        setDateRange({ from: subDays(new Date(), 6), to: new Date() });
+        setAdditionalDateRange(undefined);
+        setSelectedSellerId(null);
+        setSelectedOrigin(null);
+        setSelectedStageId(null);
+        setSelectedPipelineId(null);
+
+        // Aplicar pipeline padrão do workspace
+        const { data } = await supabase
+          .from("ghl_dashboard_settings")
+          .select("default_pipeline_ids")
+          .eq("workspace_id", activeWorkspace.id)
+          .maybeSingle();
+        if (cancelled) return;
+        const def = (data?.default_pipeline_ids || [])[0];
+        if (def) setSelectedPipelineId(def);
+      }
+
+      if (!cancelled) setHydrated(true);
     })();
+
     return () => { cancelled = true; };
   }, [activeWorkspace?.id]);
+
+  // Persistir filtros no localStorage por workspace
+  useEffect(() => {
+    if (!hydrated || !activeWorkspace?.id) return;
+    const payload: SavedFilters = {
+      from: dateRange?.from ? dateRange.from.toISOString() : undefined,
+      to: dateRange?.to ? dateRange.to.toISOString() : undefined,
+      addFrom: additionalDateRange?.from ? additionalDateRange.from.toISOString() : undefined,
+      addTo: additionalDateRange?.to ? additionalDateRange.to.toISOString() : undefined,
+      pipelineId: selectedPipelineId,
+      stageId: selectedStageId,
+      sellerId: selectedSellerId,
+      origin: selectedOrigin,
+    };
+    try {
+      localStorage.setItem(filtersStorageKey(activeWorkspace.id), JSON.stringify(payload));
+    } catch {
+      // ignora quota cheia
+    }
+  }, [hydrated, activeWorkspace?.id, dateRange, additionalDateRange, selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin]);
+
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 6)), [dateRange?.from]);
   const endDate = useMemo(() => endOfDay(dateRange?.to || dateRange?.from || new Date()), [dateRange?.to, dateRange?.from]);
