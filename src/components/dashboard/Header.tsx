@@ -61,7 +61,7 @@ function DateRangeFilter({ dateRange, onDateRangeChange, label, icon: Icon = Cal
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="gap-2 font-semibold h-10 rounded-xl">
+        <Button variant="outline" className="gap-2 h-9 rounded-lg text-sm">
           <Icon className="w-4 h-4" />
           {dateRange?.from ? (
             dateRange.to ? (
@@ -109,20 +109,20 @@ export function Header({
   const stages = selectedPipeline?.stages || [];
 
   return (
-    <header className="sticky top-0 z-30 -mx-6 px-6 py-3 mb-5 sm:mb-6 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 border-b border-border/60">
-      <div className="flex items-center justify-between gap-4 mb-3">
+    <header className="sticky top-0 z-30 bg-card border-b border-border">
+      <div className="flex items-center justify-between gap-4 px-4 py-2">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {cachedAt && !isLoading && <span>Atualizado às {format(new Date(cachedAt), "HH:mm:ss", { locale: ptBR })}</span>}
         </div>
-        <Button variant="outline" size="sm" className="shrink-0 gap-2 rounded-xl h-9" onClick={() => onRefresh(true)} disabled={isLoading} title="Forçar atualização (sincroniza com o GHL)">
+        <Button variant="ghost" size="sm" className="shrink-0 gap-1.5 h-8 px-2" onClick={() => onRefresh(true)} disabled={isLoading} title="Forçar atualização">
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          <span>Atualizar agora</span>
+          <span className="hidden sm:inline">Atualizar</span>
         </Button>
       </div>
 
-      <div>
-        <button type="button" className="flex sm:hidden items-center justify-between w-full p-3 bg-card rounded-xl border border-border shadow-sm" onClick={() => setFiltersOpen(!filtersOpen)}>
-          <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+      <div className="px-4 pb-2">
+        <button type="button" className="flex sm:hidden items-center justify-between w-full p-2 bg-muted/50 rounded-lg border border-border" onClick={() => setFiltersOpen(!filtersOpen)}>
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Filter className="w-4 h-4" />Filtros
             {activeFilterCount > 0 && <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>}
           </div>
@@ -130,12 +130,11 @@ export function Header({
         </button>
 
         <div className={cn(
-          "bg-card rounded-2xl border border-border shadow-sm overflow-hidden transition-all duration-200",
-          "sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 sm:p-3.5",
-          filtersOpen ? "flex flex-col gap-2 p-3 mt-1.5" : "hidden sm:flex",
+          "flex flex-wrap items-center gap-2",
+          filtersOpen ? "flex flex-col gap-2 mt-2" : "hidden sm:flex"
         )}>
-          <div className="hidden sm:flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-            <Filter className="w-4 h-4" />Filtros
+          <div className="hidden sm:flex items-center gap-2 text-sm font-medium text-muted-foreground mr-1">
+            <Filter className="w-4 h-4" />
           </div>
 
           <DateRangeFilter dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
@@ -149,11 +148,11 @@ export function Header({
           )}
 
           <Select value={selectedPipelineId || "all"} onValueChange={(v) => onPipelineChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+            <SelectTrigger className="w-full sm:w-[180px] h-9 rounded-lg text-sm">
               <GitBranch className="w-4 h-4 mr-2 opacity-50" />
               <SelectValue placeholder="Funil" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
+            <SelectContent className="rounded-lg">
               <SelectItem value="all">Todos os funis</SelectItem>
               {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
             </SelectContent>
@@ -161,11 +160,11 @@ export function Header({
 
           {selectedPipelineId && stages.length > 0 && onStageChange && (
             <Select value={selectedStageId || "all"} onValueChange={(v) => onStageChange(v === "all" ? null : v)}>
-              <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+              <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
                 <Layers className="w-4 h-4 mr-2 opacity-50" />
                 <SelectValue placeholder="Etapa" />
               </SelectTrigger>
-              <SelectContent className="rounded-xl">
+              <SelectContent className="rounded-lg">
                 <SelectItem value="all">Todas as etapas</SelectItem>
                 {stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
               </SelectContent>
@@ -173,34 +172,34 @@ export function Header({
           )}
 
           <Select value={selectedSellerId || "all"} onValueChange={(v) => onSellerChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+            <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
               <Users className="w-4 h-4 mr-2 opacity-50" />
               <SelectValue placeholder="Vendedor" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
+            <SelectContent className="rounded-lg">
               <SelectItem value="all">Todos os vendedores</SelectItem>
               {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={selectedOrigin || "all"} onValueChange={(v) => onOriginChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[200px] h-10 rounded-xl">
+            <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
               <Globe className="w-4 h-4 mr-2 opacity-50" />
               <SelectValue placeholder="Origem" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
+            <SelectContent className="rounded-lg">
               <SelectItem value="all">Todas as origens</SelectItem>
               {origins.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
 
           {(selectedPipelineId || selectedStageId || selectedSellerId || selectedOrigin || hasAdditionalRange) && (
-            <Button variant="ghost" size="sm" className="h-10 text-muted-foreground hover:text-foreground rounded-xl w-full sm:w-auto"
+            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground rounded-lg text-sm"
               onClick={() => {
                 onPipelineChange(null); onStageChange?.(null); onSellerChange(null); onOriginChange(null);
                 onAdditionalDateRangeChange?.(undefined);
               }}>
-              Limpar filtros
+              Limpar
             </Button>
           )}
         </div>
