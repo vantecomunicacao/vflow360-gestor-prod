@@ -120,9 +120,9 @@ export function Header({
         </Button>
       </div>
 
-      <div>
-        <button type="button" className="flex sm:hidden items-center justify-between w-full p-3 bg-card rounded-xl border border-border shadow-sm" onClick={() => setFiltersOpen(!filtersOpen)}>
-          <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+      <div className="px-4 pb-2">
+        <button type="button" className="flex sm:hidden items-center justify-between w-full p-2 bg-muted/50 rounded-lg border border-border" onClick={() => setFiltersOpen(!filtersOpen)}>
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Filter className="w-4 h-4" />Filtros
             {activeFilterCount > 0 && <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>}
           </div>
@@ -130,12 +130,11 @@ export function Header({
         </button>
 
         <div className={cn(
-          "bg-card rounded-2xl border border-border shadow-sm overflow-hidden transition-all duration-200",
-          "sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 sm:p-3.5",
-          filtersOpen ? "flex flex-col gap-2 p-3 mt-1.5" : "hidden sm:flex",
+          "flex flex-wrap items-center gap-2",
+          filtersOpen ? "flex flex-col gap-2 mt-2" : "hidden sm:flex"
         )}>
-          <div className="hidden sm:flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-            <Filter className="w-4 h-4" />Filtros
+          <div className="hidden sm:flex items-center gap-2 text-sm font-medium text-muted-foreground mr-1">
+            <Filter className="w-4 h-4" />
           </div>
 
           <DateRangeFilter dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
