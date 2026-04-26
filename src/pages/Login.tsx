@@ -61,7 +61,7 @@ const Login = () => {
           <Bot className="w-16 h-16 text-primary-foreground mx-auto mb-6" />
           <h1 className="text-4xl font-bold text-primary-foreground mb-4">VFlow36</h1>
           <p className="text-primary-foreground/80 text-lg max-w-md">
-            Seu assistente inteligente para Go High Level. Analise conversas, receba sugestões e atualize seu CRM automaticamente.
+            Seu assistente inteligente para vendas. Analise conversas, receba sugestões e atualize seu CRM automaticamente.
           </p>
         </motion.div>
       </div>

@@ -552,7 +552,7 @@ const Integrations = () => {
       <div className="space-y-6 flex-1 max-w-3xl">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Integrações</h1>
-          <p className="text-muted-foreground">Gerencie suas conexões com WhatsApp e Go High Level</p>
+          <p className="text-muted-foreground">Gerencie suas conexões com WhatsApp e seu CRM</p>
         </div>
 
       {/* WhatsApp */}
