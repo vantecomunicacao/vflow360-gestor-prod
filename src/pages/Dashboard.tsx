@@ -200,11 +200,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">{activeWorkspace.name} · oportunidades GHL</p>
-      </div>
-
       <Header
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
@@ -226,6 +221,11 @@ export default function Dashboard() {
         onAdditionalDateRangeChange={setAdditionalDateRange}
         additionalDateLabel={data.additionalDateFieldName || null}
       />
+
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground">{activeWorkspace.name} · oportunidades GHL</p>
+      </div>
 
       <AnimatedSection className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
         <MetricCard title="Total de Oportunidades" value={data.totalLeads} subtitle="no período selecionado" icon={Users} variant="default" tooltip="Quantidade total de oportunidades criadas no período filtrado." trend={leadsTrend} />
