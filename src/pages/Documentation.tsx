@@ -10,7 +10,7 @@ const Documentation = () => {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Documentação</h1>
         <p className="text-muted-foreground mt-1">
-          Entenda como o VFlowGHL funciona por dentro.
+          Entenda como o VFlow36 funciona por dentro.
         </p>
       </div>
 
@@ -98,10 +98,10 @@ const Documentation = () => {
             {[
               { step: "1", title: "Mensagem recebida", desc: "Lead envia mensagem no WhatsApp → webhook recebe a mensagem e salva no banco de dados." },
               { step: "2", title: "Verificação de contato", desc: "O sistema verifica se o contato está com análise de IA desativada. Se estiver, a análise é ignorada." },
-              { step: "3", title: "Coleta de contexto", desc: "Busca as últimas 50 mensagens, configurações do GHL (campos/etapas habilitadas), e as últimas 20 sugestões." },
+              { step: "3", title: "Coleta de contexto", desc: "Busca as últimas 50 mensagens, configurações do CRM (campos/etapas habilitadas), e as últimas 20 sugestões." },
               { step: "4", title: "Análise pela IA", desc: "A IA analisa a conversa usando as configurações de campos, etapas e prompt personalizado, e gera sugestões de ações via tool calling." },
               { step: "5", title: "Validação pós-geração", desc: "As sugestões passam por filtros: campos/etapas inválidos são removidos, contradições são eliminadas, e duplicatas (60%+ similaridade) são filtradas." },
-              { step: "6", title: "Salvar e executar", desc: "Sugestões são salvas no banco. Se auto-aprovar está ativo para o tipo de ação, a sugestão é executada imediatamente no GHL." },
+              { step: "6", title: "Salvar e executar", desc: "Sugestões são salvas no banco. Se auto-aprovar está ativo para o tipo de ação, a sugestão é executada imediatamente no CRM." },
             ].map((item) => (
               <div key={item.step} className="flex items-start gap-3">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
@@ -130,10 +130,10 @@ const Documentation = () => {
             {[
               { type: "mover_funil", label: "Mover Funil", desc: "Move o lead para outra etapa do funil/pipeline configurado.", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
               { type: "campo_personalizado", label: "Campo Personalizado", desc: "Atualiza campos do contato ou oportunidade no CRM (texto, dropdown, checkbox etc).", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
-              { type: "adicionar_nota", label: "Adicionar Nota", desc: "Adiciona uma nota de texto no contato do GHL.", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+              { type: "adicionar_nota", label: "Adicionar Nota", desc: "Adiciona uma nota de texto no contato do CRM.", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
               { type: "valor_negociacao", label: "Valor da Negociação", desc: "Atualiza o valor monetário da oportunidade. A IA detecta automaticamente menções a preço/valor na conversa.", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" },
-              { type: "agendar_lembrete", label: "Agendar Lembrete", desc: "Cria uma tarefa no GHL com título e data de vencimento. Se não informada, usa 24h a partir do momento.", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
-              { type: "ganho_perdido", label: "Ganho/Perdido", desc: "Marca a oportunidade como ganha ou perdida no GHL.", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+              { type: "agendar_lembrete", label: "Agendar Lembrete", desc: "Cria uma tarefa no CRM com título e data de vencimento. Se não informada, usa 24h a partir do momento.", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
+              { type: "ganho_perdido", label: "Ganho/Perdido", desc: "Marca a oportunidade como ganha ou perdida no CRM.", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
             ].map((action) => (
               <div key={action.type} className="flex items-start gap-3 rounded-lg border p-3">
                 <Badge variant="outline" className={`shrink-0 ${action.color}`}>
@@ -192,7 +192,7 @@ const Documentation = () => {
                 <p className="font-medium">Auto-aprovar</p>
               </div>
               <p className="text-sm text-muted-foreground">
-                A sugestão é gerada e <strong>executada imediatamente</strong> no GHL sem intervenção humana. 
+                A sugestão é gerada e <strong>executada imediatamente</strong> no CRM sem intervenção humana. 
                 Se a execução falhar, o status volta para "pendente" para retry manual.
               </p>
             </div>
@@ -279,12 +279,12 @@ const Documentation = () => {
               <AccordionContent>
                 A IA é conservadora por design, mas pode interpretar mal o contexto. 
                 Você pode rejeitar sugestões incorretas e ajustar o prompt personalizado 
-                nas configurações do GHL para refinar o comportamento. Sugestões rejeitadas 
+                nas configurações do CRM para refinar o comportamento. Sugestões rejeitadas 
                 ajudam a IA a não repetir o mesmo erro.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="q3">
-              <AccordionTrigger>O que acontece se a execução no GHL falhar?</AccordionTrigger>
+              <AccordionTrigger>O que acontece se a execução no CRM falhar?</AccordionTrigger>
               <AccordionContent>
                 Se uma sugestão auto-aprovada falhar na execução, o status é revertido para 
                 "pendente" automaticamente. Você pode tentar aprovar novamente manualmente. 
@@ -310,7 +310,7 @@ const Documentation = () => {
             <AccordionItem value="q6">
               <AccordionTrigger>Posso personalizar o comportamento da IA?</AccordionTrigger>
               <AccordionContent>
-                Sim! Nas configurações de integração do GHL, você pode adicionar um <strong>prompt 
+                Sim! Nas configurações de integração do CRM, você pode adicionar um <strong>prompt 
                 personalizado</strong> que é injetado na análise. Use para dar instruções específicas 
                 sobre seu negócio, como critérios de qualificação de leads ou regras de movimentação de funil.
               </AccordionContent>
