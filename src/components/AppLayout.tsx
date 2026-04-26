@@ -8,10 +8,7 @@ const AppLayout = () => {
       <div className="h-screen flex w-full overflow-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0 h-screen">
-          <header className="h-14 shrink-0 flex items-center border-b border-border px-4">
-            <SidebarTrigger />
-          </header>
-          <main className="flex-1 p-6 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto">
             <Outlet />
           </main>
         </div>
