@@ -552,7 +552,7 @@ const Integrations = () => {
       <div className="space-y-6 flex-1 max-w-3xl">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Integrações</h1>
-          <p className="text-muted-foreground">Gerencie suas conexões com WhatsApp e Go High Level</p>
+          <p className="text-muted-foreground">Gerencie suas conexões com WhatsApp e seu CRM</p>
         </div>
 
       {/* WhatsApp */}
@@ -735,7 +735,7 @@ const Integrations = () => {
         )}
       </motion.div>
 
-      {/* GHL */}
+      {/* CRM */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -743,9 +743,9 @@ const Integrations = () => {
               <Link2 className="w-5 h-5 text-info" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">Go High Level</h3>
+              <h3 className="font-semibold text-foreground">CRM</h3>
               <p className="text-sm text-muted-foreground">
-                {ghlConnected && ghlLocationName ? `Conectado: ${ghlLocationName}` : "Integração com CRM"}
+                {ghlConnected && ghlLocationName ? `Conectado: ${ghlLocationName}` : "Integração com seu CRM"}
               </p>
             </div>
           </div>
@@ -757,7 +757,7 @@ const Integrations = () => {
         {!ghlConnected ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Insira seu Private Integration Token e Location ID do Go High Level. Encontre em: Settings → Integrations → API Keys.
+              Insira seu Private Integration Token e Location ID. Encontre em: Settings → Integrations → API Keys.
             </p>
             <div className="space-y-2">
               <Label>API Key (Private Integration Token)</Label>
@@ -780,7 +780,7 @@ const Integrations = () => {
                   setGhlLocationName(data.locationName || "");
                   setGhlApiKey("");
                   setGhlLocationId("");
-                  toast({ title: "GHL conectado!", description: `Location: ${data.locationName || ghlLocationId}` });
+                  toast({ title: "CRM conectado!", description: `Location: ${data.locationName || ghlLocationId}` });
                 } catch (error) {
                   resetGhlState();
                   toast({ title: "Erro ao conectar", description: error instanceof Error ? error.message : "Verifique suas credenciais", variant: "destructive" });
@@ -804,7 +804,7 @@ const Integrations = () => {
                 try {
                   await callGhl("disconnect");
                   resetGhlState();
-                  toast({ title: "GHL desconectado" });
+                  toast({ title: "CRM desconectado" });
                 } catch (error) {
                   toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao desconectar", variant: "destructive" });
                 } finally {
@@ -817,19 +817,19 @@ const Integrations = () => {
 
             <Separator />
 
-            {/* Custom Fields from GHL */}
+            {/* Custom Fields */}
             <div className="space-y-4">
               <div>
-                <h4 className="font-semibold text-foreground text-sm">Campos do GHL</h4>
+                <h4 className="font-semibold text-foreground text-sm">Campos do CRM</h4>
                 <p className="text-xs text-muted-foreground">Selecione os campos que a IA deve considerar e descreva o que cada um representa</p>
               </div>
 
               {loadingFields ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando campos do GHL...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando campos do CRM...
                 </div>
               ) : ghlFields.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">Nenhum campo encontrado no GHL.</p>
+                <p className="text-sm text-muted-foreground py-4">Nenhum campo encontrado no CRM.</p>
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-1">Campos padrão</p>
@@ -902,7 +902,7 @@ const Integrations = () => {
 
             <Separator />
 
-            {/* Pipeline Stages from GHL */}
+            {/* Pipeline Stages */}
             <div className="space-y-4">
               <div>
                 <h4 className="font-semibold text-foreground text-sm">Etapas do Funil</h4>
@@ -911,10 +911,10 @@ const Integrations = () => {
 
               {loadingStages ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando etapas do GHL...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando etapas do CRM...
                 </div>
               ) : ghlStages.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">Nenhum funil encontrado no GHL.</p>
+                <p className="text-sm text-muted-foreground py-4">Nenhum funil encontrado no CRM.</p>
               ) : (
                 <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                   {ghlStages.map((stage) => (

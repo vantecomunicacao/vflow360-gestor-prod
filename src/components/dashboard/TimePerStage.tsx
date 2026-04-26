@@ -54,7 +54,7 @@ export function TimePerStage({ averageTimePerStage }: TimePerStageProps) {
       <div className="mt-7 p-4 bg-secondary/50 rounded-2xl">
         <p className="text-xs text-muted-foreground">
           <strong className="text-foreground">Nota:</strong> Estimativa baseada em <code>last_status_change_at</code> da oportunidade.
-          Para cálculo preciso por etapa, é necessário histórico completo de mudanças de etapa do GHL.
+          Para cálculo preciso por etapa, é necessário histórico completo de mudanças de etapa do CRM.
         </p>
       </div>
     </div>

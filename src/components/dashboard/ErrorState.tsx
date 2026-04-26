@@ -17,7 +17,7 @@ export function ErrorState({ error, onRetry }: ErrorStateProps) {
           <h2 className="text-xl font-semibold text-foreground mb-2">Erro ao carregar dashboard</h2>
           <p className="text-sm text-muted-foreground mb-4">{error}</p>
           <p className="text-xs text-muted-foreground">
-            Verifique se a integração GHL está conectada e se já foi feito ao menos um sync.
+            Verifique se a integração do CRM está conectada e se já foi feito ao menos um sync.
           </p>
         </div>
         <Button onClick={onRetry} className="gap-2">

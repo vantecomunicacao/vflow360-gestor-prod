@@ -173,7 +173,7 @@ export default function Dashboard() {
   }
   if (isLoading && !data) return <LoadingState />;
   if (error && !data) return <ErrorState error={error} onRetry={() => refetch(true)} />;
-  if (!data) return <ErrorState error="Sem dados. Clique em Atualizar agora para sincronizar com o GHL." onRetry={() => refetch(true)} />;
+  if (!data) return <ErrorState error="Sem dados. Clique em Atualizar agora para sincronizar com o VFlow36." onRetry={() => refetch(true)} />;
 
   const formatPercentage = (v: number) => `${v.toFixed(1)}%`;
   const calcTrend = (cur: number, prev: number) => {
@@ -224,7 +224,7 @@ export default function Dashboard() {
 
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">{activeWorkspace.name} · oportunidades GHL</p>
+        <p className="text-muted-foreground">{activeWorkspace.name} · oportunidades VFlow36</p>
       </div>
 
       <AnimatedSection className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">

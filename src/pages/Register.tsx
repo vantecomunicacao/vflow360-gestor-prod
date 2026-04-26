@@ -50,11 +50,11 @@ const Register = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <Bot className="w-8 h-8 text-primary" />
-          <span className="text-2xl font-bold text-foreground">VFlowGHL</span>
+          <span className="text-2xl font-bold text-foreground">VFlow36</span>
         </div>
 
         <h2 className="text-2xl font-semibold text-foreground mb-1">Criar nova conta</h2>
-        <p className="text-muted-foreground mb-8">Comece a usar o VFlowGHL gratuitamente</p>
+        <p className="text-muted-foreground mb-8">Comece a usar o VFlow36 gratuitamente</p>
 
         <form onSubmit={handleRegister} className="space-y-5">
           <div className="space-y-2">

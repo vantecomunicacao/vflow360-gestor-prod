@@ -249,7 +249,7 @@ const Workspaces = () => {
               Esta ação é <strong>irreversível</strong>. Todas as conversas, integrações, sugestões e
               configurações dessa conta serão removidas permanentemente do sistema.
               <br /><br />
-              <strong>Importante:</strong> as conversas no WhatsApp e os dados no GoHighLevel não serão afetados.
+              <strong>Importante:</strong> as conversas no WhatsApp e os dados no seu CRM não serão afetados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -6,7 +6,7 @@ export function LoadingState() {
       <div className="text-center space-y-4">
         <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Carregando dados do GHL...</h2>
+          <h2 className="text-lg font-semibold text-foreground">Carregando dados do VFlow36...</h2>
           <p className="text-sm text-muted-foreground">Agregando oportunidades, pipelines e vendedores</p>
         </div>
       </div>

@@ -21,7 +21,7 @@ export function LossReasons({ lossReasons, totalLost }: LossReasonsProps) {
         <h2 className="section-title mb-0">
           <XCircle className="w-5 h-5 text-destructive" />
           Motivos de Perda
-          <SectionTooltip text="Distribuição dos motivos para oportunidades marcadas como Perdidas no GHL." />
+          <SectionTooltip text="Distribuição dos motivos para oportunidades marcadas como Perdidas." />
         </h2>
         <div className="px-4 py-2 rounded-2xl text-sm font-bold border bg-destructive/5 border-destructive/10 text-destructive">
           Preenchido: {fillRate}%

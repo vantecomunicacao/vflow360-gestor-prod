@@ -50,7 +50,7 @@ const ResetPassword = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <Bot className="w-8 h-8 text-primary" />
-          <span className="text-2xl font-bold text-foreground">VFlowGHL</span>
+          <span className="text-2xl font-bold text-foreground">VFlow36</span>
         </div>
 
         <h2 className="text-2xl font-semibold text-foreground mb-1">Redefinir senha</h2>

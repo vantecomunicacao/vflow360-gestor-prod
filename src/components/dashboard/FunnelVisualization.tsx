@@ -75,7 +75,7 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
         <h2 className="section-title mb-0">
           <TrendingUp className="w-5 h-5 text-accent" />
           Visão Geral do Funil
-          <SectionTooltip text="Etapas do funil de oportunidades GHL com taxas de conversão entre fases. Clique em 'Perdidas' para ver detalhes." />
+          <SectionTooltip text="Etapas do funil de oportunidades com taxas de conversão entre fases. Clique em 'Perdidas' para ver detalhes." />
         </h2>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Conversão geral:</span>
