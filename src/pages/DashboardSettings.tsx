@@ -252,7 +252,7 @@ export default function DashboardSettings() {
         <CardHeader>
           <CardTitle>Mapeamento do funil</CardTitle>
           <CardDescription>
-            Associe cada etapa do GHL a uma das 4 fases do funil analítico. Etapas sem mapeamento são ignoradas.
+            Associe cada etapa do CRM a uma das 4 fases do funil analítico. Etapas sem mapeamento são ignoradas.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -335,7 +335,7 @@ export default function DashboardSettings() {
           <CardTitle>Campos customizados visíveis</CardTitle>
           <CardDescription>
             Quais campos contam na seção de Qualidade dos Dados. Apenas campos de <strong>Oportunidade</strong> são exibidos
-            — campos de Contato não são salvos nas oportunidades do GHL e apareceriam sempre como 0% preenchidos.
+            — campos de Contato não são salvos nas oportunidades do CRM e apareceriam sempre como 0% preenchidos.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 max-h-96 overflow-y-auto">
@@ -424,7 +424,7 @@ export default function DashboardSettings() {
           <CardTitle>Campo de data adicional (opcional)</CardTitle>
           <CardDescription>
             Quando configurado, o dashboard ganha um segundo filtro de período baseado nesse campo (ex: data de fechamento).
-            Apenas campos do tipo data do GHL são listados.
+            Apenas campos do tipo data do CRM são listados.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -433,7 +433,7 @@ export default function DashboardSettings() {
               f.data_type ? DATE_TYPES.includes(f.data_type) : false
             );
             if (dateFields.length === 0) {
-              return <p className="text-sm text-muted-foreground">Nenhum campo de data sincronizado do GHL.</p>;
+              return <p className="text-sm text-muted-foreground">Nenhum campo de data sincronizado do CRM.</p>;
             }
             return (
               <Select
