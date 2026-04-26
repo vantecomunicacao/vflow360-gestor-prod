@@ -241,8 +241,8 @@ export function Header({
   );
 
   return (
-    <header className="sticky top-0 -mx-6 -mt-6 z-30 bg-card/95 backdrop-blur-sm border-b border-border">
-      <div className="flex items-center gap-2 px-4 h-12">
+    <header className="sticky top-0 -mx-6 -mt-6 mb-2 z-30 bg-card/95 backdrop-blur-sm border-b border-border">
+      <div className="flex items-center gap-2 pl-14 pr-4 h-14">
         {/* Mobile: filtros em sheet */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
