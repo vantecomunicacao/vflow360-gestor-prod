@@ -1,9 +1,12 @@
-import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Globe, ChevronUp, Layers } from "lucide-react";
+import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Globe, Layers, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
@@ -43,9 +46,24 @@ const datePresets = [
   { label: "Este ano", getValue: () => ({ from: startOfYear(new Date()), to: new Date() }) },
 ];
 
-function DateRangeFilter({ dateRange, onDateRangeChange, label, icon: Icon = CalendarDays }: {
-  dateRange: DateRange | undefined; onDateRangeChange: (r: DateRange | undefined) => void;
-  label?: string; icon?: typeof CalendarDays;
+function formatRangeLabel(range: DateRange | undefined) {
+  if (!range?.from) return null;
+  if (!range.to) return format(range.from, "dd MMM yyyy", { locale: ptBR });
+  const sameYear = range.from.getFullYear() === range.to.getFullYear();
+  return sameYear
+    ? `${format(range.from, "dd MMM", { locale: ptBR })} – ${format(range.to, "dd MMM, yyyy", { locale: ptBR })}`
+    : `${format(range.from, "dd MMM yyyy", { locale: ptBR })} – ${format(range.to, "dd MMM yyyy", { locale: ptBR })}`;
+}
+
+function DateRangePicker({
+  dateRange, onDateRangeChange, label, placeholder = "Período", icon: Icon = CalendarDays, className,
+}: {
+  dateRange: DateRange | undefined;
+  onDateRangeChange: (r: DateRange | undefined) => void;
+  label?: string;
+  placeholder?: string;
+  icon?: typeof CalendarDays;
+  className?: string;
 }) {
   const [localRange, setLocalRange] = useState<DateRange | undefined>(dateRange);
   const [open, setOpen] = useState(false);
@@ -58,39 +76,95 @@ function DateRangeFilter({ dateRange, onDateRangeChange, label, icon: Icon = Cal
     }
   };
 
+  const labelText = formatRangeLabel(dateRange);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="gap-2 h-9 rounded-lg text-sm">
-          <Icon className="w-4 h-4" />
-          {dateRange?.from ? (
-            dateRange.to ? (
-              <>{label ? `${label}: ` : ""}{format(dateRange.from, "dd MMM", { locale: ptBR })} - {format(dateRange.to, "dd MMM", { locale: ptBR })}</>
-            ) : <>{label ? `${label}: ` : ""}{format(dateRange.from, "dd MMM yyyy", { locale: ptBR })}</>
-          ) : <span>{label || "Período"}</span>}
-          <ChevronDown className="w-3 h-3 opacity-50" />
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn("gap-2 h-8 text-xs font-medium border-border/60 hover:bg-accent/50", className)}
+        >
+          <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+          {labelText ? (
+            <span className="truncate">
+              {label && <span className="text-muted-foreground mr-1">{label}:</span>}
+              {labelText}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className="w-3 h-3 opacity-50 ml-auto" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 rounded-2xl" align="start">
+      <PopoverContent className="w-auto p-0 rounded-xl" align="start">
         <div className="flex">
-          <div className="border-r border-border p-2 space-y-1">
-            <p className="text-xs font-semibold text-muted-foreground px-2 py-1">Atalhos</p>
+          <div className="border-r border-border p-2 space-y-0.5 min-w-[140px]">
+            <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-2 py-1.5">Atalhos</p>
             {datePresets.map((p) => (
-              <Button key={p.label} variant="ghost" size="sm" className="w-full justify-start text-xs h-8 rounded-lg"
-                onClick={() => { const v = p.getValue(); setLocalRange(v); onDateRangeChange(v); setOpen(false); }}>
+              <Button
+                key={p.label}
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs h-7 rounded-md font-normal"
+                onClick={() => { const v = p.getValue(); setLocalRange(v); onDateRangeChange(v); setOpen(false); }}
+              >
                 {p.label}
               </Button>
             ))}
           </div>
           <div className="flex flex-col">
-            <Calendar initialFocus mode="range" defaultMonth={localRange?.from} selected={localRange} onSelect={setLocalRange} numberOfMonths={2} locale={ptBR} className="pointer-events-auto" />
-            <div className="flex justify-end p-3 pt-0">
-              <Button size="sm" className="rounded-xl" disabled={!localRange?.from || !localRange?.to} onClick={handleConfirm}>Feito</Button>
+            <Calendar
+              initialFocus mode="range"
+              defaultMonth={localRange?.from}
+              selected={localRange}
+              onSelect={setLocalRange}
+              numberOfMonths={2}
+              locale={ptBR}
+              className="pointer-events-auto"
+            />
+            <div className="flex justify-between items-center p-3 pt-0 border-t border-border/40 mt-2">
+              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button size="sm" className="rounded-md h-7 text-xs" disabled={!localRange?.from || !localRange?.to} onClick={handleConfirm}>
+                Aplicar
+              </Button>
             </div>
           </div>
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function FilterSelect({
+  value, onChange, placeholder, icon: Icon, options, className,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+  placeholder: string;
+  icon: typeof Users;
+  options: { id: string; name: string }[];
+  className?: string;
+}) {
+  const selected = options.find((o) => o.id === value);
+  return (
+    <Select value={value || "all"} onValueChange={(v) => onChange(v === "all" ? null : v)}>
+      <SelectTrigger
+        className={cn(
+          "h-8 text-xs font-medium border-border/60 hover:bg-accent/50 gap-2 px-3 w-auto min-w-[130px] max-w-[200px]",
+          selected && "border-primary/40 bg-primary/5 text-foreground",
+          className
+        )}
+      >
+        <Icon className={cn("w-3.5 h-3.5 shrink-0", selected ? "text-primary" : "text-muted-foreground")} />
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent className="rounded-lg">
+        <SelectItem value="all">Todos</SelectItem>
+        {options.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -101,107 +175,136 @@ export function Header({
   onPipelineChange, onStageChange, onSellerChange, onOriginChange, cachedAt,
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const hasAdditionalRange = !!additionalDateRange?.from;
   const activeFilterCount = [selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin, hasAdditionalRange].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const stages = selectedPipeline?.stages || [];
 
+  const clearAll = () => {
+    onPipelineChange(null);
+    onStageChange?.(null);
+    onSellerChange(null);
+    onOriginChange(null);
+    onAdditionalDateRangeChange?.(undefined);
+  };
+
+  const filterControls = (
+    <>
+      <DateRangePicker dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
+
+      {showAdditional && (
+        <DateRangePicker
+          dateRange={additionalDateRange}
+          onDateRangeChange={onAdditionalDateRangeChange!}
+          label={additionalDateLabel!}
+        />
+      )}
+
+      <Separator orientation="vertical" className="h-5 hidden md:block" />
+
+      <FilterSelect
+        value={selectedPipelineId}
+        onChange={onPipelineChange}
+        placeholder="Funil"
+        icon={GitBranch}
+        options={pipelines.map((p) => ({ id: p.id, name: p.name }))}
+      />
+
+      {selectedPipelineId && stages.length > 0 && onStageChange && (
+        <FilterSelect
+          value={selectedStageId || null}
+          onChange={onStageChange}
+          placeholder="Etapa"
+          icon={Layers}
+          options={stages.map((s) => ({ id: s.id, name: s.name }))}
+        />
+      )}
+
+      <FilterSelect
+        value={selectedSellerId}
+        onChange={onSellerChange}
+        placeholder="Vendedor"
+        icon={Users}
+        options={users.map((u) => ({ id: u.id, name: u.name }))}
+      />
+
+      <FilterSelect
+        value={selectedOrigin}
+        onChange={onOriginChange}
+        placeholder="Origem"
+        icon={Globe}
+        options={origins.map((o) => ({ id: o, name: o }))}
+      />
+    </>
+  );
+
   return (
-    <header className="sticky top-0 -mx-6 -mt-6 z-30 bg-card border-b border-border">
-      <div className="flex items-center justify-between gap-4 px-4 py-2">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {cachedAt && !isLoading && <span>Atualizado às {format(new Date(cachedAt), "HH:mm:ss", { locale: ptBR })}</span>}
-        </div>
-        <Button variant="ghost" size="sm" className="shrink-0 gap-1.5 h-8 px-2" onClick={() => onRefresh(true)} disabled={isLoading} title="Forçar atualização">
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          <span className="hidden sm:inline">Atualizar</span>
-        </Button>
-      </div>
+    <header className="sticky top-0 -mx-6 -mt-6 z-30 bg-card/95 backdrop-blur-sm border-b border-border">
+      <div className="flex items-center gap-2 px-4 h-12">
+        {/* Mobile: filtros em sheet */}
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="lg:hidden h-8 gap-2 text-xs">
+              <Filter className="w-3.5 h-3.5" />
+              Filtros
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px] bg-primary text-primary-foreground rounded-full">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-2xl">
+            <SheetHeader>
+              <SheetTitle>Filtros</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col gap-3 mt-4 pb-4">
+              {filterControls}
+              {activeFilterCount > 0 && (
+                <Button variant="ghost" size="sm" className="text-xs" onClick={clearAll}>
+                  <X className="w-3.5 h-3.5 mr-1" /> Limpar todos
+                </Button>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
 
-      <div className="px-4 pb-2">
-        <button type="button" className="flex sm:hidden items-center justify-between w-full p-2 bg-muted/50 rounded-lg border border-border" onClick={() => setFiltersOpen(!filtersOpen)}>
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Filter className="w-4 h-4" />Filtros
-            {activeFilterCount > 0 && <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>}
-          </div>
-          {filtersOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-        </button>
+        {/* Desktop: filtros inline */}
+        <div className="hidden lg:flex items-center gap-2 flex-1 min-w-0 flex-wrap">
+          {filterControls}
 
-        <div className={cn(
-          "flex flex-wrap items-center gap-2",
-          filtersOpen ? "flex flex-col gap-2 mt-2" : "hidden sm:flex"
-        )}>
-          <div className="hidden sm:flex items-center gap-2 text-sm font-medium text-muted-foreground mr-1">
-            <Filter className="w-4 h-4" />
-          </div>
-
-          <DateRangeFilter dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
-
-          {showAdditional && (
-            <DateRangeFilter
-              dateRange={additionalDateRange}
-              onDateRangeChange={onAdditionalDateRangeChange!}
-              label={additionalDateLabel!}
-            />
-          )}
-
-          <Select value={selectedPipelineId || "all"} onValueChange={(v) => onPipelineChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[180px] h-9 rounded-lg text-sm">
-              <GitBranch className="w-4 h-4 mr-2 opacity-50" />
-              <SelectValue placeholder="Funil" />
-            </SelectTrigger>
-            <SelectContent className="rounded-lg">
-              <SelectItem value="all">Todos os funis</SelectItem>
-              {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {selectedPipelineId && stages.length > 0 && onStageChange && (
-            <Select value={selectedStageId || "all"} onValueChange={(v) => onStageChange(v === "all" ? null : v)}>
-              <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
-                <Layers className="w-4 h-4 mr-2 opacity-50" />
-                <SelectValue placeholder="Etapa" />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg">
-                <SelectItem value="all">Todas as etapas</SelectItem>
-                {stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Select value={selectedSellerId || "all"} onValueChange={(v) => onSellerChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
-              <Users className="w-4 h-4 mr-2 opacity-50" />
-              <SelectValue placeholder="Vendedor" />
-            </SelectTrigger>
-            <SelectContent className="rounded-lg">
-              <SelectItem value="all">Todos os vendedores</SelectItem>
-              {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedOrigin || "all"} onValueChange={(v) => onOriginChange(v === "all" ? null : v)}>
-            <SelectTrigger className="w-full sm:w-[160px] h-9 rounded-lg text-sm">
-              <Globe className="w-4 h-4 mr-2 opacity-50" />
-              <SelectValue placeholder="Origem" />
-            </SelectTrigger>
-            <SelectContent className="rounded-lg">
-              <SelectItem value="all">Todas as origens</SelectItem>
-              {origins.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {(selectedPipelineId || selectedStageId || selectedSellerId || selectedOrigin || hasAdditionalRange) && (
-            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground rounded-lg text-sm"
-              onClick={() => {
-                onPipelineChange(null); onStageChange?.(null); onSellerChange(null); onOriginChange(null);
-                onAdditionalDateRangeChange?.(undefined);
-              }}>
-              Limpar
+          {activeFilterCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1 px-2"
+              onClick={clearAll}
+            >
+              <X className="w-3.5 h-3.5" /> Limpar
             </Button>
           )}
+        </div>
+
+        {/* Status + ação */}
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          {cachedAt && !isLoading && (
+            <span className="hidden md:inline text-[11px] text-muted-foreground">
+              Atualizado {format(new Date(cachedAt), "HH:mm", { locale: ptBR })}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 gap-1.5 text-xs"
+            onClick={() => onRefresh(true)}
+            disabled={isLoading}
+            title="Forçar atualização"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
+            <span className="hidden sm:inline">Atualizar</span>
+          </Button>
         </div>
       </div>
     </header>
