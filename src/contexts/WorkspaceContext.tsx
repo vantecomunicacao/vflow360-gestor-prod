@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthContext";
 
@@ -124,10 +124,14 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const activeWorkspace = workspaces.find(w => w.id === activeId) || null;
+  // Stable reference: only recompute when id or workspaces actually change
+  const activeWorkspace = useMemo(
+    () => workspaces.find(w => w.id === activeId) || null,
+    [workspaces, activeId]
+  );
 
-  return (
-    <WorkspaceContext.Provider value={{
+  const contextValue = useMemo(
+    () => ({
       workspaces,
       activeWorkspace,
       setActiveWorkspaceId,
@@ -135,7 +139,12 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       renameWorkspace,
       deleteWorkspace,
       loading,
-    }}>
+    }),
+    [workspaces, activeWorkspace, loading]
+  );
+
+  return (
+    <WorkspaceContext.Provider value={contextValue}>
       {children}
     </WorkspaceContext.Provider>
   );
