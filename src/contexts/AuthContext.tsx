@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useMemo, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -55,8 +55,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
   };
 
+  // Stable user reference: only changes when user.id changes
+  const user = useMemo(() => session?.user ?? null, [session?.user?.id]);
+
+  const contextValue = useMemo(
+    () => ({ session, user, loading, signOut }),
+    [session, user, loading]
+  );
+
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signOut }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
