@@ -823,12 +823,17 @@ serve(async (req) => {
               dueDate = fallback.toISOString();
             }
 
-            await callGhl(`/contacts/${contactId}/tasks`, "POST", {
+            const taskAssignedTo = opportunity?.assignedTo || opportunity?.assigned_to || null;
+            const taskBody: Record<string, any> = {
               title: taskTitle,
               body: taskDescription,
               dueDate: dueDate,
               completed: false,
-            }, true);
+            };
+            if (taskAssignedTo) {
+              taskBody.assignedTo = taskAssignedTo;
+            }
+            await callGhl(`/contacts/${contactId}/tasks`, "POST", taskBody, true);
             
             const formattedDate = new Date(dueDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
             executionResult = `Tarefa "${taskTitle}" criada com vencimento em ${formattedDate}`;
