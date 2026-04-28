@@ -8,8 +8,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const steps = [
   { id: 1, title: "Conectar WhatsApp", icon: MessageSquare, description: "Vincule seu WhatsApp via QR Code para começar a receber mensagens." },
-  { id: 2, title: "Conectar CRM", icon: Link2, description: "Insira suas credenciais para conectar seu CRM ao VFlow36." },
-  { id: 3, title: "Tudo pronto!", icon: CheckCircle, description: "Seu VFlow36 está configurado e pronto para usar." },
+  { id: 2, title: "Conectar CRM", icon: Link2, description: "Insira suas credenciais para conectar seu CRM ao VFlow360." },
+  { id: 3, title: "Tudo pronto!", icon: CheckCircle, description: "Seu VFlow360 está configurado e pronto para usar." },
 ];
 
 const Onboarding = () => {
@@ -37,7 +37,7 @@ const Onboarding = () => {
       <div className="w-full max-w-lg">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <Bot className="w-8 h-8 text-primary" />
-          <span className="text-2xl font-bold text-foreground">VFlow36</span>
+          <span className="text-2xl font-bold text-foreground">VFlow360</span>
         </div>
 
         {/* Progress */}

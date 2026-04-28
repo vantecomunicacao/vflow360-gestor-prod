@@ -59,7 +59,7 @@ const Login = () => {
           className="text-center z-10 px-12"
         >
           <Bot className="w-16 h-16 text-primary-foreground mx-auto mb-6" />
-          <h1 className="text-4xl font-bold text-primary-foreground mb-4">VFlow36</h1>
+          <h1 className="text-4xl font-bold text-primary-foreground mb-4">VFlow360</h1>
           <p className="text-primary-foreground/80 text-lg max-w-md">
             Seu assistente inteligente para vendas. Analise conversas, receba sugestões e atualize seu CRM automaticamente.
           </p>
@@ -70,7 +70,7 @@ const Login = () => {
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
             <Bot className="w-8 h-8 text-primary" />
-            <span className="text-2xl font-bold text-foreground">VFlow36</span>
+            <span className="text-2xl font-bold text-foreground">VFlow360</span>
           </div>
 
           <h2 className="text-2xl font-semibold text-foreground mb-1">Bem-vindo de volta</h2>

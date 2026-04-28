@@ -10,7 +10,7 @@ const Documentation = () => {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Documentação</h1>
         <p className="text-muted-foreground mt-1">
-          Entenda como o VFlow36 funciona por dentro.
+          Entenda como o VFlow360 funciona por dentro.
         </p>
       </div>
 
