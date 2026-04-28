@@ -175,7 +175,7 @@ const SettingsPage = () => {
           </div>
           <div className="space-y-2">
             <Label>Email</Label>
-            <Input defaultValue="demo@copilotoghl.com" type="email" />
+            <Input defaultValue="demo@vflow360.com" type="email" />
           </div>
           <Button>Salvar alterações</Button>
         </div>
