@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,7 +9,18 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionGuard from "@/components/PermissionGuard";
 import AppLayout from "./components/AppLayout";
-import { LoadingState } from "@/components/dashboard/LoadingState";
+import {
+  DashboardSkeleton,
+  SuggestionsSkeleton,
+  IntegrationsSkeleton,
+  ConversationsSkeleton,
+  GenericPageSkeleton,
+} from "@/components/skeletons/RouteSkeletons";
+
+// Helper: envolve cada rota lazy com seu próprio Suspense fallback
+const lazyRoute = (element: ReactNode, fallback: ReactNode) => (
+  <Suspense fallback={fallback}>{element}</Suspense>
+);
 
 // Auth pages — leves, mantidos eager para evitar flash no login
 import Login from "./pages/Login";
@@ -47,28 +58,41 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <WorkspaceProvider>
-            <Suspense fallback={<LoadingState />}>
-              <Routes>
-                <Route path="/" element={<Navigate to="/login" replace />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-                <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/conversations" element={<Conversations />} />
-                  <Route path="/suggestions" element={<PermissionGuard require="viewSuggestions"><Suggestions /></PermissionGuard>} />
-                  <Route path="/integrations" element={<PermissionGuard require="viewIntegrations"><Integrations /></PermissionGuard>} />
-                  <Route path="/settings" element={<PermissionGuard require="viewSettings"><SettingsPage /></PermissionGuard>} />
-                  <Route path="/settings/dashboard" element={<PermissionGuard require="viewSettings"><DashboardSettings /></PermissionGuard>} />
-                  <Route path="/workspaces" element={<Workspaces />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/docs" element={<Documentation />} />
-                </Route>
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+            <Routes>
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route
+                path="/onboarding"
+                element={<ProtectedRoute>{lazyRoute(<Onboarding />, <GenericPageSkeleton />)}</ProtectedRoute>}
+              />
+              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                <Route path="/dashboard" element={lazyRoute(<Dashboard />, <DashboardSkeleton />)} />
+                <Route path="/conversations" element={lazyRoute(<Conversations />, <ConversationsSkeleton />)} />
+                <Route
+                  path="/suggestions"
+                  element={<PermissionGuard require="viewSuggestions">{lazyRoute(<Suggestions />, <SuggestionsSkeleton />)}</PermissionGuard>}
+                />
+                <Route
+                  path="/integrations"
+                  element={<PermissionGuard require="viewIntegrations">{lazyRoute(<Integrations />, <IntegrationsSkeleton />)}</PermissionGuard>}
+                />
+                <Route
+                  path="/settings"
+                  element={<PermissionGuard require="viewSettings">{lazyRoute(<SettingsPage />, <GenericPageSkeleton />)}</PermissionGuard>}
+                />
+                <Route
+                  path="/settings/dashboard"
+                  element={<PermissionGuard require="viewSettings">{lazyRoute(<DashboardSettings />, <GenericPageSkeleton />)}</PermissionGuard>}
+                />
+                <Route path="/workspaces" element={lazyRoute(<Workspaces />, <GenericPageSkeleton />)} />
+                <Route path="/admin" element={lazyRoute(<Admin />, <GenericPageSkeleton />)} />
+                <Route path="/docs" element={lazyRoute(<Documentation />, <GenericPageSkeleton />)} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </WorkspaceProvider>
         </AuthProvider>
       </BrowserRouter>
