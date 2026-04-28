@@ -747,11 +747,11 @@ const Suggestions = () => {
                       </span>
                     )}
                     {group.actionSummary.length > 0 && (
-                      <div className="flex items-center gap-1 ml-auto">
+                      <div className="flex items-center gap-1 ml-auto flex-wrap justify-end max-w-full">
                         {group.actionSummary.map(({ type, count }) => (
                           <span
                             key={type}
-                            className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium ${typeColors[type] || "bg-muted text-muted-foreground border-border"}`}
+                            className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] leading-none font-medium ${typeColors[type] || "bg-muted text-muted-foreground border-border"}`}
                           >
                             {count}× {ACTION_TYPE_LABELS[type]?.split(" ")[0] || type}
                           </span>
