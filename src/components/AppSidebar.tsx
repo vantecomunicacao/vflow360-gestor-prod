@@ -45,7 +45,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <div className="p-4 flex items-center gap-2">
         <Bot className="w-7 h-7 text-sidebar-primary shrink-0" />
-        {!collapsed && <span className="text-lg font-bold text-sidebar-accent-foreground">VFlow36</span>}
+        {!collapsed && <span className="text-lg font-bold text-sidebar-accent-foreground">VFlow360</span>}
       </div>
 
       {/* Workspace Selector */}
