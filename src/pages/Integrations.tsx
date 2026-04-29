@@ -731,12 +731,12 @@ const Integrations = () => {
                       </>
                     )}
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                      {inst.provider === "uazap" ? "Uazap" : "Stevo"}
+                      {inst.provider === "uazap" ? "Uazap" : inst.provider === "stevo" ? "Stevo" : "Stevo Oficial"}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
                     {inst.provider === "uazap" && getStatusBadge(inst.status)}
-                    {inst.provider === "stevo" && (
+                    {(inst.provider === "stevo" || inst.provider === "stevo_oficial") && (
                       inst.lastWebhookAt
                         ? <Badge variant="outline" className="text-success border-success/30"><CheckCircle className="w-3 h-3 mr-1" /> Ativo</Badge>
                         : <Badge variant="outline" className="text-muted-foreground border-border"><Clock className="w-3 h-3 mr-1" /> Aguardando</Badge>
