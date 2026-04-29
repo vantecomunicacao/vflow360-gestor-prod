@@ -864,6 +864,13 @@ const Integrations = () => {
                     )}
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* CRM */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
