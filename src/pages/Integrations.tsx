@@ -38,7 +38,7 @@ interface GhlPipelineStage {
 }
 
 type WhatsAppStatus = "not_created" | "disconnected" | "connecting" | "connected";
-type WhatsAppProvider = "uazap" | "stevo";
+type WhatsAppProvider = "uazap" | "stevo" | "stevo_oficial";
 
 interface WhatsAppInstance {
   id: string;
@@ -50,6 +50,7 @@ interface WhatsAppInstance {
   loading?: boolean;
   webhookUrl?: string;
   lastWebhookAt?: string | null;
+  accessToken?: string;
 }
 
 const Integrations = () => {
@@ -280,6 +281,32 @@ const Integrations = () => {
               provider: "stevo",
               webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${int.id}`,
               lastWebhookAt: config.last_webhook_at || null,
+            });
+          }
+        }
+      } catch { /* silent */ }
+
+      // Fetch Stevo Oficial instances from DB
+      try {
+        const { data: stevoOfIntegrations } = await supabase
+          .from("integrations")
+          .select("*")
+          .eq("type", "whatsapp_stevo_oficial")
+          .eq("workspace_id", activeWorkspace.id)
+          .order("created_at", { ascending: true });
+
+        if (stevoOfIntegrations) {
+          for (const int of stevoOfIntegrations) {
+            const config = int.config as { label?: string; last_webhook_at?: string; accessToken?: string } || {};
+            allInstances.push({
+              id: int.id,
+              instanceName: "",
+              label: config.label || "Stevo Oficial",
+              status: (int.status as WhatsAppStatus) || "disconnected",
+              provider: "stevo_oficial",
+              webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-oficial-webhook?id=${int.id}`,
+              lastWebhookAt: config.last_webhook_at || null,
+              accessToken: config.accessToken || "",
             });
           }
         }
