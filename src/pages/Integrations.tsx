@@ -698,6 +698,9 @@ const Integrations = () => {
               <Button onClick={handleCreateStevoInstance} disabled={creatingNew} variant="outline">
                 Stevo (Webhook)
               </Button>
+              <Button onClick={handleCreateStevoOficialInstance} disabled={creatingNew} variant="outline">
+                Stevo Oficial
+              </Button>
             </div>
           </div>
         ) : (
