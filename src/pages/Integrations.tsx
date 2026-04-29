@@ -656,7 +656,7 @@ const Integrations = () => {
               {creatingNew ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Criando...</> : <><Plus className="w-4 h-4 mr-1" /> Adicionar número</>}
             </Button>
             {showProviderPicker && (
-              <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-10 w-48">
+              <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-10 w-56">
                 <button
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-t-lg"
                   onClick={handleCreateUazapInstance}
@@ -665,11 +665,18 @@ const Integrations = () => {
                   <p className="text-xs text-muted-foreground">Conexão via QR Code</p>
                 </button>
                 <button
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-b-lg border-t border-border"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors border-t border-border"
                   onClick={handleCreateStevoInstance}
                 >
                   <span className="font-medium text-foreground">Stevo</span>
                   <p className="text-xs text-muted-foreground">Conexão via Webhook</p>
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-b-lg border-t border-border"
+                  onClick={handleCreateStevoOficialInstance}
+                >
+                  <span className="font-medium text-foreground">Stevo API Oficial</span>
+                  <p className="text-xs text-muted-foreground">Webhook WhatsApp Cloud API</p>
                 </button>
               </div>
             )}
