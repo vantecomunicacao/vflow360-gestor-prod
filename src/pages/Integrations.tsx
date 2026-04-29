@@ -821,13 +821,49 @@ const Integrations = () => {
                     )}
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-        )}
-      </motion.div>
 
-      {/* CRM */}
+                {/* Stevo Oficial-specific UI */}
+                {inst.provider === "stevo_oficial" && inst.webhookUrl && (
+                  <div className="space-y-3">
+                    <div className="bg-muted rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1.5">Webhook URL — cole no Stevo API Oficial:</p>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-background border border-border rounded px-2 py-1 flex-1 truncate text-foreground">
+                          {inst.webhookUrl}
+                        </code>
+                        <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => copyToClipboard(inst.webhookUrl!)}>
+                          <Copy className="w-3 h-3 mr-1" /> Copiar
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted rounded-lg p-3 space-y-2">
+                      <Label className="text-xs">Access Token (opcional — necessário para baixar mídias)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="password"
+                          placeholder="EAAJxxx..."
+                          defaultValue={inst.accessToken || ""}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v && v !== inst.accessToken) handleSaveAccessToken(inst, v);
+                          }}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Token da WhatsApp Cloud API. Sem ele, áudios/imagens entram como placeholder.
+                      </p>
+                    </div>
+
+                    {inst.lastWebhookAt && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Último webhook recebido: {new Date(inst.lastWebhookAt).toLocaleString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+                )}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
