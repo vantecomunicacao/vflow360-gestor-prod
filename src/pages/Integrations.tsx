@@ -437,7 +437,60 @@ const Integrations = () => {
     }
   };
 
-  const handleReconnect = async (inst: WhatsAppInstance) => {
+  const handleCreateStevoOficialInstance = async () => {
+    setCreatingNew(true);
+    setShowProviderPicker(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      if (!activeWorkspace) throw new Error("No active workspace");
+
+      const { data: inserted, error } = await supabase.from("integrations").insert({
+        user_id: session.user.id,
+        workspace_id: activeWorkspace.id,
+        type: "whatsapp_stevo_oficial",
+        config: { label: `Stevo Oficial #${instances.filter(i => i.provider === "stevo_oficial").length + 1}` },
+        status: "disconnected",
+      }).select().single();
+
+      if (error) throw error;
+
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-oficial-webhook?id=${inserted.id}`;
+
+      setInstances(prev => [...prev, {
+        id: inserted.id,
+        instanceName: "",
+        label: `Stevo Oficial #${prev.filter(i => i.provider === "stevo_oficial").length + 1}`,
+        status: "disconnected",
+        provider: "stevo_oficial",
+        webhookUrl,
+        lastWebhookAt: null,
+        accessToken: "",
+      }]);
+
+      toast({ title: "Instância Stevo Oficial criada!", description: "Copie o webhook e cole no Stevo API Oficial." });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao criar", variant: "destructive" });
+    } finally {
+      setCreatingNew(false);
+    }
+  };
+
+  const handleSaveAccessToken = async (inst: WhatsAppInstance, token: string) => {
+    try {
+      const { data: integration } = await supabase
+        .from("integrations")
+        .select("config")
+        .eq("id", inst.id)
+        .single();
+      const config = (integration?.config as Record<string, unknown>) || {};
+      await supabase.from("integrations").update({ config: { ...config, accessToken: token } }).eq("id", inst.id);
+      updateInstance(inst.id, { accessToken: token });
+      toast({ title: "Access Token salvo!", description: "Mídias agora poderão ser baixadas." });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao salvar token", variant: "destructive" });
+    }
+  };
     if (inst.provider !== "uazap") return;
     updateInstance(inst.id, { loading: true });
     try {
