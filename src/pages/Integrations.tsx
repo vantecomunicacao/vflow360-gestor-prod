@@ -491,6 +491,8 @@ const Integrations = () => {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao salvar token", variant: "destructive" });
     }
   };
+
+  const handleReconnect = async (inst: WhatsAppInstance) => {
     if (inst.provider !== "uazap") return;
     updateInstance(inst.id, { loading: true });
     try {
