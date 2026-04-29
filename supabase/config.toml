@@ -6,3 +6,6 @@ schedule = "* * * * *"
 
 [functions.ghl-sync]
 verify_jwt = false
+
+[functions.stevo-oficial-webhook]
+verify_jwt = false

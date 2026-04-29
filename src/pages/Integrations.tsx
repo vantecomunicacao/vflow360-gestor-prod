@@ -38,7 +38,7 @@ interface GhlPipelineStage {
 }
 
 type WhatsAppStatus = "not_created" | "disconnected" | "connecting" | "connected";
-type WhatsAppProvider = "uazap" | "stevo";
+type WhatsAppProvider = "uazap" | "stevo" | "stevo_oficial";
 
 interface WhatsAppInstance {
   id: string;
@@ -50,6 +50,7 @@ interface WhatsAppInstance {
   loading?: boolean;
   webhookUrl?: string;
   lastWebhookAt?: string | null;
+  accessToken?: string;
 }
 
 const Integrations = () => {
@@ -285,6 +286,32 @@ const Integrations = () => {
         }
       } catch { /* silent */ }
 
+      // Fetch Stevo Oficial instances from DB
+      try {
+        const { data: stevoOfIntegrations } = await supabase
+          .from("integrations")
+          .select("*")
+          .eq("type", "whatsapp_stevo_oficial")
+          .eq("workspace_id", activeWorkspace.id)
+          .order("created_at", { ascending: true });
+
+        if (stevoOfIntegrations) {
+          for (const int of stevoOfIntegrations) {
+            const config = int.config as { label?: string; last_webhook_at?: string; accessToken?: string } || {};
+            allInstances.push({
+              id: int.id,
+              instanceName: "",
+              label: config.label || "Stevo Oficial",
+              status: (int.status as WhatsAppStatus) || "disconnected",
+              provider: "stevo_oficial",
+              webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-oficial-webhook?id=${int.id}`,
+              lastWebhookAt: config.last_webhook_at || null,
+              accessToken: config.accessToken || "",
+            });
+          }
+        }
+      } catch { /* silent */ }
+
       setInstances(allInstances);
       setLoadingInstances(false);
 
@@ -407,6 +434,61 @@ const Integrations = () => {
       toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao criar", variant: "destructive" });
     } finally {
       setCreatingNew(false);
+    }
+  };
+
+  const handleCreateStevoOficialInstance = async () => {
+    setCreatingNew(true);
+    setShowProviderPicker(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      if (!activeWorkspace) throw new Error("No active workspace");
+
+      const { data: inserted, error } = await supabase.from("integrations").insert({
+        user_id: session.user.id,
+        workspace_id: activeWorkspace.id,
+        type: "whatsapp_stevo_oficial",
+        config: { label: `Stevo Oficial #${instances.filter(i => i.provider === "stevo_oficial").length + 1}` },
+        status: "disconnected",
+      }).select().single();
+
+      if (error) throw error;
+
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-oficial-webhook?id=${inserted.id}`;
+
+      setInstances(prev => [...prev, {
+        id: inserted.id,
+        instanceName: "",
+        label: `Stevo Oficial #${prev.filter(i => i.provider === "stevo_oficial").length + 1}`,
+        status: "disconnected",
+        provider: "stevo_oficial",
+        webhookUrl,
+        lastWebhookAt: null,
+        accessToken: "",
+      }]);
+
+      toast({ title: "Instância Stevo Oficial criada!", description: "Copie o webhook e cole no Stevo API Oficial." });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao criar", variant: "destructive" });
+    } finally {
+      setCreatingNew(false);
+    }
+  };
+
+  const handleSaveAccessToken = async (inst: WhatsAppInstance, token: string) => {
+    try {
+      const { data: integration } = await supabase
+        .from("integrations")
+        .select("config")
+        .eq("id", inst.id)
+        .single();
+      const config = (integration?.config as Record<string, unknown>) || {};
+      await supabase.from("integrations").update({ config: { ...config, accessToken: token } }).eq("id", inst.id);
+      updateInstance(inst.id, { accessToken: token });
+      toast({ title: "Access Token salvo!", description: "Mídias agora poderão ser baixadas." });
+    } catch (error) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro ao salvar token", variant: "destructive" });
     }
   };
 
@@ -574,7 +656,7 @@ const Integrations = () => {
               {creatingNew ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Criando...</> : <><Plus className="w-4 h-4 mr-1" /> Adicionar número</>}
             </Button>
             {showProviderPicker && (
-              <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-10 w-48">
+              <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-10 w-56">
                 <button
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-t-lg"
                   onClick={handleCreateUazapInstance}
@@ -583,11 +665,18 @@ const Integrations = () => {
                   <p className="text-xs text-muted-foreground">Conexão via QR Code</p>
                 </button>
                 <button
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-b-lg border-t border-border"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors border-t border-border"
                   onClick={handleCreateStevoInstance}
                 >
                   <span className="font-medium text-foreground">Stevo</span>
                   <p className="text-xs text-muted-foreground">Conexão via Webhook</p>
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-b-lg border-t border-border"
+                  onClick={handleCreateStevoOficialInstance}
+                >
+                  <span className="font-medium text-foreground">Stevo API Oficial</span>
+                  <p className="text-xs text-muted-foreground">Webhook WhatsApp Cloud API</p>
                 </button>
               </div>
             )}
@@ -608,6 +697,9 @@ const Integrations = () => {
               </Button>
               <Button onClick={handleCreateStevoInstance} disabled={creatingNew} variant="outline">
                 Stevo (Webhook)
+              </Button>
+              <Button onClick={handleCreateStevoOficialInstance} disabled={creatingNew} variant="outline">
+                Stevo Oficial
               </Button>
             </div>
           </div>
@@ -639,12 +731,12 @@ const Integrations = () => {
                       </>
                     )}
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                      {inst.provider === "uazap" ? "Uazap" : "Stevo"}
+                      {inst.provider === "uazap" ? "Uazap" : inst.provider === "stevo" ? "Stevo" : "Stevo Oficial"}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
                     {inst.provider === "uazap" && getStatusBadge(inst.status)}
-                    {inst.provider === "stevo" && (
+                    {(inst.provider === "stevo" || inst.provider === "stevo_oficial") && (
                       inst.lastWebhookAt
                         ? <Badge variant="outline" className="text-success border-success/30"><CheckCircle className="w-3 h-3 mr-1" /> Ativo</Badge>
                         : <Badge variant="outline" className="text-muted-foreground border-border"><Clock className="w-3 h-3 mr-1" /> Aguardando</Badge>
@@ -721,6 +813,49 @@ const Integrations = () => {
                         </Button>
                       </div>
                     </div>
+                    {inst.lastWebhookAt && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Último webhook recebido: {new Date(inst.lastWebhookAt).toLocaleString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Stevo Oficial-specific UI */}
+                {inst.provider === "stevo_oficial" && inst.webhookUrl && (
+                  <div className="space-y-3">
+                    <div className="bg-muted rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1.5">Webhook URL — cole no Stevo API Oficial:</p>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-background border border-border rounded px-2 py-1 flex-1 truncate text-foreground">
+                          {inst.webhookUrl}
+                        </code>
+                        <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => copyToClipboard(inst.webhookUrl!)}>
+                          <Copy className="w-3 h-3 mr-1" /> Copiar
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted rounded-lg p-3 space-y-2">
+                      <Label className="text-xs">Access Token (opcional — necessário para baixar mídias)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="password"
+                          placeholder="EAAJxxx..."
+                          defaultValue={inst.accessToken || ""}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v && v !== inst.accessToken) handleSaveAccessToken(inst, v);
+                          }}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Token da WhatsApp Cloud API. Sem ele, áudios/imagens entram como placeholder.
+                      </p>
+                    </div>
+
                     {inst.lastWebhookAt && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Clock className="w-3 h-3" />
