@@ -222,10 +222,13 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
       const changes = Array.isArray(entry.changes) ? entry.changes : [];
       for (const change of changes) {
         const value = change.value || {};
-        if (change.field !== "messages") continue;
+        // Accept both inbound messages and outbound message_echoes (sent by the seller)
+        const isEcho = change.field === "message_echoes";
+        if (change.field !== "messages" && !isEcho) continue;
 
         const metadata = value.metadata || {};
-        const ourPhoneNumberId = metadata.phone_number_id || "";
+        const ourPhoneNumberId = String(metadata.phone_number_id || "");
+        const ourDisplayNumber = String(metadata.display_phone_number || "").replace(/\D/g, "");
 
         const contacts = Array.isArray(value.contacts) ? value.contacts : [];
         const messages = Array.isArray(value.messages) ? value.messages : [];
@@ -237,13 +240,30 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
           if (c?.wa_id && c?.profile?.name) nameByWaId[c.wa_id] = c.profile.name;
         }
 
-        // Process inbound messages
+        // Process messages (inbound from customer OR echo of outbound from seller)
         for (const msg of messages) {
           const fromWaId = String(msg.from || "");
           if (!fromWaId) continue;
 
-          const phone = fromWaId;
-          const inboundContactName = nameByWaId[fromWaId] || "";
+          // Determine direction:
+          // - Echo events are always outbound (from the seller's number)
+          // - For regular messages, if "from" matches our own number, treat as outbound (some providers route this way)
+          const fromIsOurs =
+            (ourPhoneNumberId && fromWaId === ourPhoneNumberId) ||
+            (ourDisplayNumber && fromWaId.replace(/\D/g, "") === ourDisplayNumber);
+          const direction: "inbound" | "outbound" = isEcho || fromIsOurs ? "outbound" : "inbound";
+
+          // Contact phone is the customer's number:
+          // - inbound: msg.from
+          // - outbound/echo: recipient (msg.to or first contact wa_id)
+          let phone = fromWaId;
+          if (direction === "outbound") {
+            const toWaId = String(msg.to || "");
+            const firstContactWaId = contacts[0]?.wa_id ? String(contacts[0].wa_id) : "";
+            phone = toWaId || firstContactWaId || fromWaId;
+          }
+
+          const inboundContactName = direction === "inbound" ? (nameByWaId[fromWaId] || "") : "";
           const msgTimestamp = parseSafeTimestamp(msg.timestamp);
           const msgType = msg.type || "text";
 
