@@ -390,7 +390,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
                 contact_phone: phone,
                 last_message: displayMessage,
                 last_message_at: msgTimestamp,
-                unread_count: 1,
+                unread_count: direction === "inbound" ? 1 : 0,
                 integration_type: "stevo_oficial",
                 integration_label: integrationLabel,
               })
@@ -401,59 +401,63 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
             const updateData: Record<string, unknown> = {
               last_message: displayMessage,
               last_message_at: msgTimestamp,
-              unread_count: (conversation.unread_count || 0) + 1,
               integration_type: "stevo_oficial",
               integration_label: integrationLabel,
             };
-            if (inboundContactName) updateData.contact_name = inboundContactName;
+            if (direction === "inbound") {
+              updateData.unread_count = (conversation.unread_count || 0) + 1;
+              if (inboundContactName) updateData.contact_name = inboundContactName;
+            }
             await supabase.from("conversations").update(updateData).eq("id", conversation.id);
           }
 
           if (conversation) {
             await supabase.from("messages").insert({
               conversation_id: conversation.id,
-              direction: "inbound",
+              direction,
               content,
               created_at: msgTimestamp,
             });
 
-            // Debounce + analyze trigger (same as Stevo)
-            const DEBOUNCE_MS = 4 * 60 * 1000;
-            const CEILING_MS = 10 * 60 * 1000;
-            const now = new Date();
+            // Debounce + analyze trigger only for inbound (customer) messages
+            if (direction === "inbound") {
+              const DEBOUNCE_MS = 4 * 60 * 1000;
+              const CEILING_MS = 10 * 60 * 1000;
+              const now = new Date();
 
-            const { data: convDebounce } = await supabase
-              .from("conversations")
-              .select("analyze_started_at")
-              .eq("id", conversation.id)
-              .single();
-
-            const analyzeStartedAt = convDebounce?.analyze_started_at
-              ? new Date(convDebounce.analyze_started_at)
-              : null;
-            const ceilingReached = analyzeStartedAt && (now.getTime() - analyzeStartedAt.getTime() >= CEILING_MS);
-
-            if (ceilingReached) {
-              await supabase
+              const { data: convDebounce } = await supabase
                 .from("conversations")
-                .update({ analyze_after: null, analyze_started_at: null })
-                .eq("id", conversation.id);
-              fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-                },
-                body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
-              }).catch((e) => console.error("AI analyze trigger failed:", e));
-            } else {
-              const analyzeAfter = new Date(now.getTime() + DEBOUNCE_MS).toISOString();
-              const updateData: Record<string, unknown> = { analyze_after: analyzeAfter };
-              if (!analyzeStartedAt) updateData.analyze_started_at = now.toISOString();
-              await supabase.from("conversations").update(updateData).eq("id", conversation.id);
+                .select("analyze_started_at")
+                .eq("id", conversation.id)
+                .single();
+
+              const analyzeStartedAt = convDebounce?.analyze_started_at
+                ? new Date(convDebounce.analyze_started_at)
+                : null;
+              const ceilingReached = analyzeStartedAt && (now.getTime() - analyzeStartedAt.getTime() >= CEILING_MS);
+
+              if (ceilingReached) {
+                await supabase
+                  .from("conversations")
+                  .update({ analyze_after: null, analyze_started_at: null })
+                  .eq("id", conversation.id);
+                fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                  },
+                  body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
+                }).catch((e) => console.error("AI analyze trigger failed:", e));
+              } else {
+                const analyzeAfter = new Date(now.getTime() + DEBOUNCE_MS).toISOString();
+                const updateData: Record<string, unknown> = { analyze_after: analyzeAfter };
+                if (!analyzeStartedAt) updateData.analyze_started_at = now.toISOString();
+                await supabase.from("conversations").update(updateData).eq("id", conversation.id);
+              }
             }
 
-            console.log("Stevo Oficial message saved:", conversation.id);
+            console.log(`Stevo Oficial ${direction} message saved:`, conversation.id);
           }
         }
 
