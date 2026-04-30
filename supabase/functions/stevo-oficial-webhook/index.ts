@@ -222,10 +222,13 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
       const changes = Array.isArray(entry.changes) ? entry.changes : [];
       for (const change of changes) {
         const value = change.value || {};
-        if (change.field !== "messages") continue;
+        // Accept both inbound messages and outbound message_echoes (sent by the seller)
+        const isEcho = change.field === "message_echoes";
+        if (change.field !== "messages" && !isEcho) continue;
 
         const metadata = value.metadata || {};
-        const ourPhoneNumberId = metadata.phone_number_id || "";
+        const ourPhoneNumberId = String(metadata.phone_number_id || "");
+        const ourDisplayNumber = String(metadata.display_phone_number || "").replace(/\D/g, "");
 
         const contacts = Array.isArray(value.contacts) ? value.contacts : [];
         const messages = Array.isArray(value.messages) ? value.messages : [];
@@ -237,13 +240,30 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
           if (c?.wa_id && c?.profile?.name) nameByWaId[c.wa_id] = c.profile.name;
         }
 
-        // Process inbound messages
+        // Process messages (inbound from customer OR echo of outbound from seller)
         for (const msg of messages) {
           const fromWaId = String(msg.from || "");
           if (!fromWaId) continue;
 
-          const phone = fromWaId;
-          const inboundContactName = nameByWaId[fromWaId] || "";
+          // Determine direction:
+          // - Echo events are always outbound (from the seller's number)
+          // - For regular messages, if "from" matches our own number, treat as outbound (some providers route this way)
+          const fromIsOurs =
+            (ourPhoneNumberId && fromWaId === ourPhoneNumberId) ||
+            (ourDisplayNumber && fromWaId.replace(/\D/g, "") === ourDisplayNumber);
+          const direction: "inbound" | "outbound" = isEcho || fromIsOurs ? "outbound" : "inbound";
+
+          // Contact phone is the customer's number:
+          // - inbound: msg.from
+          // - outbound/echo: recipient (msg.to or first contact wa_id)
+          let phone = fromWaId;
+          if (direction === "outbound") {
+            const toWaId = String(msg.to || "");
+            const firstContactWaId = contacts[0]?.wa_id ? String(contacts[0].wa_id) : "";
+            phone = toWaId || firstContactWaId || fromWaId;
+          }
+
+          const inboundContactName = direction === "inbound" ? (nameByWaId[fromWaId] || "") : "";
           const msgTimestamp = parseSafeTimestamp(msg.timestamp);
           const msgType = msg.type || "text";
 
@@ -370,7 +390,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
                 contact_phone: phone,
                 last_message: displayMessage,
                 last_message_at: msgTimestamp,
-                unread_count: 1,
+                unread_count: direction === "inbound" ? 1 : 0,
                 integration_type: "stevo_oficial",
                 integration_label: integrationLabel,
               })
@@ -381,59 +401,63 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
             const updateData: Record<string, unknown> = {
               last_message: displayMessage,
               last_message_at: msgTimestamp,
-              unread_count: (conversation.unread_count || 0) + 1,
               integration_type: "stevo_oficial",
               integration_label: integrationLabel,
             };
-            if (inboundContactName) updateData.contact_name = inboundContactName;
+            if (direction === "inbound") {
+              updateData.unread_count = (conversation.unread_count || 0) + 1;
+              if (inboundContactName) updateData.contact_name = inboundContactName;
+            }
             await supabase.from("conversations").update(updateData).eq("id", conversation.id);
           }
 
           if (conversation) {
             await supabase.from("messages").insert({
               conversation_id: conversation.id,
-              direction: "inbound",
+              direction,
               content,
               created_at: msgTimestamp,
             });
 
-            // Debounce + analyze trigger (same as Stevo)
-            const DEBOUNCE_MS = 4 * 60 * 1000;
-            const CEILING_MS = 10 * 60 * 1000;
-            const now = new Date();
+            // Debounce + analyze trigger only for inbound (customer) messages
+            if (direction === "inbound") {
+              const DEBOUNCE_MS = 4 * 60 * 1000;
+              const CEILING_MS = 10 * 60 * 1000;
+              const now = new Date();
 
-            const { data: convDebounce } = await supabase
-              .from("conversations")
-              .select("analyze_started_at")
-              .eq("id", conversation.id)
-              .single();
-
-            const analyzeStartedAt = convDebounce?.analyze_started_at
-              ? new Date(convDebounce.analyze_started_at)
-              : null;
-            const ceilingReached = analyzeStartedAt && (now.getTime() - analyzeStartedAt.getTime() >= CEILING_MS);
-
-            if (ceilingReached) {
-              await supabase
+              const { data: convDebounce } = await supabase
                 .from("conversations")
-                .update({ analyze_after: null, analyze_started_at: null })
-                .eq("id", conversation.id);
-              fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-                },
-                body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
-              }).catch((e) => console.error("AI analyze trigger failed:", e));
-            } else {
-              const analyzeAfter = new Date(now.getTime() + DEBOUNCE_MS).toISOString();
-              const updateData: Record<string, unknown> = { analyze_after: analyzeAfter };
-              if (!analyzeStartedAt) updateData.analyze_started_at = now.toISOString();
-              await supabase.from("conversations").update(updateData).eq("id", conversation.id);
+                .select("analyze_started_at")
+                .eq("id", conversation.id)
+                .single();
+
+              const analyzeStartedAt = convDebounce?.analyze_started_at
+                ? new Date(convDebounce.analyze_started_at)
+                : null;
+              const ceilingReached = analyzeStartedAt && (now.getTime() - analyzeStartedAt.getTime() >= CEILING_MS);
+
+              if (ceilingReached) {
+                await supabase
+                  .from("conversations")
+                  .update({ analyze_after: null, analyze_started_at: null })
+                  .eq("id", conversation.id);
+                fetch(`${SUPABASE_URL}/functions/v1/ai-analyze`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                  },
+                  body: JSON.stringify({ conversation_id: conversation.id, user_id: userId }),
+                }).catch((e) => console.error("AI analyze trigger failed:", e));
+              } else {
+                const analyzeAfter = new Date(now.getTime() + DEBOUNCE_MS).toISOString();
+                const updateData: Record<string, unknown> = { analyze_after: analyzeAfter };
+                if (!analyzeStartedAt) updateData.analyze_started_at = now.toISOString();
+                await supabase.from("conversations").update(updateData).eq("id", conversation.id);
+              }
             }
 
-            console.log("Stevo Oficial message saved:", conversation.id);
+            console.log(`Stevo Oficial ${direction} message saved:`, conversation.id);
           }
         }
 
