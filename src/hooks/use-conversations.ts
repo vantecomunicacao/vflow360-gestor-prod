@@ -32,18 +32,20 @@ export function useConversations() {
   });
 }
 
-export function useMessages(conversationId: string | null) {
+export function useMessages(conversationId: string | null, limit: number = 10) {
   return useQuery({
-    queryKey: ["messages", conversationId],
+    queryKey: ["messages", conversationId, limit],
     queryFn: async () => {
       if (!conversationId) return [];
+      // Fetch the most recent `limit` messages, then reverse to chronological order
       const { data, error } = await supabase
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(limit);
       if (error) throw error;
-      return data || [];
+      return (data || []).slice().reverse();
     },
     enabled: !!conversationId,
   });
