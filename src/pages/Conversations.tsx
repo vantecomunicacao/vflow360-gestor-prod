@@ -31,8 +31,14 @@ const Conversations = () => {
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
   
+  const INITIAL_LIMIT = 10;
+  const LOAD_STEP = 20;
+  const [messageLimit, setMessageLimit] = useState(INITIAL_LIMIT);
+  const prevScrollHeightRef = useRef<number | null>(null);
+  const prevMessagesLenRef = useRef<number>(0);
+
   const { data: conversations = [], isLoading: loading } = useConversations();
-  const { data: messages = [] } = useMessages(selected?.id ?? null);
+  const { data: messages = [], isFetching: messagesFetching } = useMessages(selected?.id ?? null, messageLimit);
 
   // Auto-select first conversation when data loads
   useEffect(() => {
@@ -46,14 +52,41 @@ const Conversations = () => {
     setSelected(null);
   }, [activeWorkspace?.id]);
 
-  // Auto-scroll to last message when conversation opens or new messages arrive
+  // Reset pagination when conversation changes
   useEffect(() => {
-    if (messages.length === 0) return;
+    setMessageLimit(INITIAL_LIMIT);
+    prevMessagesLenRef.current = 0;
+    prevScrollHeightRef.current = null;
+  }, [selected?.id]);
+
+  // Scroll handling: jump to bottom on first load / new messages, preserve position when loading older history
+  useEffect(() => {
     const container = messagesContainerRef.current;
-    if (container) {
+    if (!container || messages.length === 0) return;
+
+    const prevLen = prevMessagesLenRef.current;
+    const grew = messages.length > prevLen;
+    const prevScrollHeight = prevScrollHeightRef.current;
+
+    if (grew && prevScrollHeight !== null && messageLimit > INITIAL_LIMIT) {
+      // Loaded older messages at top — preserve viewport position
+      container.scrollTop = container.scrollHeight - prevScrollHeight;
+    } else {
+      // Initial load or new incoming message — scroll to bottom
       container.scrollTop = container.scrollHeight;
     }
-  }, [selected?.id, messages.length]);
+
+    prevMessagesLenRef.current = messages.length;
+    prevScrollHeightRef.current = container.scrollHeight;
+  }, [selected?.id, messages.length, messageLimit]);
+
+  const handleMessagesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollTop <= 40 && !messagesFetching && messages.length >= messageLimit) {
+      prevScrollHeightRef.current = el.scrollHeight;
+      setMessageLimit((l) => l + LOAD_STEP);
+    }
+  }, [messagesFetching, messages.length, messageLimit]);
 
   const handleDelete = async (conversation: Conversation) => {
     if (!confirm(`Tem certeza que deseja apagar a conversa com ${conversation.contact_name || conversation.contact_phone}? Todas as mensagens e sugestões serão removidas.`)) return;
