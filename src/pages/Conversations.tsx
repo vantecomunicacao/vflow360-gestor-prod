@@ -25,6 +25,8 @@ const Conversations = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
@@ -43,6 +45,15 @@ const Conversations = () => {
   useEffect(() => {
     setSelected(null);
   }, [activeWorkspace?.id]);
+
+  // Auto-scroll to last message when conversation opens or new messages arrive
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [selected?.id, messages.length]);
 
   const handleDelete = async (conversation: Conversation) => {
     if (!confirm(`Tem certeza que deseja apagar a conversa com ${conversation.contact_name || conversation.contact_phone}? Todas as mensagens e sugestões serão removidas.`)) return;
@@ -381,7 +392,7 @@ const Conversations = () => {
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-4 space-y-3">
+            <div ref={messagesContainerRef} className="flex-1 overflow-auto p-4 space-y-3">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                   Nenhuma mensagem nesta conversa
