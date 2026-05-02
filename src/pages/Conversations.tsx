@@ -392,7 +392,7 @@ const Conversations = () => {
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-4 space-y-3">
+            <div ref={messagesContainerRef} className="flex-1 overflow-auto p-4 space-y-3">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                   Nenhuma mensagem nesta conversa
