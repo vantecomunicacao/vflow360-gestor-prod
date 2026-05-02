@@ -59,7 +59,8 @@ const Conversations = () => {
     prevScrollHeightRef.current = null;
   }, [selected?.id]);
 
-  // Scroll handling: jump to bottom on first load / new messages, preserve position when loading older history
+  // Scroll handling: jump to bottom on first load; preserve position when loading older history
+  // or when new messages arrive while user is scrolled up reading old messages.
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container || messages.length === 0) return;
@@ -68,13 +69,23 @@ const Conversations = () => {
     const grew = messages.length > prevLen;
     const prevScrollHeight = prevScrollHeightRef.current;
 
-    if (grew && prevScrollHeight !== null && messageLimit > INITIAL_LIMIT) {
+    // Distance from bottom BEFORE this render's height change
+    const distanceFromBottom = prevScrollHeight !== null
+      ? prevScrollHeight - (container.scrollTop + container.clientHeight)
+      : 0;
+    const isNearBottom = distanceFromBottom < 80;
+
+    if (prevLen === 0) {
+      // First load of this conversation — jump to bottom
+      container.scrollTop = container.scrollHeight;
+    } else if (grew && messageLimit > INITIAL_LIMIT && prevScrollHeight !== null && distanceFromBottom > 80) {
       // Loaded older messages at top — preserve viewport position
       container.scrollTop = container.scrollHeight - prevScrollHeight;
-    } else {
-      // Initial load or new incoming message — scroll to bottom
+    } else if (grew && isNearBottom) {
+      // New incoming message and user was at bottom — follow it
       container.scrollTop = container.scrollHeight;
     }
+    // else: user is reading older messages — do not move scroll
 
     prevMessagesLenRef.current = messages.length;
     prevScrollHeightRef.current = container.scrollHeight;
