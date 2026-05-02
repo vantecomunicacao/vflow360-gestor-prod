@@ -59,14 +59,14 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
     conversionRates.fechamentoToVenda,
   ];
 
-  const gradients = [
+  const colors = [
     "hsl(var(--funnel-1))",
     "hsl(var(--funnel-2))",
     "hsl(var(--funnel-3))",
     "hsl(var(--funnel-4))",
   ];
 
-  const totalStages = funnelStages.length;
+  const maxCount = Math.max(...funnelStages.map((s) => s.count), 1);
   const lostPercentage = funnelStages[0]?.count > 0 ? (lostLeads / funnelStages[0].count) * 100 : 0;
 
   return (
@@ -75,7 +75,7 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
         <h2 className="section-title mb-0">
           <TrendingUp className="w-5 h-5 text-accent" />
           Visão Geral do Funil
-          <SectionTooltip text="Etapas do funil de oportunidades com taxas de conversão entre fases. Clique em 'Perdidas' para ver detalhes." />
+          <SectionTooltip text="Etapas do funil de oportunidades com taxas de conversão entre fases. Clique em uma etapa para ver os leads." />
         </h2>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Conversão geral:</span>
@@ -84,53 +84,38 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
       </div>
 
       <div className="flex gap-6">
-        <div className="flex-1 flex flex-col items-center gap-0">
+        <div className="flex-1 flex flex-col gap-1.5">
           {funnelStages.map((stage, index) => {
-            const topWidth = 100 - (index / totalStages) * 60;
-            const bottomWidth = 100 - ((index + 1) / totalStages) * 60;
-            const color = gradients[index] || gradients[gradients.length - 1];
+            const widthPct = Math.max((stage.count / maxCount) * 100, 8);
+            const color = colors[index] || colors[colors.length - 1];
             return (
-              <div key={stage.id} className="w-full flex flex-col items-center">
+              <div key={stage.id} className="w-full">
                 <div
-                  className="relative group transition-transform duration-200 hover:scale-[1.02] cursor-pointer"
-                  style={{ width: "100%", maxWidth: "700px" }}
+                  className="relative group cursor-pointer rounded-lg overflow-hidden h-14 transition-transform duration-200 hover:translate-x-1"
                   onClick={() => setSelectedStage({ title: stage.name, leads: stage.leads || [] })}
                 >
-                  <svg viewBox="0 0 700 70" className="w-full h-auto" preserveAspectRatio="none" style={{ display: "block" }}>
-                    <defs>
-                      <linearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="white" stopOpacity="0" />
-                        <stop offset="50%" stopColor="white" stopOpacity="1" />
-                        <stop offset="100%" stopColor="white" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    {(() => {
-                      const tl = (700 - 700 * topWidth / 100) / 2;
-                      const tr = (700 + 700 * topWidth / 100) / 2;
-                      const br = (700 + 700 * bottomWidth / 100) / 2;
-                      const bl = (700 - 700 * bottomWidth / 100) / 2;
-                      const r = 12;
-                      const d = `M${tl + r},0 L${tr - r},0 Q${tr},0 ${tr},${r} L${br},${70 - r} Q${br},70 ${br - r},70 L${bl + r},70 Q${bl},70 ${bl},${70 - r} L${tl},${r} Q${tl},0 ${tl + r},0 Z`;
-                      return (
-                        <>
-                          <path d={d} fill={color} className="transition-opacity duration-200 group-hover:opacity-90" />
-                          <path d={d} fill="url(#shine)" opacity="0.12" />
-                        </>
-                      );
-                    })()}
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="flex items-center gap-3 text-white">
-                      <span className="text-sm font-bold drop-shadow-sm">{stage.name}</span>
-                      <span className="text-lg font-extrabold drop-shadow-sm">{stage.count}</span>
+                  {/* Trilha de fundo */}
+                  <div className="absolute inset-0 bg-muted/40 rounded-lg" />
+                  {/* Barra preenchida */}
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-lg transition-all duration-300 group-hover:brightness-110"
+                    style={{ width: `${widthPct}%`, backgroundColor: color }}
+                  />
+                  {/* Conteúdo */}
+                  <div className="relative h-full flex items-center justify-between px-4">
+                    <span className="text-sm font-bold text-white drop-shadow-sm">{stage.name}</span>
+                    <div className="flex items-center gap-2 bg-background/90 px-2.5 py-0.5 rounded-md">
+                      <span className="text-base font-extrabold text-foreground">{stage.count}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">leads</span>
                     </div>
                   </div>
                 </div>
 
                 {index < funnelStages.length - 1 && (
-                  <div className="flex items-center gap-1.5 py-1.5 text-muted-foreground">
-                    <ArrowDown className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-1.5 pl-4 py-1 text-muted-foreground">
+                    <ArrowDown className="w-3 h-3" />
                     <span className="text-xs font-bold text-foreground">{formatPercentage(conversionLabels[index])}</span>
+                    <span className="text-[10px] text-muted-foreground">de conversão</span>
                   </div>
                 )}
               </div>
