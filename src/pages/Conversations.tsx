@@ -46,6 +46,15 @@ const Conversations = () => {
     setSelected(null);
   }, [activeWorkspace?.id]);
 
+  // Auto-scroll to last message when conversation opens or new messages arrive
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [selected?.id, messages.length]);
+
   const handleDelete = async (conversation: Conversation) => {
     if (!confirm(`Tem certeza que deseja apagar a conversa com ${conversation.contact_name || conversation.contact_phone}? Todas as mensagens e sugestões serão removidas.`)) return;
 
