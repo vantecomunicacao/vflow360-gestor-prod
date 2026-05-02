@@ -425,7 +425,12 @@ const Conversations = () => {
                 </Button>
               </div>
             </div>
-            <div ref={messagesContainerRef} className="flex-1 overflow-auto p-4 space-y-3">
+            <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-auto p-4 space-y-3">
+              {messagesFetching && messages.length >= messageLimit && (
+                <div className="flex items-center justify-center py-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Carregando mensagens anteriores...
+                </div>
+              )}
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                   Nenhuma mensagem nesta conversa
