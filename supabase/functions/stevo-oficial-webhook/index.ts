@@ -223,15 +223,22 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
       for (const change of changes) {
         const value = change.value || {};
         // Accept both inbound messages and outbound message_echoes (sent by the seller)
-        const isEcho = change.field === "message_echoes";
-        if (change.field !== "messages" && !isEcho) continue;
+        const isEcho =
+          change.field === "message_echoes" ||
+          change.field === "smb_message_echoes" ||
+          Array.isArray(value.message_echoes);
+        if (change.field !== "messages" && !isEcho && !Array.isArray(value.messages)) continue;
 
         const metadata = value.metadata || {};
         const ourPhoneNumberId = String(metadata.phone_number_id || "");
         const ourDisplayNumber = String(metadata.display_phone_number || "").replace(/\D/g, "");
 
         const contacts = Array.isArray(value.contacts) ? value.contacts : [];
-        const messages = Array.isArray(value.messages) ? value.messages : [];
+        const messages = Array.isArray(value.messages)
+          ? value.messages
+          : Array.isArray(value.message_echoes)
+            ? value.message_echoes
+            : [];
         const statuses = Array.isArray(value.statuses) ? value.statuses : [];
 
         // Build wa_id -> name map
