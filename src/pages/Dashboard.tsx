@@ -55,20 +55,14 @@ export default function Dashboard() {
     let cancelled = false;
 
     (async () => {
-      // 1) Tentar restaurar filtros salvos
+      // 1) Tentar restaurar filtros salvos (período sempre dinâmico: últimos 7 dias)
       let restored = false;
       try {
         const raw = localStorage.getItem(filtersStorageKey(activeWorkspace.id));
         if (raw) {
           const saved = JSON.parse(raw) as SavedFilters;
-          if (saved.from) {
-            setDateRange({
-              from: new Date(saved.from),
-              to: saved.to ? new Date(saved.to) : undefined,
-            });
-          } else {
-            setDateRange({ from: subDays(new Date(), 6), to: new Date() });
-          }
+          // Período principal sempre recalculado para "últimos 7 dias" a partir de hoje
+          setDateRange({ from: subDays(new Date(), 6), to: new Date() });
           setAdditionalDateRange(
             saved.addFrom
               ? { from: new Date(saved.addFrom), to: saved.addTo ? new Date(saved.addTo) : undefined }
