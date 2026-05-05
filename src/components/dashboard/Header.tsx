@@ -190,54 +190,74 @@ export function Header({
     onAdditionalDateRangeChange?.(undefined);
   };
 
+  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground/80 px-0.5">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+
   const filterControls = (
     <>
-      <DateRangePicker dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
+      <Field label="Período">
+        <DateRangePicker dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
+      </Field>
 
-      <Separator orientation="vertical" className="h-5 hidden md:block" />
+      <Separator orientation="vertical" className="h-10 hidden md:block self-end mb-1" />
 
-      <FilterSelect
-        value={selectedPipelineId}
-        onChange={onPipelineChange}
-        placeholder="Funil"
-        icon={GitBranch}
-        options={pipelines.map((p) => ({ id: p.id, name: p.name }))}
-      />
+      <Field label="Funil de vendas">
+        <FilterSelect
+          value={selectedPipelineId}
+          onChange={onPipelineChange}
+          placeholder="Funil"
+          icon={GitBranch}
+          options={pipelines.map((p) => ({ id: p.id, name: p.name }))}
+        />
+      </Field>
 
       {selectedPipelineId && stages.length > 0 && onStageChange && (
-        <FilterSelect
-          value={selectedStageId || null}
-          onChange={onStageChange}
-          placeholder="Etapa"
-          icon={Layers}
-          options={stages.map((s) => ({ id: s.id, name: s.name }))}
-        />
+        <Field label="Etapa">
+          <FilterSelect
+            value={selectedStageId || null}
+            onChange={onStageChange}
+            placeholder="Etapa"
+            icon={Layers}
+            options={stages.map((s) => ({ id: s.id, name: s.name }))}
+          />
+        </Field>
       )}
 
-      <FilterSelect
-        value={selectedSellerId}
-        onChange={onSellerChange}
-        placeholder="Vendedor"
-        icon={Users}
-        options={users.map((u) => ({ id: u.id, name: u.name }))}
-      />
+      <Field label="Vendedor">
+        <FilterSelect
+          value={selectedSellerId}
+          onChange={onSellerChange}
+          placeholder="Vendedor"
+          icon={Users}
+          options={users.map((u) => ({ id: u.id, name: u.name }))}
+        />
+      </Field>
 
-      <FilterSelect
-        value={selectedOrigin}
-        onChange={onOriginChange}
-        placeholder="Origem"
-        icon={Globe}
-        options={origins.map((o) => ({ id: o, name: o }))}
-      />
+      <Field label="Origem">
+        <FilterSelect
+          value={selectedOrigin}
+          onChange={onOriginChange}
+          placeholder="Origem"
+          icon={Globe}
+          options={origins.map((o) => ({ id: o, name: o }))}
+        />
+      </Field>
 
       {showAdditional && (
         <>
-          <Separator orientation="vertical" className="h-5 hidden md:block" />
-          <DateRangePicker
-            dateRange={additionalDateRange}
-            onDateRangeChange={onAdditionalDateRangeChange!}
-            label={additionalDateLabel!}
-          />
+          <Separator orientation="vertical" className="h-10 hidden md:block self-end mb-1" />
+          <Field label={additionalDateLabel!}>
+            <DateRangePicker
+              dateRange={additionalDateRange}
+              onDateRangeChange={onAdditionalDateRangeChange!}
+            />
+          </Field>
         </>
       )}
     </>
