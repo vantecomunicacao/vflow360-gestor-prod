@@ -194,14 +194,6 @@ export function Header({
     <>
       <DateRangePicker dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
 
-      {showAdditional && (
-        <DateRangePicker
-          dateRange={additionalDateRange}
-          onDateRangeChange={onAdditionalDateRangeChange!}
-          label={additionalDateLabel!}
-        />
-      )}
-
       <Separator orientation="vertical" className="h-5 hidden md:block" />
 
       <FilterSelect
@@ -237,6 +229,17 @@ export function Header({
         icon={Globe}
         options={origins.map((o) => ({ id: o, name: o }))}
       />
+
+      {showAdditional && (
+        <>
+          <Separator orientation="vertical" className="h-5 hidden md:block" />
+          <DateRangePicker
+            dateRange={additionalDateRange}
+            onDateRangeChange={onAdditionalDateRangeChange!}
+            label={additionalDateLabel!}
+          />
+        </>
+      )}
     </>
   );
 
