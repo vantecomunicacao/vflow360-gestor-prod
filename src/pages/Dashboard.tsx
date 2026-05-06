@@ -21,6 +21,7 @@ import { AIInsights } from "@/components/dashboard/AIInsights";
 import { LoadingState } from "@/components/dashboard/LoadingState";
 import { ErrorState } from "@/components/dashboard/ErrorState";
 import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
+import { AIUsageCard } from "@/components/dashboard/AIUsageCard";
 
 type SavedFilters = {
   from?: string;
@@ -275,6 +276,10 @@ export default function Dashboard() {
 
       <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
         <TimePerStage averageTimePerStage={data.averageTimePerStage} />
+      </AnimatedSection>
+
+      <AnimatedSection delay={0.05}>
+        <AIUsageCard startDate={startDate} endDate={endDate} />
       </AnimatedSection>
     </div>
   );

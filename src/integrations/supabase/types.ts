@@ -96,6 +96,48 @@ export type Database = {
           },
         ]
       }
+      ai_usage_log: {
+        Row: {
+          completion_tokens: number
+          conversation_id: string | null
+          cost_usd: number
+          created_at: string
+          id: string
+          model: string
+          prompt_tokens: number
+          provider: string
+          total_tokens: number
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          completion_tokens?: number
+          conversation_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          id?: string
+          model: string
+          prompt_tokens?: number
+          provider: string
+          total_tokens?: number
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          completion_tokens?: number
+          conversation_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          id?: string
+          model?: string
+          prompt_tokens?: number
+          provider?: string
+          total_tokens?: number
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           analyze_after: string | null

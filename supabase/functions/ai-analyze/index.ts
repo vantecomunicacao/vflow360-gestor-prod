@@ -406,6 +406,39 @@ REGRAS OBRIGATÓRIAS:
     const aiData = await aiResponse.json();
     console.log("AI response:", JSON.stringify(aiData).slice(0, 1000));
 
+    // Log token usage and estimated cost
+    try {
+      const usage = aiData.usage || {};
+      const promptTokens = Number(usage.prompt_tokens || 0);
+      const completionTokens = Number(usage.completion_tokens || 0);
+      const totalTokens = Number(usage.total_tokens || promptTokens + completionTokens);
+      // Pricing per 1M tokens (USD). Approximate; update as needed.
+      const PRICING: Record<string, { in: number; out: number }> = {
+        "gpt-4o": { in: 2.5, out: 10 },
+        "gpt-4o-mini": { in: 0.15, out: 0.6 },
+        "gpt-4-turbo": { in: 10, out: 30 },
+        "gpt-3.5-turbo": { in: 0.5, out: 1.5 },
+        "google/gemini-2.5-flash": { in: 0.075, out: 0.3 },
+        "google/gemini-2.5-pro": { in: 1.25, out: 5 },
+      };
+      const priceKey = useOpenAI ? aiModel : aiModel;
+      const pr = PRICING[priceKey] || { in: 0, out: 0 };
+      const costUsd = (promptTokens * pr.in + completionTokens * pr.out) / 1_000_000;
+      await supabase.from("ai_usage_log").insert({
+        workspace_id: conversation?.workspace_id || null,
+        user_id: resolvedUserId,
+        conversation_id: conversationId,
+        provider: useOpenAI ? "openai" : "lovable",
+        model: aiModel,
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        total_tokens: totalTokens,
+        cost_usd: Number(costUsd.toFixed(6)),
+      });
+    } catch (e) {
+      console.error("Failed to log AI usage:", e);
+    }
+
     // Parse tool call response
     let suggestions: any[] = [];
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
