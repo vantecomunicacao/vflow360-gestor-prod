@@ -581,17 +581,29 @@ serve(async (req) => {
       if (np) phoneSet.add(np);
     }
 
-    let convIds: string[] = [];
+    // Pagina TODAS as conversas do workspace e filtra por phone match (sem filtro de data
+    // — conversas antigas podem ter respostas dentro do período).
+    const convIds: string[] = [];
     if (phoneSet.size > 0) {
-      const { data: convsRows } = await supabase
-        .from("conversations")
-        .select("id,contact_phone")
-        .eq("workspace_id", workspaceId)
-        .gte("last_message_at", startDate || new Date(0).toISOString())
-        .lte("last_message_at", endDate || new Date().toISOString());
-      convIds = (convsRows || [])
-        .filter((c: any) => phoneSet.has(normalizePhone(c.contact_phone)))
-        .map((c: any) => c.id);
+      const PAGE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: convsRows, error: convErr } = await supabase
+          .from("conversations")
+          .select("id,contact_phone")
+          .eq("workspace_id", workspaceId)
+          .range(from, from + PAGE - 1);
+        if (convErr) { console.error("convs page error", convErr); break; }
+        const rows = convsRows || [];
+        for (const c of rows) {
+          if (phoneSet.has(normalizePhone((c as any).contact_phone))) {
+            convIds.push((c as any).id);
+          }
+        }
+        if (rows.length < PAGE) break;
+        from += PAGE;
+        if (from > 50000) break; // hard safety
+      }
     }
 
     let totalResponseMinutes = 0;
@@ -599,15 +611,36 @@ serve(async (req) => {
     let conversationsWithResponse = 0;
 
     if (convIds.length > 0) {
-      // Limita a 5000 mensagens para evitar timeouts em workspaces grandes
-      const { data: msgsRows } = await supabase
-        .from("messages")
-        .select("conversation_id,direction,created_at")
-        .in("conversation_id", convIds)
-        .gte("created_at", startDate || new Date(0).toISOString())
-        .lte("created_at", endDate || new Date().toISOString())
-        .order("created_at", { ascending: true })
-        .limit(5000);
+      // Pagina mensagens em lotes de conversation IDs e por páginas, sem cortar dados.
+      const ID_CHUNK = 200;
+      const MSG_PAGE = 1000;
+      const msgsAll: Array<{ conversation_id: string; direction: string; created_at: string }> = [];
+      const startIso = startDate || new Date(0).toISOString();
+      const endIso = endDate || new Date().toISOString();
+
+      for (let i = 0; i < convIds.length; i += ID_CHUNK) {
+        const chunk = convIds.slice(i, i + ID_CHUNK);
+        let mFrom = 0;
+        while (true) {
+          const { data: msgsRows, error: msgErr } = await supabase
+            .from("messages")
+            .select("conversation_id,direction,created_at")
+            .in("conversation_id", chunk)
+            .gte("created_at", startIso)
+            .lte("created_at", endIso)
+            .order("created_at", { ascending: true })
+            .range(mFrom, mFrom + MSG_PAGE - 1);
+          if (msgErr) { console.error("msgs page error", msgErr); break; }
+          const rows = (msgsRows || []) as any[];
+          for (const m of rows) msgsAll.push(m);
+          if (rows.length < MSG_PAGE) break;
+          mFrom += MSG_PAGE;
+          if (mFrom > 100000) break; // safety
+        }
+      }
+
+      const msgsRows = msgsAll;
+      console.log(`[response-time] convIds=${convIds.length} messages=${msgsRows.length}`);
 
       const byConv = new Map<string, Array<{ dir: string; t: number }>>();
       for (const m of (msgsRows || [])) {
