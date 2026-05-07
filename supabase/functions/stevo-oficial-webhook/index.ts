@@ -530,6 +530,12 @@ serve(async (req) => {
     return okResponse;
   } catch (error) {
     console.error("Stevo Oficial webhook error:", error);
+    try {
+      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:stevo-oficial-webhook", message: (error as Error)?.message || String(error), stack: (error as Error)?.stack, timestamp: new Date().toISOString() }),
+      });
+    } catch (_) {}
     return okResponse;
   }
 });

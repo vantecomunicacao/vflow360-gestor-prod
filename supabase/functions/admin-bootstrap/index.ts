@@ -50,7 +50,14 @@ Deno.serve(async (req) => {
     await admin.from("user_roles").upsert({ user_id: userId, role: "admin" });
     return json({ has_admin: true, is_admin: true, promoted: true });
   } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    const message = (e as Error).message;
+    try {
+      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:admin-bootstrap", message, stack: (e as Error)?.stack, timestamp: new Date().toISOString() }),
+      });
+    } catch (_) {}
+    return json({ error: message }, 500);
   }
 });
 
