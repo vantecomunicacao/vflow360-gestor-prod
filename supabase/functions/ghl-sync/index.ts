@@ -358,6 +358,12 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       }, { onConflict: "workspace_id" });
     }
+    try {
+      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:ghl-sync", message: msg, stack: (err as Error)?.stack, context: { workspace_id: workspaceIdForStatus }, timestamp: new Date().toISOString() }),
+      });
+    } catch (_) {}
     return new Response(JSON.stringify({ ok: false, error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

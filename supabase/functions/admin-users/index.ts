@@ -185,7 +185,14 @@ Deno.serve(async (req) => {
     }
   } catch (e) {
     console.error("admin-users error:", e);
-    return json({ error: (e as Error).message }, 500);
+    const message = (e as Error).message;
+    try {
+      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:admin-users", message, stack: (e as Error)?.stack, timestamp: new Date().toISOString() }),
+      });
+    } catch (_) {}
+    return json({ error: message }, 500);
   }
 });
 

@@ -325,11 +325,15 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("pdf-extract error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:pdf-extract", message, stack: (error as Error)?.stack, timestamp: new Date().toISOString() }),
+      });
+    } catch (_) {}
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }),
+      JSON.stringify({ success: false, error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
