@@ -664,6 +664,21 @@ REGRAS OBRIGATÓRIAS:
   } catch (error) {
     console.error("ai-analyze error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
+    const stack = error instanceof Error ? error.stack : undefined;
+    try {
+      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project: "VFlowGHL",
+          level: "error",
+          source: "edge:ai-analyze",
+          message,
+          stack,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    } catch (_) { /* ignore */ }
     return new Response(JSON.stringify({ success: false, error: message }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
