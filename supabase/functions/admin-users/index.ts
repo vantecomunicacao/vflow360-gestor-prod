@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
+import { reportEdgeError } from "../_shared/error-reporter.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -186,12 +188,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error("admin-users error:", e);
     const message = (e as Error).message;
-    try {
-      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:admin-users", message, stack: (e as Error)?.stack, timestamp: new Date().toISOString() }),
-      });
-    } catch (_) {}
+    await reportEdgeError("edge:admin-users", e);
     return json({ error: message }, 500);
   }
 });

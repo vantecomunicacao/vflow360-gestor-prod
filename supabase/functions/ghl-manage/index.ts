@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { reportEdgeError } from "../_shared/error-reporter.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -930,20 +932,7 @@ serve(async (req) => {
     console.error("ghl-manage error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     const stack = error instanceof Error ? error.stack : undefined;
-    try {
-      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project: "VFlowGHL",
-          level: "error",
-          source: "edge:ghl-manage",
-          message,
-          stack,
-          timestamp: new Date().toISOString(),
-        }),
-      });
-    } catch (_) { /* ignore */ }
+    await reportEdgeError("edge:ghl-manage", error);
     return new Response(JSON.stringify({ success: false, error: message }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

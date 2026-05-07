@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { reportEdgeError } from "../_shared/error-reporter.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -77,12 +79,7 @@ serve(async (req) => {
     );
   } catch (err) {
     console.error("Scheduler error:", err);
-    try {
-      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:analyze-scheduler", message: String(err), stack: (err as Error)?.stack, timestamp: new Date().toISOString() }),
-      });
-    } catch (_) {}
+    await reportEdgeError("edge:analyze-scheduler", err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
