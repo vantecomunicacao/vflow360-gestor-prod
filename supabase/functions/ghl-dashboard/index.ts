@@ -5,6 +5,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { reportEdgeError } from "../_shared/error-reporter.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -716,12 +718,7 @@ serve(async (req) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("ghl-dashboard error:", msg);
-    try {
-      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:ghl-dashboard", message: msg, stack: (err as Error)?.stack, timestamp: new Date().toISOString() }),
-      });
-    } catch (_) {}
+    await reportEdgeError("edge:ghl-dashboard", err);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

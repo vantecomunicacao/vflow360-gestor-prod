@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
 
+import { reportEdgeError } from "../_shared/error-reporter.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -326,12 +328,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("pdf-extract error:", error);
     const message = error instanceof Error ? error.message : String(error);
-    try {
-      await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: "VFlowGHL", level: "error", source: "edge:pdf-extract", message, stack: (error as Error)?.stack, timestamp: new Date().toISOString() }),
-      });
-    } catch (_) {}
+    await reportEdgeError("edge:pdf-extract", error);
     return new Response(
       JSON.stringify({ success: false, error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
