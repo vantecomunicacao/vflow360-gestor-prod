@@ -24,8 +24,19 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization header");
 
-    const token = authHeader.replace("Bearer ", "");
-    const isServiceRole = token === SUPABASE_SERVICE_ROLE_KEY;
+    const token = authHeader.replace("Bearer ", "").trim();
+
+    // Detect service-role token by inspecting JWT claims (robust across env mismatches)
+    let isServiceRole = token === SUPABASE_SERVICE_ROLE_KEY;
+    if (!isServiceRole) {
+      try {
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const payloadJson = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+          if (payloadJson?.role === "service_role") isServiceRole = true;
+        }
+      } catch (_) { /* ignore */ }
+    }
 
     let resolvedUserId: string | null = null;
 
