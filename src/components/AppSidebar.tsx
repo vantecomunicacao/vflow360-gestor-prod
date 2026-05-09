@@ -39,6 +39,7 @@ export function AppSidebar() {
     { title: "Dashboard config", url: "/settings/dashboard", icon: SlidersHorizontal, show: viewSettings },
     { title: "Documentação", url: "/docs", icon: BookOpen, show: true },
     { title: "Admin", url: "/admin", icon: ShieldCheck, show: isAdmin },
+    { title: "Logs", url: "/admin/logs", icon: ScrollText, show: isAdmin },
   ].filter((i) => i.show);
 
   return (
