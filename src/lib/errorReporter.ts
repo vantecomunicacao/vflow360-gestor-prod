@@ -1,7 +1,7 @@
-// Centralized error reporter — sends errors to external n8n webhook.
-// Webhook is public (no auth); safe to call from the browser.
-
+// Centralized error reporter — sends errors to n8n webhook AND persists in DB.
 const WEBHOOK_URL = "https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable";
+const LOG_EVENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/log-event`;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const PROJECT = "VFlowGHL";
 
 type ReportPayload = {
