@@ -42,13 +42,25 @@ export async function reportError(payload: ReportPayload): Promise<void> {
       timestamp: new Date().toISOString(),
     };
 
-    // Fire-and-forget; never block UI on reporting.
-    await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      keepalive: true,
-    });
+    // Fire-and-forget to both targets; never block UI on reporting.
+    await Promise.all([
+      fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        keepalive: true,
+      }).catch(() => {}),
+      fetch(LOG_EVENT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: ANON_KEY,
+          Authorization: `Bearer ${ANON_KEY}`,
+        },
+        body: JSON.stringify(body),
+        keepalive: true,
+      }).catch(() => {}),
+    ]);
   } catch {
     // Swallow — reporter must never throw.
   }
