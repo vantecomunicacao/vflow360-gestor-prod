@@ -90,6 +90,7 @@ const App = () => (
                 />
                 <Route path="/workspaces" element={lazyRoute(<Workspaces />, <GenericPageSkeleton />)} />
                 <Route path="/admin" element={lazyRoute(<Admin />, <GenericPageSkeleton />)} />
+                <Route path="/admin/logs" element={lazyRoute(<SystemLogs />, <GenericPageSkeleton />)} />
                 <Route path="/docs" element={lazyRoute(<Documentation />, <GenericPageSkeleton />)} />
               </Route>
               <Route path="*" element={<NotFound />} />
