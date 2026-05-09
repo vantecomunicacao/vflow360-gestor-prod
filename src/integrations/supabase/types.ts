@@ -727,6 +727,51 @@ export type Database = {
           },
         ]
       }
+      system_logs: {
+        Row: {
+          context: Json
+          created_at: string
+          env: string | null
+          id: string
+          level: string
+          message: string
+          source: string
+          stack: string | null
+          url: string | null
+          user_agent: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          env?: string | null
+          id?: string
+          level: string
+          message: string
+          source: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          env?: string | null
+          id?: string
+          level?: string
+          message?: string
+          source?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           created_at: string
@@ -833,6 +878,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_system_logs: { Args: never; Returns: undefined }
       create_workspace: { Args: { _name: string }; Returns: string }
       get_my_permissions: {
         Args: never

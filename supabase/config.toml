@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.stevo-oficial-webhook]
 verify_jwt = false
+
+[functions.log-event]
+verify_jwt = false

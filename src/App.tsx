@@ -38,6 +38,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DashboardSettings = lazy(() => import("./pages/DashboardSettings"));
 const Workspaces = lazy(() => import("./pages/Workspaces"));
 const Admin = lazy(() => import("./pages/Admin"));
+const SystemLogs = lazy(() => import("./pages/SystemLogs"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 
@@ -89,6 +90,7 @@ const App = () => (
                 />
                 <Route path="/workspaces" element={lazyRoute(<Workspaces />, <GenericPageSkeleton />)} />
                 <Route path="/admin" element={lazyRoute(<Admin />, <GenericPageSkeleton />)} />
+                <Route path="/admin/logs" element={lazyRoute(<SystemLogs />, <GenericPageSkeleton />)} />
                 <Route path="/docs" element={lazyRoute(<Documentation />, <GenericPageSkeleton />)} />
               </Route>
               <Route path="*" element={<NotFound />} />

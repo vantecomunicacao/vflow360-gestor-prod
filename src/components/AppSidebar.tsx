@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen, ShieldCheck, SlidersHorizontal, ScrollText } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
@@ -39,6 +39,7 @@ export function AppSidebar() {
     { title: "Dashboard config", url: "/settings/dashboard", icon: SlidersHorizontal, show: viewSettings },
     { title: "Documentação", url: "/docs", icon: BookOpen, show: true },
     { title: "Admin", url: "/admin", icon: ShieldCheck, show: isAdmin },
+    { title: "Logs", url: "/admin/logs", icon: ScrollText, show: isAdmin },
   ].filter((i) => i.show);
 
   return (
