@@ -124,6 +124,11 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
                     <div className="flex items-center gap-3 text-white">
                       <span className="text-sm font-bold drop-shadow-sm">{stage.name}</span>
                       <span className="text-lg font-extrabold drop-shadow-sm">{stage.count}</span>
+                      {typeof stage.currentCount === "number" && (
+                        <span className="text-[11px] font-medium text-white/80 drop-shadow-sm">
+                          (atual: {stage.currentCount})
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
