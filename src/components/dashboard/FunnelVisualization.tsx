@@ -75,8 +75,8 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
       <div className="flex items-center justify-between mb-6">
         <h2 className="section-title mb-0">
           <TrendingUp className="w-5 h-5 text-accent" />
-          Visão Geral do Funil
-          <SectionTooltip text="Etapas do funil de oportunidades com taxas de conversão entre fases. Clique em 'Perdidas' para ver detalhes." />
+          Visão Geral - Funil de Passagem
+          <SectionTooltip text="Funil de passagem: cada etapa mostra o total de leads que JÁ PASSARAM por ela (ou seja, soma os que estão nela com os que avançaram para etapas posteriores). O número menor entre parênteses indica quantos leads estão atualmente nessa etapa. As taxas de conversão refletem o quanto seguiu para a próxima etapa. Clique em uma etapa para ver os leads que estão nela hoje." />
         </h2>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Conversão geral:</span>
