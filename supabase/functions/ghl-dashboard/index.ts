@@ -361,19 +361,27 @@ serve(async (req) => {
         }
       }
     }
+    // Funil de passagem: cada etapa soma os leads que estão nela + os que avançaram
+    const passage = {
+      contato_inicial: counts.contato_inicial + counts.proposta_enviada + counts.fechamento + counts.venda_ganha,
+      proposta_enviada: counts.proposta_enviada + counts.fechamento + counts.venda_ganha,
+      fechamento: counts.fechamento + counts.venda_ganha,
+      venda_ganha: counts.venda_ganha,
+    };
     const funnelStages = [
-      { id: "contato_inicial", name: "Contato Inicial", count: counts.contato_inicial, leads: leadsByBucket.contato_inicial },
-      { id: "proposta_enviada", name: "Proposta Enviada", count: counts.proposta_enviada, leads: leadsByBucket.proposta_enviada },
-      { id: "fechamento", name: "Fechamento", count: counts.fechamento, leads: leadsByBucket.fechamento },
-      { id: "venda_ganha", name: "Venda Ganha", count: counts.venda_ganha, leads: leadsByBucket.venda_ganha },
+      { id: "contato_inicial", name: "Contato Inicial", count: passage.contato_inicial, currentCount: counts.contato_inicial, leads: leadsByBucket.contato_inicial },
+      { id: "proposta_enviada", name: "Proposta Enviada", count: passage.proposta_enviada, currentCount: counts.proposta_enviada, leads: leadsByBucket.proposta_enviada },
+      { id: "fechamento", name: "Fechamento", count: passage.fechamento, currentCount: counts.fechamento, leads: leadsByBucket.fechamento },
+      { id: "venda_ganha", name: "Venda Ganha", count: passage.venda_ganha, currentCount: counts.venda_ganha, leads: leadsByBucket.venda_ganha },
     ];
 
     const safeRate = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0);
+    // Taxas baseadas no funil de passagem (passou para a próxima etapa)
     const conversionRates = {
-      contatoToProsposta: safeRate(counts.proposta_enviada, counts.contato_inicial),
-      propostaToFechamento: safeRate(counts.fechamento, counts.proposta_enviada),
-      fechamentoToVenda: safeRate(counts.venda_ganha, counts.fechamento),
-      overallConversion: safeRate(counts.venda_ganha, counts.contato_inicial || totalLeads),
+      contatoToProsposta: safeRate(passage.proposta_enviada, passage.contato_inicial),
+      propostaToFechamento: safeRate(passage.fechamento, passage.proposta_enviada),
+      fechamentoToVenda: safeRate(passage.venda_ganha, passage.fechamento),
+      overallConversion: safeRate(passage.venda_ganha, passage.contato_inicial || totalLeads),
     };
 
     // ===== Sellers =====
