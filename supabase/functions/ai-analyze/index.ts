@@ -42,13 +42,14 @@ serve(async (req) => {
       throw new Error("conversation_id and user_id are required");
     }
 
-    // 1. Fetch conversation messages (last 50)
-    const { data: messages, error: msgErr } = await supabase
+    // 1. Fetch conversation messages (last 20)
+    const { data: messagesDesc, error: msgErr } = await supabase
       .from("messages")
       .select("content, direction, created_at")
       .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true })
-      .limit(50);
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const messages = (messagesDesc || []).slice().reverse();
 
     if (msgErr) throw new Error(`Error fetching messages: ${msgErr.message}`);
     if (!messages || messages.length === 0) {
@@ -199,7 +200,7 @@ serve(async (req) => {
       .eq("conversation_id", conversationId)
       .eq("user_id", resolvedUserId)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(5);
 
     // Build previous suggestions context for the AI
     let previousContext = "";
@@ -310,7 +311,7 @@ REGRAS OBRIGATÓRIAS:
       ? "https://api.openai.com/v1/chat/completions"
       : "https://ai.gateway.lovable.dev/v1/chat/completions";
     const aiApiKey = useOpenAI ? providerConfig.api_key : LOVABLE_API_KEY;
-    const aiModel = useOpenAI ? (providerConfig.model || "gpt-4o") : "google/gemini-2.5-flash";
+    const aiModel = useOpenAI ? (providerConfig.model || "gpt-4o-mini") : "google/gemini-2.5-flash";
 
     if (!aiApiKey) throw new Error("No AI API key configured. Please configure an AI provider in Settings.");
 
