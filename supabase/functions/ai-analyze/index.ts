@@ -311,7 +311,7 @@ REGRAS OBRIGATÓRIAS:
       ? "https://api.openai.com/v1/chat/completions"
       : "https://ai.gateway.lovable.dev/v1/chat/completions";
     const aiApiKey = useOpenAI ? providerConfig.api_key : LOVABLE_API_KEY;
-    const aiModel = useOpenAI ? (providerConfig.model || "gpt-4o") : "google/gemini-2.5-flash";
+    const aiModel = useOpenAI ? (providerConfig.model || "gpt-4o-mini") : "google/gemini-2.5-flash";
 
     if (!aiApiKey) throw new Error("No AI API key configured. Please configure an AI provider in Settings.");
 
