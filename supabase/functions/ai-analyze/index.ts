@@ -200,7 +200,7 @@ serve(async (req) => {
       .eq("conversation_id", conversationId)
       .eq("user_id", resolvedUserId)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(5);
 
     // Build previous suggestions context for the AI
     let previousContext = "";
