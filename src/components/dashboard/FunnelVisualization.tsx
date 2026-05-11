@@ -67,7 +67,8 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
   ];
 
   const totalStages = funnelStages.length;
-  const lostPercentage = funnelStages[0]?.count > 0 ? (lostLeads / funnelStages[0].count) * 100 : 0;
+  const topPassage = funnelStages[0]?.count ?? 0;
+  const lostPercentage = topPassage > 0 ? (lostLeads / topPassage) * 100 : 0;
 
   return (
     <div className="dashboard-section animate-slide-up">
