@@ -430,8 +430,8 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
 
             // Debounce + analyze trigger only for inbound (customer) messages
             if (direction === "inbound") {
-              const DEBOUNCE_MS = 4 * 60 * 1000;
-              const CEILING_MS = 10 * 60 * 1000;
+              const DEBOUNCE_MS = 8 * 60 * 1000;
+              const CEILING_MS = 20 * 60 * 1000;
               const now = new Date();
 
               const { data: convDebounce } = await supabase
