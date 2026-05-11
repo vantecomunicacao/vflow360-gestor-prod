@@ -42,13 +42,14 @@ serve(async (req) => {
       throw new Error("conversation_id and user_id are required");
     }
 
-    // 1. Fetch conversation messages (last 50)
-    const { data: messages, error: msgErr } = await supabase
+    // 1. Fetch conversation messages (last 20)
+    const { data: messagesDesc, error: msgErr } = await supabase
       .from("messages")
       .select("content, direction, created_at")
       .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true })
-      .limit(50);
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const messages = (messagesDesc || []).slice().reverse();
 
     if (msgErr) throw new Error(`Error fetching messages: ${msgErr.message}`);
     if (!messages || messages.length === 0) {
