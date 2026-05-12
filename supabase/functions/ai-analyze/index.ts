@@ -357,7 +357,7 @@ REGRAS OBRIGATÓRIAS:
 
     // 8. Call AI with tool calling for structured output
     const aiRequestBody: any = {
-      model: aiModel,
+      model: resolved.model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Analise esta conversa e gere sugestões de ações para o CRM:\n\n${conversationText}` },
@@ -462,15 +462,15 @@ REGRAS OBRIGATÓRIAS:
         "google/gemini-2.5-flash": { in: 0.075, out: 0.3 },
         "google/gemini-2.5-pro": { in: 1.25, out: 5 },
       };
-      const priceKey = useOpenAI ? aiModel : aiModel;
+      const priceKey = resolved.model;
       const pr = PRICING[priceKey] || { in: 0, out: 0 };
       const costUsd = (promptTokens * pr.in + completionTokens * pr.out) / 1_000_000;
       await supabase.from("ai_usage_log").insert({
         workspace_id: conversation?.workspace_id || null,
         user_id: resolvedUserId,
         conversation_id: conversationId,
-        provider: useOpenAI ? "openai" : "lovable",
-        model: aiModel,
+        provider: resolved.providerLabel,
+        model: resolved.model,
         prompt_tokens: promptTokens,
         completion_tokens: completionTokens,
         total_tokens: totalTokens,
@@ -636,7 +636,7 @@ REGRAS OBRIGATÓRIAS:
               lostReasonName: lostReasonsMap[s.lost_reason_id] || null,
             } : {}),
           },
-          ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o-mini"}` : `lovable/${aiModel}`,
+          ai_provider: buildAiProviderString(providerConfig || null, resolved),
         })
         .select()
         .single();
