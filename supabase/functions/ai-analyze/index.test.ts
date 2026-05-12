@@ -1,4 +1,4 @@
-import { assertEquals, assertNull } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   buildAiProviderString,
   LEGACY_TYPE_MAP,
