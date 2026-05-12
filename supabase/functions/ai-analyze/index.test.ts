@@ -31,7 +31,7 @@ Deno.test("resolveAiModel: OpenAI with null model falls back to gpt-4o-mini", ()
 });
 
 Deno.test("resolveAiModel: Lovable AI when provider is lovable", () => {
-  const result = resolveAiModel({ provider: "lovable", api_key: null, model: null });
+  const result = resolveAiModel({ provider: "lovable", api_key: undefined, model: undefined });
   assertEquals(result.useOpenAI, false);
   assertEquals(result.model, "google/gemini-2.5-flash");
   assertEquals(result.providerLabel, "lovable");
