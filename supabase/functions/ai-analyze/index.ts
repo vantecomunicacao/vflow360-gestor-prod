@@ -345,16 +345,15 @@ REGRAS OBRIGATÓRIAS:
       .eq("user_id", resolvedUserId)
       .maybeSingle();
 
-    const useOpenAI = providerConfig?.provider === "openai" && providerConfig?.api_key;
-    const aiEndpoint = useOpenAI
+    const resolved = resolveAiModel(providerConfig || null);
+    const aiEndpoint = resolved.useOpenAI
       ? "https://api.openai.com/v1/chat/completions"
       : "https://ai.gateway.lovable.dev/v1/chat/completions";
-    const aiApiKey = useOpenAI ? providerConfig.api_key : LOVABLE_API_KEY;
-    const aiModel = useOpenAI ? (providerConfig.model || "gpt-4o-mini") : "google/gemini-2.5-flash";
+    const aiApiKey = resolved.useOpenAI ? providerConfig!.api_key : LOVABLE_API_KEY;
 
     if (!aiApiKey) throw new Error("No AI API key configured. Please configure an AI provider in Settings.");
 
-    console.log(`Using AI provider: ${useOpenAI ? "OpenAI" : "Lovable AI"}, model: ${aiModel}`);
+    console.log(`Using AI provider: ${resolved.useOpenAI ? "OpenAI" : "Lovable AI"}, model: ${resolved.model}`);
 
     // 8. Call AI with tool calling for structured output
     const aiRequestBody: any = {
