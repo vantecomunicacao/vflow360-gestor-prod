@@ -3,6 +3,45 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { reportEdgeError } from "../_shared/error-reporter.ts";
 
+// ====== Exported helpers for testing ======
+export const VALID_SUGGESTION_TYPES = [
+  "mover_funil",
+  "campo_personalizado",
+  "adicionar_nota",
+  "valor_negociacao",
+  "agendar_lembrete",
+  "ganho_perdido",
+];
+
+export const LEGACY_TYPE_MAP: Record<string, string> = {
+  "🗓️ contato futuro": "agendar_lembrete",
+  "field_personalizado": "campo_personalizado",
+  "mov_funil": "mover_funil",
+};
+
+export function normalizeSuggestionType(type: string): string | null {
+  const normalized = LEGACY_TYPE_MAP[type.toLowerCase().trim()] || type;
+  return VALID_SUGGESTION_TYPES.includes(normalized) ? normalized : null;
+}
+
+export function resolveAiModel(
+  providerConfig: { provider?: string; api_key?: string; model?: string } | null,
+): { useOpenAI: boolean; model: string; providerLabel: string } {
+  const useOpenAI = providerConfig?.provider === "openai" && !!providerConfig?.api_key;
+  const model = useOpenAI ? (providerConfig?.model || "gpt-4o-mini") : "google/gemini-2.5-flash";
+  return { useOpenAI, model, providerLabel: useOpenAI ? "openai" : "lovable" };
+}
+
+export function buildAiProviderString(
+  providerConfig: { model?: string } | null,
+  resolved: { useOpenAI: boolean; model: string; providerLabel: string },
+): string {
+  return resolved.useOpenAI
+    ? `openai/${providerConfig?.model || "gpt-4o-mini"}`
+    : `lovable/${resolved.model}`;
+}
+// ====== End helpers ======
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
