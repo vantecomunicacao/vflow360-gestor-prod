@@ -598,7 +598,7 @@ REGRAS OBRIGATÓRIAS:
               lostReasonName: lostReasonsMap[s.lost_reason_id] || null,
             } : {}),
           },
-          ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o"}` : `lovable/${aiModel}`,
+          ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o-mini"}` : `lovable/${aiModel}`,
         })
         .select()
         .single();
