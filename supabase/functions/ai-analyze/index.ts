@@ -3,6 +3,45 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { reportEdgeError } from "../_shared/error-reporter.ts";
 
+// ====== Exported helpers for testing ======
+export const VALID_SUGGESTION_TYPES = [
+  "mover_funil",
+  "campo_personalizado",
+  "adicionar_nota",
+  "valor_negociacao",
+  "agendar_lembrete",
+  "ganho_perdido",
+];
+
+export const LEGACY_TYPE_MAP: Record<string, string> = {
+  "🗓️ contato futuro": "agendar_lembrete",
+  "field_personalizado": "campo_personalizado",
+  "mov_funil": "mover_funil",
+};
+
+export function normalizeSuggestionType(type: string): string | null {
+  const normalized = LEGACY_TYPE_MAP[type.toLowerCase().trim()] || type;
+  return VALID_SUGGESTION_TYPES.includes(normalized) ? normalized : null;
+}
+
+export function resolveAiModel(
+  providerConfig: { provider?: string; api_key?: string; model?: string } | null,
+): { useOpenAI: boolean; model: string; providerLabel: string } {
+  const useOpenAI = providerConfig?.provider === "openai" && !!providerConfig?.api_key;
+  const model = useOpenAI ? (providerConfig?.model || "gpt-4o-mini") : "google/gemini-2.5-flash";
+  return { useOpenAI, model, providerLabel: useOpenAI ? "openai" : "lovable" };
+}
+
+export function buildAiProviderString(
+  providerConfig: { model?: string } | null,
+  resolved: { useOpenAI: boolean; model: string; providerLabel: string },
+): string {
+  return resolved.useOpenAI
+    ? `openai/${providerConfig?.model || "gpt-4o-mini"}`
+    : `lovable/${resolved.model}`;
+}
+// ====== End helpers ======
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -306,20 +345,19 @@ REGRAS OBRIGATÓRIAS:
       .eq("user_id", resolvedUserId)
       .maybeSingle();
 
-    const useOpenAI = providerConfig?.provider === "openai" && providerConfig?.api_key;
-    const aiEndpoint = useOpenAI
+    const resolved = resolveAiModel(providerConfig || null);
+    const aiEndpoint = resolved.useOpenAI
       ? "https://api.openai.com/v1/chat/completions"
       : "https://ai.gateway.lovable.dev/v1/chat/completions";
-    const aiApiKey = useOpenAI ? providerConfig.api_key : LOVABLE_API_KEY;
-    const aiModel = useOpenAI ? (providerConfig.model || "gpt-4o-mini") : "google/gemini-2.5-flash";
+    const aiApiKey = resolved.useOpenAI ? providerConfig!.api_key : LOVABLE_API_KEY;
 
     if (!aiApiKey) throw new Error("No AI API key configured. Please configure an AI provider in Settings.");
 
-    console.log(`Using AI provider: ${useOpenAI ? "OpenAI" : "Lovable AI"}, model: ${aiModel}`);
+    console.log(`Using AI provider: ${resolved.useOpenAI ? "OpenAI" : "Lovable AI"}, model: ${resolved.model}`);
 
     // 8. Call AI with tool calling for structured output
     const aiRequestBody: any = {
-      model: aiModel,
+      model: resolved.model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Analise esta conversa e gere sugestões de ações para o CRM:\n\n${conversationText}` },
@@ -424,15 +462,15 @@ REGRAS OBRIGATÓRIAS:
         "google/gemini-2.5-flash": { in: 0.075, out: 0.3 },
         "google/gemini-2.5-pro": { in: 1.25, out: 5 },
       };
-      const priceKey = useOpenAI ? aiModel : aiModel;
+      const priceKey = resolved.model;
       const pr = PRICING[priceKey] || { in: 0, out: 0 };
       const costUsd = (promptTokens * pr.in + completionTokens * pr.out) / 1_000_000;
       await supabase.from("ai_usage_log").insert({
         workspace_id: conversation?.workspace_id || null,
         user_id: resolvedUserId,
         conversation_id: conversationId,
-        provider: useOpenAI ? "openai" : "lovable",
-        model: aiModel,
+        provider: resolved.providerLabel,
+        model: resolved.model,
         prompt_tokens: promptTokens,
         completion_tokens: completionTokens,
         total_tokens: totalTokens,
@@ -453,6 +491,20 @@ REGRAS OBRIGATÓRIAS:
         console.error("Failed to parse AI suggestions:", e);
       }
     }
+    // 8b. Normalize suggestion types (defense against model hallucinating invalid types)
+    suggestions = suggestions
+      .map((s) => {
+        const normalized = normalizeSuggestionType(s.type);
+        if (!normalized) {
+          console.log(`Filtered suggestion with invalid/hallucinated type: "${s.type}" — title: "${s.title}"`);
+          return null;
+        }
+        if (normalized !== s.type) {
+          console.log(`Normalized suggestion type: "${s.type}" → "${normalized}"`);
+        }
+        return { ...s, type: normalized };
+      })
+      .filter(Boolean);
 
     // 9. POST-GENERATION VALIDATION
 
@@ -598,7 +650,7 @@ REGRAS OBRIGATÓRIAS:
               lostReasonName: lostReasonsMap[s.lost_reason_id] || null,
             } : {}),
           },
-          ai_provider: useOpenAI ? `openai/${providerConfig.model || "gpt-4o-mini"}` : `lovable/${aiModel}`,
+          ai_provider: buildAiProviderString(providerConfig || null, resolved),
         })
         .select()
         .single();
