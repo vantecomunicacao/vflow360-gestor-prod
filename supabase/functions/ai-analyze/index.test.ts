@@ -87,11 +87,11 @@ Deno.test("normalizeSuggestionType: normalizes legacy types", () => {
 });
 
 Deno.test("normalizeSuggestionType: rejects unknown/hallucinated types", () => {
-  assertNull(normalizeSuggestionType("✳️ Qualificando"));
-  assertNull(normalizeSuggestionType("🌐 Mover para Aguardando Doc"));
-  assertNull(normalizeSuggestionType("🔥 Proposta Quente"));
-  assertNull(normalizeSuggestionType("inventado_pelo_modelo"));
-  assertNull(normalizeSuggestionType(""));
+  assertEquals(normalizeSuggestionType("✳️ Qualificando"), null);
+  assertEquals(normalizeSuggestionType("🌐 Mover para Aguardando Doc"), null);
+  assertEquals(normalizeSuggestionType("🔥 Proposta Quente"), null);
+  assertEquals(normalizeSuggestionType("inventado_pelo_modelo"), null);
+  assertEquals(normalizeSuggestionType(""), null);
 });
 
 Deno.test("normalizeSuggestionType: is case-insensitive for legacy map", () => {
