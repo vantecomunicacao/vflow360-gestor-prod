@@ -491,6 +491,20 @@ REGRAS OBRIGATÓRIAS:
         console.error("Failed to parse AI suggestions:", e);
       }
     }
+    // 8b. Normalize suggestion types (defense against model hallucinating invalid types)
+    suggestions = suggestions
+      .map((s) => {
+        const normalized = normalizeSuggestionType(s.type);
+        if (!normalized) {
+          console.log(`Filtered suggestion with invalid/hallucinated type: "${s.type}" — title: "${s.title}"`);
+          return null;
+        }
+        if (normalized !== s.type) {
+          console.log(`Normalized suggestion type: "${s.type}" → "${normalized}"`);
+        }
+        return { ...s, type: normalized };
+      })
+      .filter(Boolean);
 
     // 9. POST-GENERATION VALIDATION
 
