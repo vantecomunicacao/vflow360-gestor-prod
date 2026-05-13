@@ -120,17 +120,17 @@
 @layer components {
   /* Metric Cards */
   .metric-card {
-    @apply bg-card rounded-xl lg:rounded-2xl border border-border px-4 py-3.5 sm:px-5 sm:py-4 lg:py-5 shadow-sm transition-all duration-200;
+    @apply bg-card rounded-xl border border-border px-3.5 py-3 sm:px-4 sm:py-3 shadow-sm transition-all duration-200;
   }
   .metric-card:hover {
     @apply shadow-md border-border/80;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
   }
   .metric-value {
-    @apply text-[1.65rem] font-extrabold text-foreground tracking-tight leading-none;
+    @apply text-xl font-extrabold text-foreground tracking-tight leading-none;
   }
   .metric-label {
-    @apply text-[11px] font-semibold text-muted-foreground uppercase tracking-widest;
+    @apply text-[10px] font-semibold text-muted-foreground uppercase tracking-wider;
   }
 
   /* Dashboard Section */
