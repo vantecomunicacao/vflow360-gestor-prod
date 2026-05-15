@@ -131,7 +131,62 @@ serve(async (req) => {
       }
     }
 
-    // 3. Fetch GHL integration config (mappings)
+    // 2c. Pipeline filter — skip analysis for leads outside the allowed funnels
+    if (conversation?.workspace_id) {
+      const { data: dashSettings } = await supabase
+        .from("ghl_dashboard_settings")
+        .select("ai_allowed_pipeline_ids")
+        .eq("workspace_id", conversation.workspace_id)
+        .maybeSingle();
+
+      const allowedPipelines = (dashSettings?.ai_allowed_pipeline_ids as string[] | null) || [];
+
+      if (allowedPipelines.length > 0) {
+        const phone = conversation.contact_phone || "";
+        const digits = phone.replace(/\D/g, "");
+        const last10 = digits.slice(-10);
+
+        let oppQuery = supabase
+          .from("ghl_opportunities")
+          .select("pipeline_id, ghl_updated_at")
+          .eq("workspace_id", conversation.workspace_id)
+          .order("ghl_updated_at", { ascending: false, nullsFirst: false })
+          .limit(1);
+
+        if (phone && last10) {
+          oppQuery = oppQuery.or(`contact_phone.eq.${phone},contact_phone.ilike.%${last10}`);
+        } else if (phone) {
+          oppQuery = oppQuery.eq("contact_phone", phone);
+        } else {
+          // No phone → cannot match an opportunity → skip
+          console.log(`Pipeline filter: skipping ${conversationId} — no contact_phone to match`);
+          return new Response(
+            JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason: "no_contact_phone_for_pipeline_filter" } }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        const { data: opp } = await oppQuery.maybeSingle();
+
+        if (!opp) {
+          console.log(`Pipeline filter: skipping ${conversationId} — no opportunity found for contact ${phone}`);
+          return new Response(
+            JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason: "no_opportunity_for_contact" } }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        if (!opp.pipeline_id || !allowedPipelines.includes(opp.pipeline_id)) {
+          console.log(`Pipeline filter: skipping ${conversationId} — pipeline ${opp.pipeline_id} not in allowed list`);
+          return new Response(
+            JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason: "pipeline_not_allowed" } }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+    }
+
+
     let ghlQuery = supabase
       .from("integrations")
       .select("config, status")
