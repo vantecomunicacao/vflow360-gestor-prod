@@ -9,6 +9,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { WhatsAppProviderPicker } from "@/components/integrations/WhatsAppProviderPicker";
 import { WhatsAppInstanceCard } from "@/components/integrations/WhatsAppInstanceCard";
 import { GhlSection } from "@/components/integrations/GhlSection";
+import { AiPipelineFilter } from "@/components/integrations/AiPipelineFilter";
 import {
   FieldOption,
   GhlCustomField,
@@ -806,6 +807,8 @@ const Integrations = () => {
           setAiPrompt={setAiPrompt}
           onSaveMappings={handleSaveMappings}
         />
+
+        {ghlConnected && <AiPipelineFilter />}
       </div>
       <div className="hidden xl:block w-80 shrink-0">
         <WebhookLogs />
