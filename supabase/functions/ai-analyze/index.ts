@@ -388,7 +388,7 @@ REGRAS OBRIGATÓRIAS:
 - Se o campo tem OPÇÕES VÁLIDAS listadas, use APENAS um valor dessa lista. NUNCA invente opções.
 - No campo "field" da sugestão, use a CHAVE do campo (fieldKey), não o nome amigável.
 - No campo "value", use o valor exato (nome da etapa para funil, opção para dropdowns, texto para campos livres).
-- Para "valor_negociacao": SEMPRE que houver menção de preço, valor, orçamento ou quantia monetária na conversa, use o tipo "valor_negociacao". NÃO coloque valores monetários em campos personalizados. O "value" deve ser APENAS o número (ex: "1500", "2300.50"), sem "R$", sem texto.
+- Para "valor_negociacao": SEMPRE que houver menção de preço, valor, orçamento ou quantia monetária na conversa, use o tipo "valor_negociacao". NÃO coloque valores monetários em campos personalizados. O "value" deve ser APENAS o número (ex: "1500", "2300.50"), sem "R$", sem texto. SEMPRE use o VALOR TOTAL/CHEIO da negociação — se houver parcelamento (ex: "10x de R$150"), multiplique para obter o total (1500). NUNCA sugira o valor da parcela isolada.
 - NUNCA gere sugestões contraditórias no mesmo lote (ex: ganho E perdido ao mesmo tempo)
 - Analise a conversa INTEIRA para entender a conclusão final do lead antes de sugerir ganho/perdido
 - Retorne as sugestões usando a tool fornecida`;
