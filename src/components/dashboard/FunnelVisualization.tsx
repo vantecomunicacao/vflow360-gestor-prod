@@ -50,6 +50,13 @@ function LeadListDialog({ open, onOpenChange, title, leads }: {
   );
 }
 
+const stageAccents = [
+  { text: "text-funnel-1", bg: "bg-funnel-1/5", icon: "text-funnel-1" },
+  { text: "text-funnel-2", bg: "bg-funnel-2/5", icon: "text-funnel-2" },
+  { text: "text-funnel-3", bg: "bg-funnel-3/5", icon: "text-funnel-3" },
+  { text: "text-funnel-4", bg: "bg-funnel-4/5", icon: "text-funnel-4" },
+];
+
 export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [] }: FunnelVisualizationProps) {
   const [selectedStage, setSelectedStage] = useState<{ title: string; leads: StageLead[] } | null>(null);
 
@@ -59,16 +66,11 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
     conversionRates.fechamentoToVenda,
   ];
 
-  const gradients = [
-    "hsl(var(--funnel-1))",
-    "hsl(var(--funnel-2))",
-    "hsl(var(--funnel-3))",
-    "hsl(var(--funnel-4))",
-  ];
-
-  const totalStages = funnelStages.length;
   const topPassage = funnelStages[0]?.count ?? 0;
   const lostPercentage = topPassage > 0 ? (lostLeads / topPassage) * 100 : 0;
+
+  // Tapering widths to keep the funnel feel without trapezoidal shapes
+  const stageWidths = ["w-full", "w-[92%]", "w-[80%]", "w-[66%]"];
 
   return (
     <div className="dashboard-section animate-slide-up">
@@ -84,59 +86,63 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
         </div>
       </div>
 
-      <div className="flex gap-6">
-        <div className="flex-1 flex flex-col items-center gap-0">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Main Funnel Flow */}
+        <div className="lg:col-span-2 flex flex-col items-center">
           {funnelStages.map((stage, index) => {
-            const topWidth = 100 - (index / totalStages) * 60;
-            const bottomWidth = 100 - ((index + 1) / totalStages) * 60;
-            const color = gradients[index] || gradients[gradients.length - 1];
+            const isLast = index === funnelStages.length - 1;
+            const accent = stageAccents[index] || stageAccents[stageAccents.length - 1];
+            const widthClass = stageWidths[index] || stageWidths[stageWidths.length - 1];
+            const stageNumber = String(index + 1).padStart(2, "0");
+
             return (
-              <div key={stage.id} className="w-full flex flex-col items-center">
-                <div
-                  className="relative group transition-transform duration-200 hover:scale-[1.02] cursor-pointer"
-                  style={{ width: "100%", maxWidth: "700px" }}
+              <div key={stage.id} className={`${widthClass} flex flex-col items-center`}>
+                <button
+                  type="button"
                   onClick={() => setSelectedStage({ title: stage.name, leads: stage.leads || [] })}
+                  className={`relative w-full text-left rounded-xl border transition-all overflow-hidden cursor-pointer ${
+                    isLast
+                      ? "border-funnel-4/40 bg-funnel-4 shadow-md hover:brightness-105"
+                      : `border-border bg-card hover:shadow-md hover:border-border/80 ${accent.bg}`
+                  }`}
                 >
-                  <svg viewBox="0 0 700 70" className="w-full h-auto" preserveAspectRatio="none" style={{ display: "block" }}>
-                    <defs>
-                      <linearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="white" stopOpacity="0" />
-                        <stop offset="50%" stopColor="white" stopOpacity="1" />
-                        <stop offset="100%" stopColor="white" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    {(() => {
-                      const tl = (700 - 700 * topWidth / 100) / 2;
-                      const tr = (700 + 700 * topWidth / 100) / 2;
-                      const br = (700 + 700 * bottomWidth / 100) / 2;
-                      const bl = (700 - 700 * bottomWidth / 100) / 2;
-                      const r = 12;
-                      const d = `M${tl + r},0 L${tr - r},0 Q${tr},0 ${tr},${r} L${br},${70 - r} Q${br},70 ${br - r},70 L${bl + r},70 Q${bl},70 ${bl},${70 - r} L${tl},${r} Q${tl},0 ${tl + r},0 Z`;
-                      return (
-                        <>
-                          <path d={d} fill={color} className="transition-opacity duration-200 group-hover:opacity-90" />
-                          <path d={d} fill="url(#shine)" opacity="0.12" />
-                        </>
-                      );
-                    })()}
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="flex items-center gap-3 text-white">
-                      <span className="text-sm font-bold drop-shadow-sm">{stage.name}</span>
-                      <span className="text-lg font-extrabold drop-shadow-sm">{stage.count}</span>
+                  <div className="relative p-4 flex justify-between items-center">
+                    <div className="flex flex-col">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                        isLast ? "text-white/80" : accent.text
+                      }`}>
+                        {isLast ? "Final" : `Etapa ${stageNumber}`}
+                      </span>
+                      <h3 className={`text-base font-bold ${isLast ? "text-white" : "text-foreground"}`}>
+                        {stage.name}
+                      </h3>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-2xl font-extrabold leading-none ${
+                        isLast ? "text-white" : "text-foreground"
+                      }`}>
+                        {stage.count}
+                      </div>
                       {typeof stage.currentCount === "number" && (
-                        <span className="text-[11px] font-medium text-white/80 drop-shadow-sm">
-                          (atual: {stage.currentCount})
-                        </span>
+                        <div className={`text-[11px] font-medium mt-1 ${
+                          isLast ? "text-white/80" : "text-muted-foreground"
+                        }`}>
+                          <span className={isLast ? "opacity-70" : "opacity-60"}>atual:</span> {stage.currentCount}
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
+                </button>
 
-                {index < funnelStages.length - 1 && (
-                  <div className="flex items-center gap-1.5 py-1.5 text-muted-foreground">
-                    <ArrowDown className="w-3.5 h-3.5" />
-                    <span className="text-xs font-bold text-foreground">{formatPercentage(conversionLabels[index])}</span>
+                {!isLast && (
+                  <div className="h-9 flex flex-col items-center justify-center relative w-full">
+                    <div className="w-px h-full bg-border"></div>
+                    <div className="absolute bg-card border border-border px-2.5 py-1 rounded-full shadow-sm">
+                      <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                        <ArrowDown className={`w-3 h-3 ${accent.icon}`} />
+                        {formatPercentage(conversionLabels[index])}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -144,20 +150,45 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
           })}
         </div>
 
-        <div className="w-44 flex flex-col items-center justify-center">
+        {/* Lost Opportunities Card */}
+        <div className="lg:col-span-1">
           <div
-            className="bg-destructive/10 rounded-2xl p-6 text-center w-full border border-destructive/20 cursor-pointer hover:bg-destructive/15 transition-colors"
+            className="relative bg-card border border-border rounded-2xl p-6 shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setSelectedStage({ title: "Oportunidades Perdidas", leads: lostLeadsDetail })}
           >
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <XCircle className="w-5 h-5 text-destructive" />
-              <span className="text-sm font-bold text-destructive uppercase tracking-widest">Perdidas</span>
-            </div>
-            <p className="text-3xl font-extrabold text-destructive mb-1">{lostLeads}</p>
-            <p className="text-xs text-muted-foreground">oportunidades</p>
-            <div className="mt-3 pt-3 border-t border-destructive/20">
-              <p className="text-xs text-muted-foreground">Taxa de perda</p>
-              <p className="text-lg font-extrabold text-destructive">{formatPercentage(lostPercentage)}</p>
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-destructive/10 blur-3xl rounded-full pointer-events-none"></div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+                  <XCircle className="w-5 h-5 text-destructive" />
+                </div>
+                <h4 className="font-bold text-foreground">Oportunidades Perdidas</h4>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <div className="text-sm text-muted-foreground mb-1">Total acumulado</div>
+                  <div className="text-4xl font-black text-destructive tabular-nums">{lostLeads}</div>
+                </div>
+
+                <div className="pt-6 border-t border-border">
+                  <div className="flex justify-between items-end mb-2">
+                    <span className="text-sm font-medium text-muted-foreground">Taxa de perda</span>
+                    <span className="text-xl font-bold text-foreground">{formatPercentage(lostPercentage)}</span>
+                  </div>
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-destructive rounded-full transition-all"
+                      style={{ width: `${Math.min(100, Math.max(2, lostPercentage))}%` }}
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs leading-relaxed text-muted-foreground italic">
+                  Refere-se a leads que saíram do funil antes de atingir a etapa de Venda Ganha.
+                </p>
+              </div>
             </div>
           </div>
         </div>
