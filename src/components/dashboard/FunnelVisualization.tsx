@@ -51,10 +51,10 @@ function LeadListDialog({ open, onOpenChange, title, leads }: {
 }
 
 const stageAccents = [
-  { text: "text-funnel-1", bg: "bg-funnel-1/5", icon: "text-funnel-1" },
-  { text: "text-funnel-2", bg: "bg-funnel-2/5", icon: "text-funnel-2" },
-  { text: "text-funnel-3", bg: "bg-funnel-3/5", icon: "text-funnel-3" },
-  { text: "text-funnel-4", bg: "bg-funnel-4/5", icon: "text-funnel-4" },
+  { bg: "bg-funnel-1", border: "border-funnel-1/40", icon: "text-funnel-1" },
+  { bg: "bg-funnel-2", border: "border-funnel-2/40", icon: "text-funnel-2" },
+  { bg: "bg-funnel-3", border: "border-funnel-3/40", icon: "text-funnel-3" },
+  { bg: "bg-funnel-4", border: "border-funnel-4/40", icon: "text-funnel-4" },
 ];
 
 export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [] }: FunnelVisualizationProps) {
@@ -100,34 +100,24 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
                 <button
                   type="button"
                   onClick={() => setSelectedStage({ title: stage.name, leads: stage.leads || [] })}
-                  className={`relative w-full text-left rounded-xl border transition-all overflow-hidden cursor-pointer ${
-                    isLast
-                      ? "border-funnel-4/40 bg-funnel-4 shadow-md hover:brightness-105"
-                      : `border-border bg-card hover:shadow-md hover:border-border/80 ${accent.bg}`
-                  }`}
+                  className={`relative w-full text-left rounded-xl border transition-all overflow-hidden cursor-pointer shadow-sm hover:shadow-md hover:brightness-105 ${accent.border} ${accent.bg}`}
                 >
                   <div className="relative p-4 flex justify-between items-center">
                     <div className="flex flex-col">
-                      <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                        isLast ? "text-white/80" : accent.text
-                      }`}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
                         {isLast ? "Final" : `Etapa ${stageNumber}`}
                       </span>
-                      <h3 className={`text-base font-bold ${isLast ? "text-white" : "text-foreground"}`}>
+                      <h3 className="text-base font-bold text-white">
                         {stage.name}
                       </h3>
                     </div>
                     <div className="text-right">
-                      <div className={`text-2xl font-extrabold leading-none ${
-                        isLast ? "text-white" : "text-foreground"
-                      }`}>
+                      <div className="text-2xl font-extrabold leading-none text-white">
                         {stage.count}
                       </div>
                       {typeof stage.currentCount === "number" && (
-                        <div className={`text-[11px] font-medium mt-1 ${
-                          isLast ? "text-white/80" : "text-muted-foreground"
-                        }`}>
-                          <span className={isLast ? "opacity-70" : "opacity-60"}>atual:</span> {stage.currentCount}
+                        <div className="text-[11px] font-medium mt-1 text-white/80">
+                          <span className="opacity-70">atual:</span> {stage.currentCount}
                         </div>
                       )}
                     </div>
