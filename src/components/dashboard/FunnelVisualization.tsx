@@ -51,10 +51,10 @@ function LeadListDialog({ open, onOpenChange, title, leads }: {
 }
 
 const stageAccents = [
-  { text: "text-funnel-1", bg: "bg-funnel-1/5", icon: "text-funnel-1" },
-  { text: "text-funnel-2", bg: "bg-funnel-2/5", icon: "text-funnel-2" },
-  { text: "text-funnel-3", bg: "bg-funnel-3/5", icon: "text-funnel-3" },
-  { text: "text-funnel-4", bg: "bg-funnel-4/5", icon: "text-funnel-4" },
+  { bg: "bg-funnel-1", border: "border-funnel-1/40", icon: "text-funnel-1" },
+  { bg: "bg-funnel-2", border: "border-funnel-2/40", icon: "text-funnel-2" },
+  { bg: "bg-funnel-3", border: "border-funnel-3/40", icon: "text-funnel-3" },
+  { bg: "bg-funnel-4", border: "border-funnel-4/40", icon: "text-funnel-4" },
 ];
 
 export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [] }: FunnelVisualizationProps) {
