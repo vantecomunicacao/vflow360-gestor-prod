@@ -619,7 +619,8 @@ REGRAS OBRIGATÓRIAS:
       );
 
       // Normalize title: extract significant keywords (3+ chars), sorted
-      const normalizeTitle = (title: string): string => {
+      const normalizeTitle = (title: unknown): string => {
+        if (typeof title !== "string" || !title) return "";
         const stopWords = new Set(["de", "do", "da", "dos", "das", "para", "por", "com", "sem", "em", "no", "na", "nos", "nas", "um", "uma", "que", "se", "ou", "ao", "os", "as", "este", "esta", "esse", "essa", "são", "está", "foi", "ser"]);
         return title.toLowerCase()
           .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
