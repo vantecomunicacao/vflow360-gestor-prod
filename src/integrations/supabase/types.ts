@@ -145,6 +145,7 @@ export type Database = {
           contact_name: string | null
           contact_phone: string | null
           created_at: string
+          ghl_user_id: string | null
           id: string
           integration_label: string | null
           integration_type: string | null
@@ -161,6 +162,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
+          ghl_user_id?: string | null
           id?: string
           integration_label?: string | null
           integration_type?: string | null
@@ -177,6 +179,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
+          ghl_user_id?: string | null
           id?: string
           integration_label?: string | null
           integration_type?: string | null
