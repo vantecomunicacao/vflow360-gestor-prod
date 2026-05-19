@@ -462,8 +462,9 @@ async function processWebhook(rawPayload: unknown, integrationId: string) {
 
     const userId = integration.user_id;
     const workspaceId = integration.workspace_id;
-    const integrationConfig = integration.config as { label?: string; last_webhook_at?: string; serverUrl?: string; instanceToken?: string } || {};
+    const integrationConfig = integration.config as { label?: string; last_webhook_at?: string; serverUrl?: string; instanceToken?: string; ghl_user_id?: string } || {};
     const integrationLabel = integrationConfig.label || "Stevo";
+    const ghlUserId = integrationConfig.ghl_user_id || null;
 
     let payload = rawPayload as Record<string, unknown>;
 
