@@ -36,4 +36,10 @@ export interface WhatsAppInstance {
   webhookUrl?: string;
   lastWebhookAt?: string | null;
   accessToken?: string;
+  ghlUserId?: string | null;
+}
+
+export interface GhlUserOption {
+  ghl_id: string;
+  name: string;
 }
