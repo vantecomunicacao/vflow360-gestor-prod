@@ -192,6 +192,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
     const workspaceId = integration.workspace_id;
     const config = (integration.config as Record<string, unknown>) || {};
     const integrationLabel = (config.label as string) || "Stevo Oficial";
+    const ghlUserId = (config.ghl_user_id as string) || null;
     const accessToken = (config.accessToken as string) || "";
 
     // Normalize payload: array wrapper from n8n
