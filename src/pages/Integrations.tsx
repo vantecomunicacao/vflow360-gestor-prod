@@ -14,6 +14,7 @@ import {
   FieldOption,
   GhlCustomField,
   GhlPipelineStage,
+  GhlUserOption,
   WhatsAppInstance,
   WhatsAppStatus,
 } from "@/components/integrations/types";
