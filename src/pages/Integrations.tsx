@@ -38,6 +38,7 @@ const Integrations = () => {
   const [aiPrompt, setAiPrompt] = useState(
     "Você é um assistente de CRM. Ao analisar conversas, leve em conta os campos personalizados e etapas do funil mapeados abaixo para gerar sugestões precisas.",
   );
+  const [ghlUsers, setGhlUsers] = useState<GhlUserOption[]>([]);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
 
