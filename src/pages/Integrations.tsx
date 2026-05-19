@@ -290,6 +290,27 @@ const Integrations = () => {
         /* silent */
       }
 
+
+      // Enrich Uazap instances with ghl_user_id from integrations.config (Uazap status doesn't expose it)
+      try {
+        const uazapIds = allInstances.filter((i) => i.provider === "uazap").map((i) => i.id);
+        if (uazapIds.length > 0) {
+          const { data: rows } = await supabase
+            .from("integrations")
+            .select("id,config")
+            .in("id", uazapIds);
+          if (rows) {
+            for (const r of rows) {
+              const cfg = (r.config as { ghl_user_id?: string }) || {};
+              const inst = allInstances.find((x) => x.id === r.id);
+              if (inst) inst.ghlUserId = cfg.ghl_user_id || null;
+            }
+          }
+        }
+      } catch {
+        /* silent */
+      }
+
       setInstances(allInstances);
       setLoadingInstances(false);
 
@@ -303,6 +324,18 @@ const Integrations = () => {
         }
       } catch {
         /* silent */
+      }
+
+      // Load GHL users for the "Vendedor responsável" selector
+      try {
+        const { data: users } = await supabase
+          .from("ghl_users")
+          .select("ghl_id,name")
+          .eq("workspace_id", activeWorkspace.id)
+          .order("name", { ascending: true });
+        setGhlUsers((users || []) as GhlUserOption[]);
+      } catch {
+        setGhlUsers([]);
       }
     };
     checkStatus();
