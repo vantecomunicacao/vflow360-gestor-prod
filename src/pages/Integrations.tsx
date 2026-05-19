@@ -847,6 +847,8 @@ const Integrations = () => {
                   onDisconnect={handleDisconnect}
                   onCopy={copyToClipboard}
                   onSaveAccessToken={handleSaveAccessToken}
+                  ghlUsers={ghlUsers}
+                  onChangeGhlUser={handleChangeGhlUser}
                 />
               ))}
             </div>
