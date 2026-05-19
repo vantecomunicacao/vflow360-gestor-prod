@@ -758,6 +758,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string) {
           unread_count: isFromMe ? 0 : 1,
           integration_type: "stevo",
           integration_label: integrationLabel,
+          ghl_user_id: ghlUserId,
         })
         .select("id, unread_count, contact_name")
         .single();
@@ -769,6 +770,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string) {
         unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
         integration_type: "stevo",
         integration_label: integrationLabel,
+        ghl_user_id: ghlUserId,
       };
 
       if (inboundContactName) {
