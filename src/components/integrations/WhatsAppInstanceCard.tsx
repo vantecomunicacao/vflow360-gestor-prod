@@ -29,6 +29,8 @@ interface Props {
   onDisconnect: (inst: WhatsAppInstance) => void;
   onCopy: (text: string) => void;
   onSaveAccessToken: (inst: WhatsAppInstance, token: string) => void;
+  ghlUsers: GhlUserOption[];
+  onChangeGhlUser: (inst: WhatsAppInstance, ghlUserId: string | null) => void;
 }
 
 const statusBadge = (status: WhatsAppStatus) => {
