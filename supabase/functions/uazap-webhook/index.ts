@@ -468,8 +468,9 @@ serve(async (req) => {
 
     const userId = integration.user_id;
     const workspaceId = integration.workspace_id;
-    const integrationConfig = integration.config as { token?: string; instanceName?: string; label?: string };
+    const integrationConfig = integration.config as { token?: string; instanceName?: string; label?: string; ghl_user_id?: string };
     const integrationLabel = integrationConfig.label || "Uazap";
+    const ghlUserId = integrationConfig.ghl_user_id || null;
     const instToken = integrationConfig.token || instanceToken || "";
     // Handle connection status changes
     if (event === "status" || event === "connection.update" || event === "status_instance") {
