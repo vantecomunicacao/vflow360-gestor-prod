@@ -243,7 +243,7 @@ const Integrations = () => {
 
         if (stevoIntegrations) {
           for (const int of stevoIntegrations) {
-            const config = (int.config as { label?: string; last_webhook_at?: string }) || {};
+            const config = (int.config as { label?: string; last_webhook_at?: string; ghl_user_id?: string }) || {};
             allInstances.push({
               id: int.id,
               instanceName: "",
@@ -252,6 +252,7 @@ const Integrations = () => {
               provider: "stevo",
               webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${int.id}`,
               lastWebhookAt: config.last_webhook_at || null,
+              ghlUserId: config.ghl_user_id || null,
             });
           }
         }
