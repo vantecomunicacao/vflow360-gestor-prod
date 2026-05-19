@@ -224,6 +224,7 @@ const Integrations = () => {
               label: inst.label || inst.instanceName || "WhatsApp",
               status: inst.status as WhatsAppStatus,
               provider: "uazap",
+              ghlUserId: inst.ghl_user_id || null,
             });
           }
         }
