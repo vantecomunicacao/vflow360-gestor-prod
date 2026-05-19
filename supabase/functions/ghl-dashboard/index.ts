@@ -593,21 +593,29 @@ serve(async (req) => {
 
     // Pagina TODAS as conversas do workspace e filtra por phone match (sem filtro de data
     // — conversas antigas podem ter respostas dentro do período).
+    // Quando há filtro de vendedor, também inclui conversas vinculadas à instância de WhatsApp
+    // daquele vendedor (conversations.ghl_user_id), mesmo sem oportunidade casada por telefone.
     const convIds: string[] = [];
-    if (phoneSet.size > 0) {
+    const seenConvIds = new Set<string>();
+    if (phoneSet.size > 0 || filterUserId) {
       const PAGE = 1000;
       let from = 0;
       while (true) {
         const { data: convsRows, error: convErr } = await supabase
           .from("conversations")
-          .select("id,contact_phone")
+          .select("id,contact_phone,ghl_user_id")
           .eq("workspace_id", workspaceId)
           .range(from, from + PAGE - 1);
         if (convErr) { console.error("convs page error", convErr); break; }
         const rows = convsRows || [];
         for (const c of rows) {
-          if (phoneSet.has(normalizePhone((c as any).contact_phone))) {
-            convIds.push((c as any).id);
+          const id = (c as any).id as string;
+          if (seenConvIds.has(id)) continue;
+          const phoneMatch = phoneSet.has(normalizePhone((c as any).contact_phone));
+          const sellerMatch = !!filterUserId && (c as any).ghl_user_id === filterUserId;
+          if (phoneMatch || sellerMatch) {
+            convIds.push(id);
+            seenConvIds.add(id);
           }
         }
         if (rows.length < PAGE) break;
