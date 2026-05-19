@@ -140,6 +140,25 @@ export const WhatsAppInstanceCard = ({
         </div>
       </div>
 
+      {/* Vendedor responsável — usado para vincular conversas a um usuário do CRM */}
+      <div className="flex items-center gap-2">
+        <Label className="text-xs text-muted-foreground whitespace-nowrap">Vendedor responsável:</Label>
+        <Select
+          value={inst.ghlUserId || NONE}
+          onValueChange={(v) => onChangeGhlUser(inst, v === NONE ? null : v)}
+        >
+          <SelectTrigger className="h-7 text-xs flex-1 max-w-xs">
+            <SelectValue placeholder={ghlUsers.length === 0 ? "Conecte o CRM primeiro" : "Nenhum"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>Nenhum</SelectItem>
+            {ghlUsers.map((u) => (
+              <SelectItem key={u.ghl_id} value={u.ghl_id}>{u.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Uazap-specific UI */}
       {inst.provider === "uazap" && inst.status === "connecting" && (
         <div className="bg-muted rounded-lg p-4 flex flex-col items-center gap-3">
