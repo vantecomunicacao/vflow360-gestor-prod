@@ -523,6 +523,38 @@ const Integrations = () => {
       setCreatingNew(false);
     }
   };
+  const handleChangeGhlUser = async (inst: WhatsAppInstance, ghlUserId: string | null) => {
+    try {
+      const { data: integration } = await supabase
+        .from("integrations")
+        .select("config")
+        .eq("id", inst.id)
+        .single();
+      const config = (integration?.config as Record<string, unknown>) || {};
+      const newConfig = { ...config, ghl_user_id: ghlUserId };
+      await supabase.from("integrations").update({ config: newConfig }).eq("id", inst.id);
+
+      // Backfill existing conversations from this instance so the dashboard
+      // imediatamente reflete o vínculo nas conversas já existentes.
+      if (activeWorkspace?.id && inst.label) {
+        await supabase
+          .from("conversations")
+          .update({ ghl_user_id: ghlUserId })
+          .eq("workspace_id", activeWorkspace.id)
+          .eq("integration_label", inst.label);
+      }
+
+      updateInstance(inst.id, { ghlUserId });
+      toast({ title: "Vendedor atualizado", description: ghlUserId ? "Conversas dessa instância foram vinculadas." : "Vínculo removido." });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao salvar vendedor",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   const handleSaveAccessToken = async (inst: WhatsAppInstance, token: string) => {
     try {
