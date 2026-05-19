@@ -77,9 +77,12 @@ export const WhatsAppInstanceCard = ({
   onDisconnect,
   onCopy,
   onSaveAccessToken,
+  ghlUsers,
+  onChangeGhlUser,
 }: Props) => {
+  const NONE = "__none__";
   return (
-    <div className="border border-border rounded-lg p-4">
+    <div className="border border-border rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-success" />
