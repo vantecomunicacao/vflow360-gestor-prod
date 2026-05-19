@@ -462,8 +462,9 @@ async function processWebhook(rawPayload: unknown, integrationId: string) {
 
     const userId = integration.user_id;
     const workspaceId = integration.workspace_id;
-    const integrationConfig = integration.config as { label?: string; last_webhook_at?: string; serverUrl?: string; instanceToken?: string } || {};
+    const integrationConfig = integration.config as { label?: string; last_webhook_at?: string; serverUrl?: string; instanceToken?: string; ghl_user_id?: string } || {};
     const integrationLabel = integrationConfig.label || "Stevo";
+    const ghlUserId = integrationConfig.ghl_user_id || null;
 
     let payload = rawPayload as Record<string, unknown>;
 
@@ -757,6 +758,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string) {
           unread_count: isFromMe ? 0 : 1,
           integration_type: "stevo",
           integration_label: integrationLabel,
+          ghl_user_id: ghlUserId,
         })
         .select("id, unread_count, contact_name")
         .single();
@@ -768,6 +770,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string) {
         unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
         integration_type: "stevo",
         integration_label: integrationLabel,
+        ghl_user_id: ghlUserId,
       };
 
       if (inboundContactName) {

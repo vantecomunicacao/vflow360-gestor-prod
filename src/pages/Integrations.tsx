@@ -14,6 +14,7 @@ import {
   FieldOption,
   GhlCustomField,
   GhlPipelineStage,
+  GhlUserOption,
   WhatsAppInstance,
   WhatsAppStatus,
 } from "@/components/integrations/types";
@@ -37,6 +38,7 @@ const Integrations = () => {
   const [aiPrompt, setAiPrompt] = useState(
     "Você é um assistente de CRM. Ao analisar conversas, leve em conta os campos personalizados e etapas do funil mapeados abaixo para gerar sugestões precisas.",
   );
+  const [ghlUsers, setGhlUsers] = useState<GhlUserOption[]>([]);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
 
@@ -222,6 +224,7 @@ const Integrations = () => {
               label: inst.label || inst.instanceName || "WhatsApp",
               status: inst.status as WhatsAppStatus,
               provider: "uazap",
+              ghlUserId: inst.ghl_user_id || null,
             });
           }
         }
@@ -240,7 +243,7 @@ const Integrations = () => {
 
         if (stevoIntegrations) {
           for (const int of stevoIntegrations) {
-            const config = (int.config as { label?: string; last_webhook_at?: string }) || {};
+            const config = (int.config as { label?: string; last_webhook_at?: string; ghl_user_id?: string }) || {};
             allInstances.push({
               id: int.id,
               instanceName: "",
@@ -249,6 +252,7 @@ const Integrations = () => {
               provider: "stevo",
               webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-webhook?id=${int.id}`,
               lastWebhookAt: config.last_webhook_at || null,
+              ghlUserId: config.ghl_user_id || null,
             });
           }
         }
@@ -268,7 +272,7 @@ const Integrations = () => {
         if (stevoOfIntegrations) {
           for (const int of stevoOfIntegrations) {
             const config =
-              (int.config as { label?: string; last_webhook_at?: string; accessToken?: string }) || {};
+              (int.config as { label?: string; last_webhook_at?: string; accessToken?: string; ghl_user_id?: string }) || {};
             allInstances.push({
               id: int.id,
               instanceName: "",
@@ -278,7 +282,29 @@ const Integrations = () => {
               webhookUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stevo-oficial-webhook?id=${int.id}`,
               lastWebhookAt: config.last_webhook_at || null,
               accessToken: config.accessToken || "",
+              ghlUserId: config.ghl_user_id || null,
             });
+          }
+        }
+      } catch {
+        /* silent */
+      }
+
+
+      // Enrich Uazap instances with ghl_user_id from integrations.config (Uazap status doesn't expose it)
+      try {
+        const uazapIds = allInstances.filter((i) => i.provider === "uazap").map((i) => i.id);
+        if (uazapIds.length > 0) {
+          const { data: rows } = await supabase
+            .from("integrations")
+            .select("id,config")
+            .in("id", uazapIds);
+          if (rows) {
+            for (const r of rows) {
+              const cfg = (r.config as { ghl_user_id?: string }) || {};
+              const inst = allInstances.find((x) => x.id === r.id);
+              if (inst) inst.ghlUserId = cfg.ghl_user_id || null;
+            }
           }
         }
       } catch {
@@ -298,6 +324,18 @@ const Integrations = () => {
         }
       } catch {
         /* silent */
+      }
+
+      // Load GHL users for the "Vendedor responsável" selector
+      try {
+        const { data: users } = await supabase
+          .from("ghl_users")
+          .select("ghl_id,name")
+          .eq("workspace_id", activeWorkspace.id)
+          .order("name", { ascending: true });
+        setGhlUsers((users || []) as GhlUserOption[]);
+      } catch {
+        setGhlUsers([]);
       }
     };
     checkStatus();
@@ -485,6 +523,38 @@ const Integrations = () => {
       setCreatingNew(false);
     }
   };
+  const handleChangeGhlUser = async (inst: WhatsAppInstance, ghlUserId: string | null) => {
+    try {
+      const { data: integration } = await supabase
+        .from("integrations")
+        .select("config")
+        .eq("id", inst.id)
+        .single();
+      const config = (integration?.config as Record<string, unknown>) || {};
+      const newConfig = { ...config, ghl_user_id: ghlUserId };
+      await supabase.from("integrations").update({ config: newConfig }).eq("id", inst.id);
+
+      // Backfill existing conversations from this instance so the dashboard
+      // imediatamente reflete o vínculo nas conversas já existentes.
+      if (activeWorkspace?.id && inst.label) {
+        await supabase
+          .from("conversations")
+          .update({ ghl_user_id: ghlUserId })
+          .eq("workspace_id", activeWorkspace.id)
+          .eq("integration_label", inst.label);
+      }
+
+      updateInstance(inst.id, { ghlUserId });
+      toast({ title: "Vendedor atualizado", description: ghlUserId ? "Conversas dessa instância foram vinculadas." : "Vínculo removido." });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao salvar vendedor",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   const handleSaveAccessToken = async (inst: WhatsAppInstance, token: string) => {
     try {
@@ -777,6 +847,8 @@ const Integrations = () => {
                   onDisconnect={handleDisconnect}
                   onCopy={copyToClipboard}
                   onSaveAccessToken={handleSaveAccessToken}
+                  ghlUsers={ghlUsers}
+                  onChangeGhlUser={handleChangeGhlUser}
                 />
               ))}
             </div>

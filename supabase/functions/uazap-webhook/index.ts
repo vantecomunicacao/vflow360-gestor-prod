@@ -468,8 +468,9 @@ serve(async (req) => {
 
     const userId = integration.user_id;
     const workspaceId = integration.workspace_id;
-    const integrationConfig = integration.config as { token?: string; instanceName?: string; label?: string };
+    const integrationConfig = integration.config as { token?: string; instanceName?: string; label?: string; ghl_user_id?: string };
     const integrationLabel = integrationConfig.label || "Uazap";
+    const ghlUserId = integrationConfig.ghl_user_id || null;
     const instToken = integrationConfig.token || instanceToken || "";
     // Handle connection status changes
     if (event === "status" || event === "connection.update" || event === "status_instance") {
@@ -673,6 +674,7 @@ serve(async (req) => {
             unread_count: isFromMe ? 0 : 1,
             integration_type: "uazap",
             integration_label: integrationLabel,
+            ghl_user_id: ghlUserId,
           })
           .select("id, unread_count")
           .single();
@@ -687,6 +689,7 @@ serve(async (req) => {
             unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
             integration_type: "uazap",
             integration_label: integrationLabel,
+            ghl_user_id: ghlUserId,
           })
           .eq("id", conversation.id);
       }

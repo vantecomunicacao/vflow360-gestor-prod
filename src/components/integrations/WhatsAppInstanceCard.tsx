@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { WhatsAppInstance, WhatsAppStatus } from "./types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { GhlUserOption, WhatsAppInstance, WhatsAppStatus } from "./types";
 
 interface Props {
   inst: WhatsAppInstance;
@@ -28,6 +29,8 @@ interface Props {
   onDisconnect: (inst: WhatsAppInstance) => void;
   onCopy: (text: string) => void;
   onSaveAccessToken: (inst: WhatsAppInstance, token: string) => void;
+  ghlUsers: GhlUserOption[];
+  onChangeGhlUser: (inst: WhatsAppInstance, ghlUserId: string | null) => void;
 }
 
 const statusBadge = (status: WhatsAppStatus) => {
@@ -74,9 +77,12 @@ export const WhatsAppInstanceCard = ({
   onDisconnect,
   onCopy,
   onSaveAccessToken,
+  ghlUsers,
+  onChangeGhlUser,
 }: Props) => {
+  const NONE = "__none__";
   return (
-    <div className="border border-border rounded-lg p-4">
+    <div className="border border-border rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-success" />
@@ -132,6 +138,25 @@ export const WhatsAppInstanceCard = ({
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </div>
+      </div>
+
+      {/* Vendedor responsável — usado para vincular conversas a um usuário do CRM */}
+      <div className="flex items-center gap-2">
+        <Label className="text-xs text-muted-foreground whitespace-nowrap">Vendedor responsável:</Label>
+        <Select
+          value={inst.ghlUserId || NONE}
+          onValueChange={(v) => onChangeGhlUser(inst, v === NONE ? null : v)}
+        >
+          <SelectTrigger className="h-7 text-xs flex-1 max-w-xs">
+            <SelectValue placeholder={ghlUsers.length === 0 ? "Conecte o CRM primeiro" : "Nenhum"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>Nenhum</SelectItem>
+            {ghlUsers.map((u) => (
+              <SelectItem key={u.ghl_id} value={u.ghl_id}>{u.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Uazap-specific UI */}

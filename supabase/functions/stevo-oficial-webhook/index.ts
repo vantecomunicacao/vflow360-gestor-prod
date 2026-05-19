@@ -192,6 +192,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
     const workspaceId = integration.workspace_id;
     const config = (integration.config as Record<string, unknown>) || {};
     const integrationLabel = (config.label as string) || "Stevo Oficial";
+    const ghlUserId = (config.ghl_user_id as string) || null;
     const accessToken = (config.accessToken as string) || "";
 
     // Normalize payload: array wrapper from n8n
@@ -402,6 +403,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
                 unread_count: direction === "inbound" ? 1 : 0,
                 integration_type: "stevo_oficial",
                 integration_label: integrationLabel,
+                ghl_user_id: ghlUserId,
               })
               .select("id, unread_count, contact_name")
               .single();
@@ -412,6 +414,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
               last_message_at: msgTimestamp,
               integration_type: "stevo_oficial",
               integration_label: integrationLabel,
+              ghl_user_id: ghlUserId,
             };
             if (direction === "inbound") {
               updateData.unread_count = (conversation.unread_count || 0) + 1;
