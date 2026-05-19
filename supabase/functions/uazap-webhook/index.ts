@@ -674,6 +674,7 @@ serve(async (req) => {
             unread_count: isFromMe ? 0 : 1,
             integration_type: "uazap",
             integration_label: integrationLabel,
+            ghl_user_id: ghlUserId,
           })
           .select("id, unread_count")
           .single();
@@ -688,6 +689,7 @@ serve(async (req) => {
             unread_count: isFromMe ? conversation.unread_count : (conversation.unread_count || 0) + 1,
             integration_type: "uazap",
             integration_label: integrationLabel,
+            ghl_user_id: ghlUserId,
           })
           .eq("id", conversation.id);
       }
