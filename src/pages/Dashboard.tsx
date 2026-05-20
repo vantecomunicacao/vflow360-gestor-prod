@@ -229,6 +229,10 @@ export default function Dashboard() {
         <MetricCard title="Taxa de Conversão" value={formatPercentage(data.conversionRates.overallConversion)} subtitle="do funil completo" icon={TrendingUp} variant="accent" tooltip="Percentual da primeira etapa até venda ganha." trend={convTrend} />
       </AnimatedSection>
 
+      <AnimatedSection delay={0.05}>
+        <SellerPerformance sellers={data.sellers} />
+      </AnimatedSection>
+
       <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
         <div className="lg:col-span-2">
           <FunnelVisualization
@@ -270,13 +274,10 @@ export default function Dashboard() {
         <DailyLeads dailyLeads={data.dailyLeads || []} />
       </AnimatedSection>
 
-      <AnimatedSection delay={0.05}>
-        <SellerPerformance sellers={data.sellers} />
-      </AnimatedSection>
-
       <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
         <TimePerStage averageTimePerStage={data.averageTimePerStage} />
       </AnimatedSection>
+
 
       <AnimatedSection delay={0.05}>
         <AIUsageCard startDate={startDate} endDate={endDate} />
