@@ -5,11 +5,14 @@ import { useToast } from "@/hooks/use-toast";
 export interface StageLead { id: number; name: string; }
 export interface FunnelStage { id: string; name: string; count: number; currentCount?: number; leads?: StageLead[]; }
 export interface Seller {
+  id?: string;
   name: string;
   contatoInicial: number;
   propostaEnviada: number;
   fechamento: number;
   vendaGanha: number;
+  avgResponseMinutes?: number | null;
+  responseCount?: number;
 }
 export interface LeadOrigin { name: string; count: number; percentage: number; }
 export interface CustomField {
