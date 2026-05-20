@@ -718,6 +718,16 @@ serve(async (req) => {
 
     const sellers = Array.from(sellersMap.values()).filter(s => s.contatoInicial + s.propostaEnviada + s.fechamento + s.vendaGanha > 0);
 
+    const responseTime = {
+      averageMinutes: responseCount > 0 ? totalResponseMinutes / responseCount : 0,
+      responseCount,
+      conversationsAnalyzed: conversationsWithResponse,
+      businessHoursStart: businessStartStr,
+      businessHoursEnd: businessEndStr,
+    };
+
+
+
     return new Response(JSON.stringify({
       totalLeads,
       lostLeads,
