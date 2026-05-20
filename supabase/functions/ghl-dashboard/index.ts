@@ -385,23 +385,26 @@ serve(async (req) => {
     };
 
     // ===== Sellers =====
-    const sellersMap = new Map<string, { name: string; contatoInicial: number; propostaEnviada: number; fechamento: number; vendaGanha: number }>();
-    for (const u of usersList) sellersMap.set(u.ghl_id, { name: u.name, contatoInicial: 0, propostaEnviada: 0, fechamento: 0, vendaGanha: 0 });
+    const sellersMap = new Map<string, { id: string; name: string; contatoInicial: number; propostaEnviada: number; fechamento: number; vendaGanha: number; avgResponseMinutes: number | null; responseCount: number }>();
+    for (const u of usersList) sellersMap.set(u.ghl_id, { id: u.ghl_id, name: u.name, contatoInicial: 0, propostaEnviada: 0, fechamento: 0, vendaGanha: 0, avgResponseMinutes: null, responseCount: 0 });
+    // Mapa de phone -> assigned_to (para vincular conversas por telefone ao vendedor)
+    const phoneToSeller = new Map<string, string>();
     for (const o of opps) {
       const b = stageBucket(o.stage_id);
       if (!b) continue;
       const userKey = o.assigned_to || "__unassigned__";
       let s = sellersMap.get(userKey);
       if (!s) {
-        s = { name: userKey === "__unassigned__" ? "Não atribuído" : `Usuário ${userKey.slice(0, 6)}`, contatoInicial: 0, propostaEnviada: 0, fechamento: 0, vendaGanha: 0 };
+        s = { id: userKey, name: userKey === "__unassigned__" ? "Não atribuído" : `Usuário ${userKey.slice(0, 6)}`, contatoInicial: 0, propostaEnviada: 0, fechamento: 0, vendaGanha: 0, avgResponseMinutes: null, responseCount: 0 };
         sellersMap.set(userKey, s);
       }
       if (b === "contato_inicial") s.contatoInicial++;
       if (b === "proposta_enviada") s.propostaEnviada++;
       if (b === "fechamento") s.fechamento++;
       if (b === "venda_ganha") s.vendaGanha++;
+      const np = (o.contact_phone || "").replace(/\D+/g, "");
+      if (np && o.assigned_to && !phoneToSeller.has(np)) phoneToSeller.set(np, o.assigned_to);
     }
-    const sellers = Array.from(sellersMap.values()).filter(s => s.contatoInicial + s.propostaEnviada + s.fechamento + s.vendaGanha > 0);
 
     // ===== Lead origins =====
     const originsCount = new Map<string, number>();
