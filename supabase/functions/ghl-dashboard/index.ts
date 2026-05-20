@@ -600,6 +600,7 @@ serve(async (req) => {
     // daquele vendedor (conversations.ghl_user_id), mesmo sem oportunidade casada por telefone.
     const convIds: string[] = [];
     const seenConvIds = new Set<string>();
+    const convToSeller = new Map<string, string>(); // convId -> sellerId
     if (phoneSet.size > 0 || filterUserId) {
       const PAGE = 1000;
       let from = 0;
@@ -614,11 +615,16 @@ serve(async (req) => {
         for (const c of rows) {
           const id = (c as any).id as string;
           if (seenConvIds.has(id)) continue;
-          const phoneMatch = phoneSet.has(normalizePhone((c as any).contact_phone));
-          const sellerMatch = !!filterUserId && (c as any).ghl_user_id === filterUserId;
+          const phone = normalizePhone((c as any).contact_phone);
+          const convSeller = (c as any).ghl_user_id as string | null;
+          const phoneMatch = phoneSet.has(phone);
+          const sellerMatch = !!filterUserId && convSeller === filterUserId;
           if (phoneMatch || sellerMatch) {
             convIds.push(id);
             seenConvIds.add(id);
+            // prefer explicit conversation linkage, fall back to phone -> assigned_to
+            const sid = convSeller || phoneToSeller.get(phone) || null;
+            if (sid) convToSeller.set(id, sid);
           }
         }
         if (rows.length < PAGE) break;
@@ -630,6 +636,8 @@ serve(async (req) => {
     let totalResponseMinutes = 0;
     let responseCount = 0;
     let conversationsWithResponse = 0;
+    // Por vendedor
+    const sellerResponse = new Map<string, { totalMinutes: number; count: number }>();
 
     if (convIds.length > 0) {
       // Pagina mensagens em lotes de conversation IDs e por páginas, sem cortar dados.
@@ -670,40 +678,45 @@ serve(async (req) => {
         byConv.set((m as any).conversation_id, arr);
       }
 
-      for (const [, msgs] of byConv) {
+      for (const [convId, msgs] of byConv) {
         let lastInbound: number | null = null;
         let convHadResponse = false;
+        const sid = convToSeller.get(convId);
+        const acc = sid ? (sellerResponse.get(sid) || { totalMinutes: 0, count: 0 }) : null;
         for (const m of msgs) {
           if (m.dir === "inbound") {
-            // só guarda o primeiro inbound de uma sequência (até o vendedor responder)
             if (lastInbound === null) lastInbound = m.t;
           } else if (m.dir === "outbound" && lastInbound !== null) {
             const minutes = businessMinutesBetween(lastInbound, m.t, startMin, endMin);
-            // ignora respostas de 0 minutos úteis (foram inteiramente fora do expediente)
             if (minutes > 0) {
               totalResponseMinutes += minutes;
               responseCount++;
               convHadResponse = true;
+              if (acc) { acc.totalMinutes += minutes; acc.count++; }
             } else if (m.t - lastInbound > 0) {
-              // resposta inteiramente fora do expediente — ainda conta como respondida
               totalResponseMinutes += 0;
               responseCount++;
               convHadResponse = true;
+              if (acc) { acc.count++; }
             }
             lastInbound = null;
           }
         }
         if (convHadResponse) conversationsWithResponse++;
+        if (sid && acc) sellerResponse.set(sid, acc);
       }
     }
 
-    const responseTime = {
-      averageMinutes: responseCount > 0 ? totalResponseMinutes / responseCount : 0,
-      responseCount,
-      conversationsAnalyzed: conversationsWithResponse,
-      businessHoursStart: businessStartStr,
-      businessHoursEnd: businessEndStr,
-    };
+    // Aplica tempo médio de resposta a cada vendedor
+    for (const [sid, agg] of sellerResponse) {
+      const s = sellersMap.get(sid);
+      if (s) {
+        s.avgResponseMinutes = agg.count > 0 ? agg.totalMinutes / agg.count : null;
+        s.responseCount = agg.count;
+      }
+    }
+
+    const sellers = Array.from(sellersMap.values()).filter(s => s.contatoInicial + s.propostaEnviada + s.fechamento + s.vendaGanha > 0);
 
     return new Response(JSON.stringify({
       totalLeads,
