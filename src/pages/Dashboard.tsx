@@ -268,8 +268,13 @@ export default function Dashboard() {
       )}
 
       <AnimatedSection delay={0.05}>
+        <SellerPerformance sellers={data.sellers} />
+      </AnimatedSection>
+
+      <AnimatedSection delay={0.05}>
         <DailyLeads dailyLeads={data.dailyLeads || []} />
       </AnimatedSection>
+
 
       <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
         <TimePerStage averageTimePerStage={data.averageTimePerStage} />
