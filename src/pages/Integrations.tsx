@@ -19,6 +19,10 @@ import {
   WhatsAppStatus,
 } from "@/components/integrations/types";
 
+// TEMP: Uazap desabilitado por enquanto (estava gerando muitos erros).
+// Para reativar, troque para `true` e defina a env UAZAP_ENABLED="true" nas edge functions.
+const UAZAP_ENABLED = false;
+
 const Integrations = () => {
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(true);
@@ -213,9 +217,9 @@ const Integrations = () => {
       setLoadingInstances(true);
       const allInstances: WhatsAppInstance[] = [];
 
-      // Fetch Uazap instances
+      // Fetch Uazap instances (desabilitado por enquanto)
       try {
-        const data = await callUazap("status", { workspace_id: activeWorkspace.id });
+        const data = UAZAP_ENABLED ? await callUazap("status", { workspace_id: activeWorkspace.id }) : null;
         if (data?.instances && data.instances.length > 0) {
           for (const inst of data.instances) {
             allInstances.push({
@@ -806,6 +810,7 @@ const Integrations = () => {
               onCreateUazap={handleCreateUazapInstance}
               onCreateStevo={handleCreateStevoInstance}
               onCreateStevoOficial={handleCreateStevoOficialInstance}
+              uazapEnabled={UAZAP_ENABLED}
             />
           </div>
 
@@ -820,9 +825,11 @@ const Integrations = () => {
                 Conecte seu WhatsApp para começar a receber e analisar mensagens automaticamente.
               </p>
               <div className="flex gap-2">
-                <Button onClick={handleCreateUazapInstance} disabled={creatingNew} variant="outline">
-                  Uazap (QR Code)
-                </Button>
+                {UAZAP_ENABLED && (
+                  <Button onClick={handleCreateUazapInstance} disabled={creatingNew} variant="outline">
+                    Uazap (QR Code)
+                  </Button>
+                )}
                 <Button onClick={handleCreateStevoInstance} disabled={creatingNew} variant="outline">
                   Stevo (Webhook)
                 </Button>

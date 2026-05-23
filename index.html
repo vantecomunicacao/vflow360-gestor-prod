@@ -1,16 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>VFlow360 — Dashboard e Copiloto IA</title>
     <meta name="description" content="VFlow360: dashboard, copiloto IA e automações para o seu CRM.">
-    <meta name="author" content="Lovable" />
+    <meta name="author" content="Vante Comunicação" />
+    <link rel="icon" type="image/png" href="/vflow360-logo.png" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    
-    
+    <!-- Satoshi — fonte oficial do Design System Vante -->
+    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap" />
+
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/QrE0sv43VMZenU5LpHFIaupkc4i2/social-images/social-1777388987504-ChatGPT_Image_27_de_abr._de_2026,_19_18_36.webp">
 
@@ -33,6 +34,13 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      // Aplica o tema salvo antes da pintura (evita flash). Default: escuro.
+      try {
+        var t = localStorage.getItem("vflow-theme");
+        document.documentElement.classList.toggle("dark", t !== "light");
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

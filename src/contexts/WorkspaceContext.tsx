@@ -7,6 +7,7 @@ interface Workspace {
   name: string;
   owner_id: string;
   created_at: string;
+  deleted_at?: string | null;
 }
 
 interface WorkspaceContextType {
@@ -16,6 +17,8 @@ interface WorkspaceContextType {
   createWorkspace: (name: string) => Promise<Workspace>;
   renameWorkspace: (id: string, name: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
+  restoreWorkspace: (id: string) => Promise<void>;
+  listTrashedWorkspaces: () => Promise<Workspace[]>;
   loading: boolean;
 }
 
@@ -26,6 +29,8 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
   createWorkspace: async () => ({ id: "", name: "", owner_id: "", created_at: "" }),
   renameWorkspace: async () => {},
   deleteWorkspace: async () => {},
+  restoreWorkspace: async () => {},
+  listTrashedWorkspaces: async () => [],
   loading: true,
 });
 
@@ -49,6 +54,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       const { data, error } = await supabase
         .from("workspaces")
         .select("*")
+        .is("deleted_at", null)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
@@ -113,7 +119,11 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteWorkspace = async (id: string) => {
     if (workspaces.length <= 1) throw new Error("Não é possível excluir o único workspace");
-    const { error } = await supabase.from("workspaces").delete().eq("id", id);
+    // Soft delete: vai para a lixeira (expurgo automático em 30 dias via pg_cron).
+    const { error } = await supabase
+      .from("workspaces")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", id);
     if (error) throw error;
     setWorkspaces(prev => {
       const remaining = prev.filter(w => w.id !== id);
@@ -122,6 +132,32 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       }
       return remaining;
     });
+  };
+
+  const restoreWorkspace = async (id: string) => {
+    const { data, error } = await supabase
+      .from("workspaces")
+      .update({ deleted_at: null })
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    const ws = data as Workspace;
+    setWorkspaces(prev =>
+      prev.some(w => w.id === ws.id)
+        ? prev
+        : [...prev, ws].sort((a, b) => a.created_at.localeCompare(b.created_at))
+    );
+  };
+
+  const listTrashedWorkspaces = async (): Promise<Workspace[]> => {
+    const { data, error } = await supabase
+      .from("workspaces")
+      .select("*")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+    if (error) throw error;
+    return (data || []) as Workspace[];
   };
 
   // Stable reference: only recompute when id or workspaces actually change
@@ -138,6 +174,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       createWorkspace,
       renameWorkspace,
       deleteWorkspace,
+      restoreWorkspace,
+      listTrashedWorkspaces,
       loading,
     }),
     [workspaces, activeWorkspace, loading]

@@ -1,10 +1,13 @@
-project_id = "uikrpvucauamkhxxsvyb"
+project_id = "xcrfbpyhyznyufijrdry"
 
 [functions.analyze-scheduler]
 verify_jwt = false
-schedule = "* * * * *"
+# schedule = "* * * * *"  # comentado p/ rodar localmente (CLI local não aceita esta chave)
 
 [functions.ghl-sync]
+verify_jwt = false
+
+[functions.stevo-webhook]
 verify_jwt = false
 
 [functions.stevo-oficial-webhook]

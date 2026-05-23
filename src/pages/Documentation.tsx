@@ -228,7 +228,7 @@ const Documentation = () => {
           </p>
           <div className="space-y-2">
             {[
-              { icon: "🎤", text: "Áudios: transcritos automaticamente usando IA (Whisper/Gemini) e analisados como texto" },
+              { icon: "🎤", text: "Áudios: transcritos automaticamente com IA (OpenAI Whisper) e analisados como texto" },
               { icon: "🖼️", text: "Imagens: descritas pela IA e o conteúdo é usado como contexto da conversa" },
               { icon: "📝", text: "Texto: analisado diretamente como parte da conversa" },
             ].map((item, i) => (
@@ -302,9 +302,9 @@ const Documentation = () => {
             <AccordionItem value="q5">
               <AccordionTrigger>Qual modelo de IA é usado?</AccordionTrigger>
               <AccordionContent>
-                Por padrão, o sistema usa o <strong>Gemini 2.5 Flash</strong> via Lovable AI. 
-                Você pode configurar a OpenAI (GPT-4o) como provedor alternativo nas 
-                configurações, fornecendo sua própria chave de API.
+                Por padrão, o sistema usa o <strong>GPT-4o Mini</strong> da OpenAI (ChatGPT),
+                gerenciado pelo sistema. Você pode usar sua própria chave da OpenAI e escolher
+                outro modelo (ex.: GPT-4o) nas configurações.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="q6">

@@ -1,7 +1,8 @@
-import { Bot, LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen, ShieldCheck, SlidersHorizontal, ScrollText } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen, ShieldCheck, ScrollText } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -30,13 +31,12 @@ export function AppSidebar() {
     navigate("/login", { replace: true });
   };
 
-  const navItems = [
+  const navItems: { title: string; url: string; icon: typeof LayoutDashboard; show: boolean; end?: boolean }[] = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, show: true },
     { title: "Conversas", url: "/conversations", icon: MessageSquare, show: true },
     { title: "Sugestões IA", url: "/suggestions", icon: Sparkles, show: viewSuggestions },
     { title: "Integrações", url: "/integrations", icon: Plug, show: viewIntegrations },
-    { title: "Configurações", url: "/settings", icon: Settings, show: viewSettings },
-    { title: "Dashboard config", url: "/settings/dashboard", icon: SlidersHorizontal, show: viewSettings },
+    { title: "Configurações", url: "/settings", icon: Settings, show: viewSettings, end: false },
     { title: "Documentação", url: "/docs", icon: BookOpen, show: true },
     { title: "Admin", url: "/admin", icon: ShieldCheck, show: isAdmin },
     { title: "Logs", url: "/admin/logs", icon: ScrollText, show: isAdmin },
@@ -44,9 +44,20 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <div className="p-4 flex items-center gap-2">
-        <Bot className="w-7 h-7 text-sidebar-primary shrink-0" />
-        {!collapsed && <span className="text-lg font-bold text-sidebar-accent-foreground">VFlow360</span>}
+      <div className="px-4 py-5 flex items-center">
+        {collapsed ? (
+          /* Símbolo "V" recortado do logo p/ a sidebar colapsada */
+          <div className="w-7 h-7 overflow-hidden shrink-0" aria-label="VFlow360">
+            <img
+              src="/vflow360-logo-escuro.png"
+              alt="VFlow360"
+              className="h-7 max-w-none"
+              style={{ objectFit: "cover", objectPosition: "left center", width: "auto" }}
+            />
+          </div>
+        ) : (
+          <img src="/vflow360-logo-escuro.png" alt="VFlow360" className="h-7 w-auto" />
+        )}
       </div>
 
       {/* Workspace Selector */}
@@ -63,7 +74,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      end
+                      end={item.end !== false}
                       className="flex items-center gap-3 px-3 py-2 rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                     >
@@ -78,7 +89,10 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-3 gap-2">
+        <div className={collapsed ? "flex justify-center" : "px-1"}>
+          <ThemeToggle placement="inline" />
+        </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

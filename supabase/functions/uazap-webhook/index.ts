@@ -240,7 +240,7 @@ async function downloadMediaViaUazap(
 }
 
 // Transcribe audio using AI (supports Lovable AI and OpenAI)
-async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: string, endpoint: string = "https://ai.gateway.lovable.dev/v1/chat/completions", model: string = "google/gemini-2.5-flash"): Promise<string> {
+async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: string, endpoint: string = "https://api.openai.com/v1/chat/completions", model: string = "gpt-4o-mini"): Promise<string> {
   try {
     if (!base64Audio || base64Audio.length < 100) {
       return "[🎵 Áudio recebido - sem dados para transcrever]";
@@ -331,7 +331,7 @@ async function transcribeAudio(base64Audio: string, apiKey: string, mimetype: st
 }
 
 // Describe image using AI (supports Lovable AI and OpenAI)
-async function describeImage(base64Image: string, apiKey: string, mimetype: string, endpoint: string = "https://ai.gateway.lovable.dev/v1/chat/completions", model: string = "google/gemini-2.5-flash"): Promise<string> {
+async function describeImage(base64Image: string, apiKey: string, mimetype: string, endpoint: string = "https://api.openai.com/v1/chat/completions", model: string = "gpt-4o-mini"): Promise<string> {
   try {
     if (!base64Image || base64Image.length < 100) {
       return "[📷 Imagem recebida - sem dados para analisar]";
@@ -427,15 +427,26 @@ function extractMedia(message: any): { type: string; url: string; base64?: strin
   };
 }
 
+// TEMP: Uazap desabilitado por enquanto (estava gerando muitos erros).
+// Para reativar: defina a env UAZAP_ENABLED="true".
+const UAZAP_ENABLED = Deno.env.get("UAZAP_ENABLED") === "true";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Kill-switch: ignora o webhook (200 OK) e NÃO reporta erros enquanto desabilitado.
+  if (!UAZAP_ENABLED) {
+    return new Response(JSON.stringify({ success: true, disabled: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const payload = await req.json();
@@ -550,10 +561,10 @@ serve(async (req) => {
         const hasUsableData = mediaBase64.length > 100;
 
         // Fetch AI provider config for this user
-        let aiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
-        let aiKey = LOVABLE_API_KEY;
-        let aiModel = "google/gemini-2.5-flash";
-        
+        let aiEndpoint = "https://api.openai.com/v1/chat/completions";
+        let aiKey = OPENAI_API_KEY;
+        let aiModel = "gpt-4o-mini";
+
         try {
           const { data: providerCfg } = await supabase
             .from("ai_provider_config")
@@ -561,7 +572,6 @@ serve(async (req) => {
             .eq("user_id", userId)
             .maybeSingle();
           if (providerCfg?.provider === "openai" && providerCfg?.api_key) {
-            aiEndpoint = "https://api.openai.com/v1/chat/completions";
             aiKey = providerCfg.api_key;
             aiModel = providerCfg.model || "gpt-4o";
           }

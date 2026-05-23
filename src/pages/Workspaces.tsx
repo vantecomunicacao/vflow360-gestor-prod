@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Building2, Plus, Pencil, Trash2, Check, X, Crown } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Building2, Plus, Pencil, Trash2, Check, X, Crown, RotateCcw } from "lucide-react";
 import { motion } from "framer-motion";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,11 +27,56 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { WorkspaceMembers } from "@/components/settings/WorkspaceMembers";
 
 const Workspaces = () => {
-  const { workspaces, activeWorkspace, createWorkspace, renameWorkspace, deleteWorkspace } = useWorkspace();
+  const {
+    workspaces,
+    activeWorkspace,
+    createWorkspace,
+    renameWorkspace,
+    deleteWorkspace,
+    restoreWorkspace,
+    listTrashedWorkspaces,
+  } = useWorkspace();
   const { user } = useAuth();
   const { isAdmin } = useIsAdmin();
+
+  type TrashedWorkspace = { id: string; name: string; owner_id: string; created_at: string; deleted_at?: string | null };
+  const [trashed, setTrashed] = useState<TrashedWorkspace[]>([]);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const RETENTION_DAYS = 30;
+  const daysLeft = (deletedAt?: string | null) => {
+    if (!deletedAt) return RETENTION_DAYS;
+    const elapsed = (Date.now() - new Date(deletedAt).getTime()) / 86_400_000;
+    return Math.max(0, Math.ceil(RETENTION_DAYS - elapsed));
+  };
+
+  const refreshTrash = useCallback(async () => {
+    try {
+      setTrashed(await listTrashedWorkspaces());
+    } catch (err) {
+      console.error("Erro ao carregar lixeira:", err);
+    }
+  }, [listTrashedWorkspaces]);
+
+  useEffect(() => {
+    refreshTrash();
+  }, [refreshTrash]);
+
+  const handleRestore = async (id: string) => {
+    setRestoringId(id);
+    try {
+      await restoreWorkspace(id);
+      toast.success("Conta restaurada!");
+      await refreshTrash();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao restaurar");
+    } finally {
+      setRestoringId(null);
+    }
+  };
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -88,8 +133,11 @@ const Workspaces = () => {
     setDeleting(true);
     try {
       await deleteWorkspace(deleteId);
-      toast.success("Conta excluída!");
+      toast.success("Conta movida para a lixeira", {
+        description: `Pode ser restaurada por ${RETENTION_DAYS} dias.`,
+      });
       setDeleteId(null);
+      await refreshTrash();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao excluir");
     } finally {
@@ -103,11 +151,11 @@ const Workspaces = () => {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Gerenciar Contas</h1>
+          <h1 className="text-2xl font-bold text-foreground">Workspace</h1>
           <p className="text-muted-foreground">
-            {isAdmin 
-              ? "Crie, renomeie e exclua suas contas (workspaces). Cada conta tem dados e integrações isolados."
-              : "Visualize e gerencie suas contas. Apenas administradores podem criar novas contas."}
+            {isAdmin
+              ? "Gerencie seus workspaces e os membros de cada um. Cada workspace tem dados e integrações isolados."
+              : "Gerencie seus workspaces e membros. Apenas administradores podem criar novos workspaces."}
           </p>
         </div>
         {isAdmin && (
@@ -210,6 +258,63 @@ const Workspaces = () => {
         })}
       </div>
 
+      {/* Membros do workspace ativo */}
+      {activeWorkspace && (
+        <WorkspaceMembers
+          key={activeWorkspace.id}
+          workspaceId={activeWorkspace.id}
+          canManage={activeWorkspace.owner_id === user?.id || isAdmin}
+        />
+      )}
+
+      {/* Lixeira */}
+      {trashed.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">Lixeira</h2>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Contas excluídas ficam aqui por {RETENTION_DAYS} dias e depois são removidas
+            definitivamente. Restaure antes do prazo para recuperar todos os dados.
+          </p>
+          {trashed.map((ws) => {
+            const left = daysLeft(ws.deleted_at);
+            const isOwner = ws.owner_id === user?.id;
+            return (
+              <div
+                key={ws.id}
+                className="glass-card p-4 flex items-center gap-3 opacity-80"
+              >
+                <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-muted-foreground truncate line-through">
+                      {ws.name}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {left > 0 ? `Some em ${left} dia${left === 1 ? "" : "s"}` : "Será removida em breve"}
+                    </Badge>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleRestore(ws.id)}
+                  disabled={!isOwner || restoringId === ws.id}
+                  title={isOwner ? "Restaurar" : "Apenas o proprietário pode restaurar"}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  {restoringId === ws.id ? "Restaurando..." : "Restaurar"}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Create */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
@@ -244,10 +349,12 @@ const Workspaces = () => {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir conta "{wsToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>Mover conta "{wsToDelete?.name}" para a lixeira?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação é <strong>irreversível</strong>. Todas as conversas, integrações, sugestões e
-              configurações dessa conta serão removidas permanentemente do sistema.
+              A conta e todos os seus dados (conversas, integrações, sugestões e configurações) vão
+              para a <strong>lixeira</strong> e deixam de aparecer no app. Você pode
+              <strong> restaurá-la nos próximos {RETENTION_DAYS} dias</strong>; depois disso ela é
+              excluída definitivamente.
               <br /><br />
               <strong>Importante:</strong> as conversas no WhatsApp e os dados no seu CRM não serão afetados.
             </AlertDialogDescription>
@@ -262,7 +369,7 @@ const Workspaces = () => {
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? "Excluindo..." : "Excluir definitivamente"}
+              {deleting ? "Movendo..." : "Mover para a lixeira"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

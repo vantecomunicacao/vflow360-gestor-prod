@@ -72,59 +72,58 @@ async function summarizeWithAI(
   }
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  // Convert in chunks to avoid call stack overflow on large files
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return btoa(binary);
-}
-
 /**
- * OCR via Gemini Vision multimodal — envia o PDF inteiro como inline_data.
- * Gemini processa PDFs nativamente, extraindo texto de páginas escaneadas (imagens).
+ * OCR via OpenAI — sobe o PDF para a Files API e usa a Responses API (gpt-4o),
+ * que lê PDFs nativamente (input_file), extraindo texto de páginas escaneadas.
  * Retorna { text, summary } combinados em uma única chamada.
  */
-async function ocrWithGeminiVision(
+async function ocrWithOpenAI(
   pdfBytes: Uint8Array,
   apiKey: string,
   fileName: string,
   totalPages: number,
 ): Promise<{ text: string; summary: string }> {
+  let fileId = "";
   try {
-    const base64Pdf = bytesToBase64(pdfBytes);
-    console.log(`OCR fallback: sending ${formatBytes(pdfBytes.byteLength)} PDF to Gemini Vision`);
+    console.log(`OCR fallback: uploading ${formatBytes(pdfBytes.byteLength)} PDF to OpenAI Files`);
 
-    // Using Lovable AI Gateway with Gemini multimodal — supports PDF input via image_url with data URL
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // 1. Upload the PDF to the Files API (purpose user_data → usable as input_file)
+    const uploadForm = new FormData();
+    uploadForm.append("purpose", "user_data");
+    uploadForm.append("file", new Blob([pdfBytes], { type: "application/pdf" }), fileName || "document.pdf");
+
+    const uploadResp = await fetch("https://api.openai.com/v1/files", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: uploadForm,
+    });
+    if (!uploadResp.ok) {
+      console.error("OpenAI file upload error:", uploadResp.status, await uploadResp.text());
+      return { text: "", summary: "" };
+    }
+    fileId = (await uploadResp.json()).id;
+
+    // 2. Run OCR + summary via the Responses API (gpt-4o reads the PDF natively)
+    const instructions =
+      "Você é um OCR de PDFs em português. Receberá um PDF (possivelmente escaneado) e deve: 1) extrair TODO o texto visível, página por página; 2) gerar um resumo curto (2-4 frases) destacando tipo de documento, assunto e dados relevantes. Retorne no formato exato:\n\n===TEXTO===\n[texto extraído]\n\n===RESUMO===\n[resumo]";
+
+    const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você é um OCR de PDFs em português. Receberá um PDF (possivelmente escaneado) e deve: 1) extrair TODO o texto visível, página por página; 2) gerar um resumo curto (2-4 frases) destacando tipo de documento, assunto e dados relevantes. Retorne no formato exato:\n\n===TEXTO===\n[texto extraído]\n\n===RESUMO===\n[resumo]",
-          },
+        model: "gpt-4o",
+        input: [
           {
             role: "user",
             content: [
               {
-                type: "text",
-                text: `Arquivo: ${fileName} (${totalPages} páginas). Faça OCR completo e gere o resumo.`,
+                type: "input_text",
+                text: `${instructions}\n\nArquivo: ${fileName} (${totalPages} páginas). Faça OCR completo e gere o resumo.`,
               },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:application/pdf;base64,${base64Pdf}`,
-                },
-              },
+              { type: "input_file", file_id: fileId },
             ],
           },
         ],
@@ -132,13 +131,23 @@ async function ocrWithGeminiVision(
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini Vision OCR error:", response.status, errText);
+      console.error("OpenAI Responses OCR error:", response.status, await response.text());
       return { text: "", summary: "" };
     }
 
     const data = await response.json();
-    const fullContent: string = data.choices?.[0]?.message?.content?.trim() || "";
+    // Aggregate the model output. The raw HTTP response exposes `output[].content[]`
+    // with `{ type: "output_text", text }`; some responses also include `output_text`.
+    let fullContent = "";
+    if (typeof data.output_text === "string") {
+      fullContent = data.output_text;
+    } else if (Array.isArray(data.output)) {
+      fullContent = data.output
+        .flatMap((item: any) => (Array.isArray(item.content) ? item.content : []))
+        .map((c: any) => c?.text ?? "")
+        .join("");
+    }
+    fullContent = fullContent.trim();
 
     // Parse response into text + summary
     const textMatch = fullContent.match(/===TEXTO===\s*([\s\S]*?)\s*===RESUMO===/);
@@ -149,8 +158,16 @@ async function ocrWithGeminiVision(
 
     return { text, summary };
   } catch (e) {
-    console.error("Gemini Vision OCR failed:", e);
+    console.error("OpenAI OCR failed:", e);
     return { text: "", summary: "" };
+  } finally {
+    // Best-effort cleanup of the uploaded file
+    if (fileId) {
+      fetch(`https://api.openai.com/v1/files/${fileId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }).catch(() => {});
+    }
   }
 }
 
@@ -162,7 +179,7 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const body = await req.json();
@@ -214,9 +231,9 @@ serve(async (req) => {
     }
 
     // Resolve AI provider for this user
-    let aiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
-    let aiKey = LOVABLE_API_KEY;
-    let aiModel = "google/gemini-3-flash-preview";
+    let aiEndpoint = "https://api.openai.com/v1/chat/completions";
+    let aiKey = OPENAI_API_KEY;
+    let aiModel = "gpt-4o-mini";
 
     if (user_id) {
       try {
@@ -226,7 +243,6 @@ serve(async (req) => {
           .eq("user_id", user_id)
           .maybeSingle();
         if (providerCfg?.provider === "openai" && providerCfg?.api_key) {
-          aiEndpoint = "https://api.openai.com/v1/chat/completions";
           aiKey = providerCfg.api_key;
           aiModel = providerCfg.model || "gpt-4o-mini";
         }
@@ -264,10 +280,10 @@ serve(async (req) => {
     let usedOcr = false;
     let summary = "";
 
-    if (needsOcr && LOVABLE_API_KEY) {
-      // Fallback: scanned PDF — send entire PDF to Gemini Vision for OCR + summary
-      console.log("Text extraction insufficient, falling back to Gemini Vision OCR");
-      const ocrResult = await ocrWithGeminiVision(pdfBytes, LOVABLE_API_KEY, file_name, totalPages || 0);
+    if (needsOcr && aiKey) {
+      // Fallback: scanned PDF — send entire PDF to OpenAI (gpt-4o) for OCR + summary
+      console.log("Text extraction insufficient, falling back to OpenAI OCR");
+      const ocrResult = await ocrWithOpenAI(pdfBytes, aiKey, file_name, totalPages || 0);
       if (ocrResult.text || ocrResult.summary) {
         usedOcr = true;
         text = ocrResult.text || text;

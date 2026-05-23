@@ -1,8 +1,7 @@
-import { User, Bell, Shield, Brain, Eye, EyeOff } from "lucide-react";
+import { Brain, Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,9 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const SettingsPage = () => {
+const AiSettings = () => {
   const { user } = useAuth();
-  const [aiProvider, setAiProvider] = useState("lovable");
+  const [aiProvider, setAiProvider] = useState("managed");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [openaiModel, setOpenaiModel] = useState("gpt-4o");
   const [showApiKey, setShowApiKey] = useState(false);
@@ -34,7 +33,7 @@ const SettingsPage = () => {
         .maybeSingle();
       if (data) {
         const d = data as any;
-        setAiProvider(d.provider || "lovable");
+        setAiProvider(d.provider === "openai" && d.api_key ? "openai" : "managed");
         setOpenaiApiKey(d.api_key || "");
         setOpenaiModel(d.model || "gpt-4o");
       }
@@ -84,11 +83,10 @@ const SettingsPage = () => {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
-        <p className="text-muted-foreground">Gerencie seu perfil e preferências</p>
+        <h1 className="text-2xl font-bold text-foreground">Provedor de IA</h1>
+        <p className="text-muted-foreground">Modelo usado nas análises e sugestões</p>
       </div>
 
-      {/* AI Provider */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6">
         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
           <Brain className="w-5 h-5 text-primary" /> Provedor de IA
@@ -101,13 +99,13 @@ const SettingsPage = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="lovable">Lovable AI (Padrão)</SelectItem>
-                <SelectItem value="openai">OpenAI (ChatGPT)</SelectItem>
+                <SelectItem value="managed">OpenAI gerenciado (Padrão)</SelectItem>
+                <SelectItem value="openai">Minha chave OpenAI</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {aiProvider === "lovable"
-                ? "Usando IA integrada do Lovable — sem necessidade de configuração extra."
+              {aiProvider === "managed"
+                ? "Usando o ChatGPT (OpenAI) gerenciado pelo sistema — sem necessidade de configuração extra."
                 : "Use sua própria chave da OpenAI para análises com ChatGPT."}
             </p>
           </div>
@@ -162,74 +160,8 @@ const SettingsPage = () => {
           </Button>
         </div>
       </motion.div>
-
-      {/* Profile */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-6">
-        <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
-          <User className="w-5 h-5 text-primary" /> Perfil
-        </h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nome</Label>
-            <Input defaultValue="Usuário Demo" />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input defaultValue="demo@vflow360.com" type="email" />
-          </div>
-          <Button>Salvar alterações</Button>
-        </div>
-      </motion.div>
-
-      {/* Notifications */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card p-6">
-        <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
-          <Bell className="w-5 h-5 text-primary" /> Notificações
-        </h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-foreground">Novas sugestões da IA</p>
-              <p className="text-xs text-muted-foreground">Receber notificação quando uma nova sugestão for gerada</p>
-            </div>
-            <Switch defaultChecked />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-foreground">Novas mensagens</p>
-              <p className="text-xs text-muted-foreground">Notificar quando receber mensagens no WhatsApp</p>
-            </div>
-            <Switch defaultChecked />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-foreground">Relatórios semanais</p>
-              <p className="text-xs text-muted-foreground">Resumo semanal de atividades por email</p>
-            </div>
-            <Switch />
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Security */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass-card p-6">
-        <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
-          <Shield className="w-5 h-5 text-primary" /> Segurança
-        </h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Senha atual</Label>
-            <Input type="password" placeholder="••••••••" />
-          </div>
-          <div className="space-y-2">
-            <Label>Nova senha</Label>
-            <Input type="password" placeholder="••••••••" />
-          </div>
-          <Button variant="outline">Alterar senha</Button>
-        </div>
-      </motion.div>
     </div>
   );
 };
 
-export default SettingsPage;
+export default AiSettings;

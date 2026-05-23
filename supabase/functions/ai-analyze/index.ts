@@ -27,18 +27,19 @@ export function normalizeSuggestionType(type: string): string | null {
 export function resolveAiModel(
   providerConfig: { provider?: string; api_key?: string; model?: string } | null,
 ): { useOpenAI: boolean; model: string; providerLabel: string } {
+  // OpenAI é o provedor único. `useOpenAI` indica se o usuário trouxe a própria
+  // chave (api_key em ai_provider_config); caso contrário usa-se a chave global
+  // OPENAI_API_KEY. O modelo padrão é gpt-4o-mini.
   const useOpenAI = providerConfig?.provider === "openai" && !!providerConfig?.api_key;
-  const model = useOpenAI ? (providerConfig?.model || "gpt-4o-mini") : "google/gemini-2.5-flash";
-  return { useOpenAI, model, providerLabel: useOpenAI ? "openai" : "lovable" };
+  const model = useOpenAI ? (providerConfig?.model || "gpt-4o-mini") : "gpt-4o-mini";
+  return { useOpenAI, model, providerLabel: "openai" };
 }
 
 export function buildAiProviderString(
-  providerConfig: { model?: string } | null,
+  _providerConfig: { model?: string } | null,
   resolved: { useOpenAI: boolean; model: string; providerLabel: string },
 ): string {
-  return resolved.useOpenAI
-    ? `openai/${providerConfig?.model || "gpt-4o-mini"}`
-    : `lovable/${resolved.model}`;
+  return `openai/${resolved.model}`;
 }
 // ====== End helpers ======
 
@@ -56,7 +57,7 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -401,14 +402,12 @@ REGRAS OBRIGATÓRIAS:
       .maybeSingle();
 
     const resolved = resolveAiModel(providerConfig || null);
-    const aiEndpoint = resolved.useOpenAI
-      ? "https://api.openai.com/v1/chat/completions"
-      : "https://ai.gateway.lovable.dev/v1/chat/completions";
-    const aiApiKey = resolved.useOpenAI ? providerConfig!.api_key : LOVABLE_API_KEY;
+    const aiEndpoint = "https://api.openai.com/v1/chat/completions";
+    const aiApiKey = resolved.useOpenAI ? providerConfig!.api_key : OPENAI_API_KEY;
 
-    if (!aiApiKey) throw new Error("No AI API key configured. Please configure an AI provider in Settings.");
+    if (!aiApiKey) throw new Error("No OpenAI API key configured. Set the OPENAI_API_KEY secret or configure an AI provider in Settings.");
 
-    console.log(`Using AI provider: ${resolved.useOpenAI ? "OpenAI" : "Lovable AI"}, model: ${resolved.model}`);
+    console.log(`Using OpenAI (${resolved.useOpenAI ? "user key" : "global key"}), model: ${resolved.model}`);
 
     // 8. Call AI with tool calling for structured output
     const aiRequestBody: any = {
@@ -514,8 +513,6 @@ REGRAS OBRIGATÓRIAS:
         "gpt-4o-mini": { in: 0.15, out: 0.6 },
         "gpt-4-turbo": { in: 10, out: 30 },
         "gpt-3.5-turbo": { in: 0.5, out: 1.5 },
-        "google/gemini-2.5-flash": { in: 0.075, out: 0.3 },
-        "google/gemini-2.5-pro": { in: 1.25, out: 5 },
       };
       const priceKey = resolved.model;
       const pr = PRICING[priceKey] || { in: 0, out: 0 };

@@ -30,24 +30,24 @@ Deno.test("resolveAiModel: OpenAI with null model falls back to gpt-4o-mini", ()
   assertEquals(result.model, "gpt-4o-mini");
 });
 
-Deno.test("resolveAiModel: Lovable AI when provider is lovable", () => {
+Deno.test("resolveAiModel: global key (no user provider) uses gpt-4o-mini", () => {
   const result = resolveAiModel({ provider: "lovable", api_key: undefined, model: undefined });
   assertEquals(result.useOpenAI, false);
-  assertEquals(result.model, "google/gemini-2.5-flash");
-  assertEquals(result.providerLabel, "lovable");
+  assertEquals(result.model, "gpt-4o-mini");
+  assertEquals(result.providerLabel, "openai");
 });
 
-Deno.test("resolveAiModel: Lovable AI when no provider config", () => {
+Deno.test("resolveAiModel: global key when no provider config", () => {
   const result = resolveAiModel(null);
   assertEquals(result.useOpenAI, false);
-  assertEquals(result.model, "google/gemini-2.5-flash");
-  assertEquals(result.providerLabel, "lovable");
+  assertEquals(result.model, "gpt-4o-mini");
+  assertEquals(result.providerLabel, "openai");
 });
 
-Deno.test("resolveAiModel: OpenAI without api_key falls back to Lovable", () => {
+Deno.test("resolveAiModel: OpenAI without api_key falls back to global key", () => {
   const result = resolveAiModel({ provider: "openai", api_key: "", model: "gpt-4o" });
   assertEquals(result.useOpenAI, false);
-  assertEquals(result.model, "google/gemini-2.5-flash");
+  assertEquals(result.model, "gpt-4o-mini");
 });
 
 // =====================
@@ -65,10 +65,10 @@ Deno.test("buildAiProviderString: OpenAI fallback to gpt-4o-mini", () => {
   assertEquals(str, "openai/gpt-4o-mini");
 });
 
-Deno.test("buildAiProviderString: Lovable AI", () => {
+Deno.test("buildAiProviderString: global key defaults to gpt-4o-mini", () => {
   const resolved = resolveAiModel(null);
   const str = buildAiProviderString(null, resolved);
-  assertEquals(str, "lovable/google/gemini-2.5-flash");
+  assertEquals(str, "openai/gpt-4o-mini");
 });
 
 // =====================

@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 
+# Secrets / env (credenciais nunca devem ser commitadas)
+.env
+.env.*
+!.env.example
+.supabase-creds
+
+# Supabase CLI local state (não versionar)
+supabase/.branches/
+supabase/.temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

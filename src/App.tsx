@@ -9,6 +9,8 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionGuard from "@/components/PermissionGuard";
 import AppLayout from "./components/AppLayout";
+import SettingsLayout from "./components/SettingsLayout";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   DashboardSkeleton,
   SuggestionsSkeleton,
@@ -34,7 +36,8 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Conversations = lazy(() => import("./pages/Conversations"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
 const Integrations = lazy(() => import("./pages/Integrations"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const AccountSettings = lazy(() => import("./pages/settings/AccountSettings"));
+const AiSettings = lazy(() => import("./pages/settings/AiSettings"));
 const DashboardSettings = lazy(() => import("./pages/DashboardSettings"));
 const Workspaces = lazy(() => import("./pages/Workspaces"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -56,6 +59,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <ThemeToggle />
       <BrowserRouter>
         <AuthProvider>
           <WorkspaceProvider>
@@ -82,13 +86,16 @@ const App = () => (
                 />
                 <Route
                   path="/settings"
-                  element={<PermissionGuard require="viewSettings">{lazyRoute(<SettingsPage />, <GenericPageSkeleton />)}</PermissionGuard>}
-                />
-                <Route
-                  path="/settings/dashboard"
-                  element={<PermissionGuard require="viewSettings">{lazyRoute(<DashboardSettings />, <GenericPageSkeleton />)}</PermissionGuard>}
-                />
-                <Route path="/workspaces" element={lazyRoute(<Workspaces />, <GenericPageSkeleton />)} />
+                  element={<PermissionGuard require="viewSettings"><SettingsLayout /></PermissionGuard>}
+                >
+                  <Route index element={<Navigate to="/settings/account" replace />} />
+                  <Route path="account" element={lazyRoute(<AccountSettings />, <GenericPageSkeleton />)} />
+                  <Route path="workspace" element={lazyRoute(<Workspaces />, <GenericPageSkeleton />)} />
+                  <Route path="ai" element={lazyRoute(<AiSettings />, <GenericPageSkeleton />)} />
+                  <Route path="dashboard" element={lazyRoute(<DashboardSettings />, <GenericPageSkeleton />)} />
+                  <Route path="integrations" element={lazyRoute(<Integrations />, <GenericPageSkeleton />)} />
+                </Route>
+                <Route path="/workspaces" element={<Navigate to="/settings/workspace" replace />} />
                 <Route path="/admin" element={lazyRoute(<Admin />, <GenericPageSkeleton />)} />
                 <Route path="/admin/logs" element={lazyRoute(<SystemLogs />, <GenericPageSkeleton />)} />
                 <Route path="/docs" element={lazyRoute(<Documentation />, <GenericPageSkeleton />)} />

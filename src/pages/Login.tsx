@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bot, Mail, Lock, ArrowRight } from "lucide-react";
+import { Mail, Lock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +41,7 @@ const Login = () => {
           {[...Array(5)].map((_, i) => (
             <div
               key={i}
-              className="absolute rounded-full border border-primary-foreground/20"
+              className="absolute rounded-full border border-white/20"
               style={{
                 width: `${200 + i * 150}px`,
                 height: `${200 + i * 150}px`,
@@ -58,9 +58,13 @@ const Login = () => {
           transition={{ delay: 0.2 }}
           className="text-center z-10 px-12"
         >
-          <Bot className="w-16 h-16 text-primary-foreground mx-auto mb-6" />
-          <h1 className="text-4xl font-bold text-primary-foreground mb-4">VFlow360</h1>
-          <p className="text-primary-foreground/80 text-lg max-w-md">
+          <img
+            src="/vflow360-logo-escuro.png"
+            alt="VFlow360"
+            className="h-12 w-auto mx-auto mb-8"
+            style={{ filter: "brightness(0) invert(1)" }}
+          />
+          <p className="text-white text-lg max-w-md leading-relaxed">
             Seu assistente inteligente para vendas. Analise conversas, receba sugestões e atualize seu CRM automaticamente.
           </p>
         </motion.div>
@@ -68,9 +72,9 @@ const Login = () => {
 
       <div className="flex-1 flex items-center justify-center p-8">
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
-            <Bot className="w-8 h-8 text-primary" />
-            <span className="text-2xl font-bold text-foreground">VFlow360</span>
+          <div className="lg:hidden flex mb-8 justify-center">
+            <img src="/vflow360-logo.png" alt="VFlow360" className="h-9 w-auto dark:hidden" />
+            <img src="/vflow360-logo-escuro.png" alt="VFlow360" className="h-9 w-auto hidden dark:block" />
           </div>
 
           <h2 className="text-2xl font-semibold text-foreground mb-1">Bem-vindo de volta</h2>
@@ -96,7 +100,7 @@ const Login = () => {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" variant="brand" className="w-full" disabled={loading}>
               {loading ? "Entrando..." : "Entrar"}
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>

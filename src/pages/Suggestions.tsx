@@ -780,7 +780,7 @@ const Suggestions = () => {
                               </Badge>
                               {suggestion.ai_provider && (
                                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">
-                                  {suggestion.ai_provider.startsWith("openai") ? "🤖 OpenAI" : "✨ Lovable AI"}
+                                  {suggestion.ai_provider.startsWith("openai") ? "🤖 OpenAI" : "✨ IA (legado)"}
                                   {suggestion.ai_provider.includes("/") && (
                                     <span className="ml-1 opacity-60">{suggestion.ai_provider.split("/").pop()}</span>
                                   )}

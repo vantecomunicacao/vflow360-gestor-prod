@@ -9,9 +9,21 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// TEMP: Uazap desabilitado por enquanto (estava gerando muitos erros).
+// Para reativar: defina a env UAZAP_ENABLED="true".
+const UAZAP_ENABLED = Deno.env.get("UAZAP_ENABLED") === "true";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Kill-switch: responde de forma benigna e NÃO reporta erros enquanto desabilitado.
+  if (!UAZAP_ENABLED) {
+    return new Response(
+      JSON.stringify({ success: true, disabled: true, data: { status: "not_created", instances: [] } }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 
   try {

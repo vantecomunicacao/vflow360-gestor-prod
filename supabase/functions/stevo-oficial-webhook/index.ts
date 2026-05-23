@@ -173,7 +173,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: integration } = await supabase
@@ -280,9 +280,9 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
           let content = "";
 
           // AI config (lazy)
-          let aiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
-          let aiKey = LOVABLE_API_KEY;
-          let aiModel = "google/gemini-2.5-flash";
+          let aiEndpoint = "https://api.openai.com/v1/chat/completions";
+          let aiKey = OPENAI_API_KEY;
+          let aiModel = "gpt-4o-mini";
           try {
             const { data: providerCfg } = await supabase
               .from("ai_provider_config")
@@ -290,7 +290,6 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
               .eq("user_id", userId)
               .maybeSingle();
             if (providerCfg?.provider === "openai" && providerCfg?.api_key) {
-              aiEndpoint = "https://api.openai.com/v1/chat/completions";
               aiKey = providerCfg.api_key;
               aiModel = providerCfg.model || "gpt-4o";
             }

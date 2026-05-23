@@ -1,8 +1,16 @@
+import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 
 const AppLayout = () => {
+  // Marca que estamos dentro do app (sidebar presente) para ocultar o
+  // toggle de tema flutuante — no app ele vive no rodapé da sidebar.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-app", "1");
+    return () => document.documentElement.removeAttribute("data-app");
+  }, []);
+
   return (
     <SidebarProvider>
       <div className="h-screen flex w-full overflow-hidden">
