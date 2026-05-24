@@ -374,7 +374,7 @@ export default function DashboardSettings() {
             const f = customFields.find((c) => c.ghl_id === id);
             return f && (f.model || "").toLowerCase() !== "opportunity";
           }) && (
-            <p className="text-xs text-warning mt-3">
+            <p className="text-xs text-warning-ink mt-3">
               ⚠ Há campos de Contato selecionados nas suas configurações antigas. Eles aparecerão sempre como 0%. Remova-os e selecione campos de Oportunidade.
             </p>
           )}

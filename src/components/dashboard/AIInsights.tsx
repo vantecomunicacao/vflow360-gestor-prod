@@ -7,7 +7,7 @@ export function AIInsights() {
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-lg bg-accent/10">
-            <Sparkles className="h-5 w-5 text-accent" />
+            <Sparkles className="h-5 w-5 text-primary-ink" />
           </div>
           <h3 className="text-lg font-semibold text-foreground">Insights com I.A.</h3>
         </div>
@@ -18,7 +18,7 @@ export function AIInsights() {
         <div className="relative">
           <div className="absolute inset-0 rounded-full bg-accent/20 blur-2xl" />
           <div className="relative p-4 rounded-full bg-gradient-to-br from-accent/20 to-primary/20 border border-accent/30">
-            <Sparkles className="h-8 w-8 text-accent" />
+            <Sparkles className="h-8 w-8 text-primary-ink" />
           </div>
         </div>
         <div className="max-w-xs space-y-2">

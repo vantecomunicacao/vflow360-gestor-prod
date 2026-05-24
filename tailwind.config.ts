@@ -34,6 +34,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          ink: "hsl(var(--primary-ink))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -66,6 +67,7 @@ export default {
         warning: {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
+          ink: "hsl(var(--warning-ink))",
         },
         info: {
           DEFAULT: "hsl(var(--info))",
@@ -85,6 +87,10 @@ export default {
         "funnel-2": "hsl(var(--funnel-2))",
         "funnel-3": "hsl(var(--funnel-3))",
         "funnel-4": "hsl(var(--funnel-4))",
+        "funnel-1-ink": "hsl(var(--funnel-1-ink))",
+        "funnel-2-ink": "hsl(var(--funnel-2-ink))",
+        "funnel-3-ink": "hsl(var(--funnel-3-ink))",
+        "funnel-4-ink": "hsl(var(--funnel-4-ink))",
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",

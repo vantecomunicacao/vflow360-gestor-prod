@@ -23,7 +23,7 @@ export function TimePerStage({ averageTimePerStage }: TimePerStageProps) {
   return (
     <div className="dashboard-section animate-slide-up">
       <h2 className="section-title">
-        <Clock className="w-5 h-5 text-accent" />
+        <Clock className="w-5 h-5 text-primary-ink" />
         Tempo Médio por Etapa
         <SectionTooltip text="Tempo médio (em horas) que oportunidades estão na etapa atual. Identifica gargalos no funil." />
       </h2>

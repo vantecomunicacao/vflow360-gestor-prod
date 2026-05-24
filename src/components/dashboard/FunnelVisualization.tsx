@@ -51,10 +51,10 @@ function LeadListDialog({ open, onOpenChange, title, leads }: {
 }
 
 const stageAccents = [
-  { bg: "bg-funnel-1", border: "border-funnel-1/40", icon: "text-funnel-1" },
-  { bg: "bg-funnel-2", border: "border-funnel-2/40", icon: "text-funnel-2" },
-  { bg: "bg-funnel-3", border: "border-funnel-3/40", icon: "text-funnel-3" },
-  { bg: "bg-funnel-4", border: "border-funnel-4/40", icon: "text-funnel-4" },
+  { bg: "bg-funnel-1", border: "border-funnel-1/40", icon: "text-funnel-1-ink" },
+  { bg: "bg-funnel-2", border: "border-funnel-2/40", icon: "text-funnel-2-ink" },
+  { bg: "bg-funnel-3", border: "border-funnel-3/40", icon: "text-funnel-3-ink" },
+  { bg: "bg-funnel-4", border: "border-funnel-4/40", icon: "text-funnel-4-ink" },
 ];
 
 export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [] }: FunnelVisualizationProps) {
@@ -76,13 +76,13 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
     <div className="dashboard-section animate-slide-up">
       <div className="flex items-center justify-between mb-6">
         <h2 className="section-title mb-0">
-          <TrendingUp className="w-5 h-5 text-accent" />
+          <TrendingUp className="w-5 h-5 text-primary-ink" />
           Visão Geral - Funil de Passagem
           <SectionTooltip text="Funil de passagem: cada etapa mostra o total de leads que JÁ PASSARAM por ela (ou seja, soma os que estão nela com os que avançaram para etapas posteriores). O número menor entre parênteses indica quantos leads estão atualmente nessa etapa. As taxas de conversão refletem o quanto seguiu para a próxima etapa. Clique em uma etapa para ver os leads que estão nela hoje." />
         </h2>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Conversão geral:</span>
-          <span className="font-extrabold text-accent text-lg">{formatPercentage(conversionRates.overallConversion)}</span>
+          <span className="font-extrabold text-primary-ink text-lg">{formatPercentage(conversionRates.overallConversion)}</span>
         </div>
       </div>
 

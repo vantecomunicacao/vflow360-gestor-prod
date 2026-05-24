@@ -63,7 +63,7 @@ export function AIUsageCard({ startDate, endDate }: Props) {
     <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-4">
         <div className="p-2 rounded-lg bg-primary/10">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Sparkles className="h-5 w-5 text-primary-ink" />
         </div>
         <div>
           <h3 className="text-lg font-semibold text-foreground">Consumo de IA (Sugestões)</h3>
@@ -107,7 +107,7 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
   return (
     <div className="rounded-lg border border-border bg-background/50 p-3">
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`text-lg font-semibold ${highlight ? "text-primary" : "text-foreground"}`}>{value}</p>
+      <p className={`text-lg font-semibold ${highlight ? "text-primary-ink" : "text-foreground"}`}>{value}</p>
     </div>
   );
 }

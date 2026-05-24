@@ -18,13 +18,13 @@ export function SalesOrigins({ wonOrigins, fillRate }: SalesOriginsProps) {
     <div className="dashboard-section animate-slide-up h-full">
       <div className="flex items-center justify-between mb-4">
         <h2 className="section-title mb-0">
-          <Trophy className="w-5 h-5 text-accent" />
+          <Trophy className="w-5 h-5 text-primary-ink" />
           Origem das Vendas
           <SectionTooltip text="Origem das oportunidades ganhas. Útil para identificar canais mais rentáveis." />
         </h2>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Preenchido:</span>
-          <span className={`font-bold ${fillRate > 50 ? "text-accent" : "text-warning"}`}>{fillRate.toFixed(1)}%</span>
+          <span className={`font-bold ${fillRate > 50 ? "text-success" : "text-warning-ink"}`}>{fillRate.toFixed(1)}%</span>
         </div>
       </div>
 

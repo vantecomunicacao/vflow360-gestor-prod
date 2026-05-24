@@ -34,7 +34,7 @@ export function CustomFieldCharts({ fields }: CustomFieldChartsProps) {
   return (
     <div className="dashboard-section animate-slide-up">
       <h2 className="section-title">
-        <PieIcon className="w-5 h-5 text-primary" />
+        <PieIcon className="w-5 h-5 text-primary-ink" />
         Distribuição de Campos Personalizados
         <SectionTooltip text="Distribuição dos valores nos campos personalizados selecionados nas configurações." />
       </h2>

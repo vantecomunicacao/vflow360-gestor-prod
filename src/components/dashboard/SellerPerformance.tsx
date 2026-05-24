@@ -22,9 +22,9 @@ export function SellerPerformance({ sellers }: SellerPerformanceProps) {
   const sortedSellers = [...sellers].sort((a, b) => b.vendaGanha - a.vendaGanha);
 
   const getRankBadge = (i: number) => {
-    if (i === 0) return <Trophy className="w-4 h-4 text-chart-3" />;
+    if (i === 0) return <Trophy className="w-4 h-4 text-warning-ink" />;
     if (i === 1) return <Medal className="w-4 h-4 text-muted-foreground" />;
-    if (i === 2) return <Medal className="w-4 h-4 text-chart-3/70" />;
+    if (i === 2) return <Medal className="w-4 h-4 text-warning-ink/70" />;
     return null;
   };
 
@@ -32,7 +32,7 @@ export function SellerPerformance({ sellers }: SellerPerformanceProps) {
     return (
       <div className="dashboard-section animate-slide-up">
         <h2 className="section-title">
-          <Users className="w-5 h-5 text-primary" />
+          <Users className="w-5 h-5 text-primary-ink" />
           Performance por Vendedor
         </h2>
         <p className="text-muted-foreground text-center py-8">Nenhum vendedor com oportunidades no período.</p>
@@ -43,7 +43,7 @@ export function SellerPerformance({ sellers }: SellerPerformanceProps) {
   return (
     <div className="dashboard-section animate-slide-up">
       <h2 className="section-title">
-        <Users className="w-5 h-5 text-primary" />
+        <Users className="w-5 h-5 text-primary-ink" />
         Performance por Vendedor
         <SectionTooltip text="Comparativo entre vendedores: oportunidades atribuídas por etapa, taxa de conversão e tempo médio de resposta individual." />
       </h2>
@@ -73,18 +73,18 @@ export function SellerPerformance({ sellers }: SellerPerformanceProps) {
                   </td>
                   <td className="font-semibold">{s.name}</td>
                   <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-1/10 text-funnel-1 rounded-lg font-bold text-sm">{s.contatoInicial}</span>
+                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-1/10 text-funnel-1-ink rounded-lg font-bold text-sm">{s.contatoInicial}</span>
                   </td>
                   <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-2/10 text-funnel-2 rounded-lg font-bold text-sm">{s.propostaEnviada}</span>
+                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-2/10 text-funnel-2-ink rounded-lg font-bold text-sm">{s.propostaEnviada}</span>
                   </td>
                   <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-3/10 text-funnel-3 rounded-lg font-bold text-sm">{s.fechamento}</span>
+                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-3/10 text-funnel-3-ink rounded-lg font-bold text-sm">{s.fechamento}</span>
                   </td>
                   <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-4/10 text-funnel-4 rounded-lg font-bold text-sm">{s.vendaGanha}</span>
+                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-4/10 text-funnel-4-ink rounded-lg font-bold text-sm">{s.vendaGanha}</span>
                   </td>
-                  <td className="text-center"><span className="font-bold text-accent">{rate}%</span></td>
+                  <td className="text-center"><span className="font-bold text-primary-ink">{rate}%</span></td>
                   <td className="text-center">
                     <span className="font-semibold text-foreground tabular-nums">{respLabel}</span>
                     {s.responseCount ? (

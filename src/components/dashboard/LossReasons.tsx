@@ -6,7 +6,7 @@ import { SectionTooltip } from "./SectionTooltip";
 interface LossReasonsProps { lossReasons: LossReason[]; totalLost: number; }
 
 const COLORS = [
-  "hsl(var(--destructive))", "hsl(var(--warning))", "hsl(var(--primary))", "hsl(var(--accent))",
+  "hsl(var(--destructive))", "hsl(var(--warning))", "hsl(var(--primary))", "hsl(var(--funnel-3))",
   "hsl(var(--muted-foreground))", "hsl(var(--success))", "hsl(220, 70%, 55%)", "hsl(280, 60%, 50%)",
 ];
 

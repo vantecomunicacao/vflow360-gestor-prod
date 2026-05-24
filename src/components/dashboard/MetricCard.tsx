@@ -18,10 +18,10 @@ export function MetricCard({
   title, value, subtitle, icon: Icon, trend, variant = "default", tooltip, className,
 }: MetricCardProps) {
   const iconBgVariants = {
-    default: "bg-primary/10 text-primary",
-    accent: "bg-accent/10 text-accent",
+    default: "bg-primary/10 text-primary-ink",
+    accent: "bg-accent/10 text-accent-foreground",
     success: "bg-success/10 text-success",
-    warning: "bg-warning/10 text-warning",
+    warning: "bg-warning/10 text-warning-ink",
   };
 
   return (

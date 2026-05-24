@@ -19,6 +19,7 @@
     --popover-foreground: 0 0% 5%;
     --primary: 33 98% 51%;          /* laranja-700 #FD8E06 */
     --primary-foreground: 0 0% 10%; /* texto escuro p/ contraste sobre laranja */
+    --primary-ink: 18 92% 36%;      /* laranja escurecido p/ TEXTO sobre fundos claros (AA) */
     --secondary: 240 5% 96%;
     --secondary-foreground: 0 0% 9%;
     --muted: 240 5% 96%;
@@ -46,6 +47,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 45 93% 47%;          /* aviso-base #EAB308 */
     --warning-foreground: 0 0% 10%;
+    --warning-ink: 32 95% 30%;      /* âmbar escurecido p/ TEXTO sobre fundos claros (AA) */
     --info: 221 83% 53%;            /* info-base #2563EB */
     --info-foreground: 0 0% 100%;
 
@@ -54,6 +56,11 @@
     --funnel-2: 28 98% 53%;
     --funnel-3: 14 98% 52%;
     --funnel-4: 4 90% 48%;
+    /* Variantes "ink" do funil — TEXTO acessível em fundos claros e sobre tints /10 */
+    --funnel-1-ink: 28 95% 36%;
+    --funnel-2-ink: 18 95% 38%;
+    --funnel-3-ink: 10 92% 40%;
+    --funnel-4-ink: 0 80% 42%;
 
     /* Gráficos — marca + cores de apoio distinguíveis */
     --chart-1: 33 98% 51%;          /* laranja */
@@ -79,6 +86,7 @@
     --popover-foreground: 0 0% 96%;
     --primary: 33 98% 53%;          /* laranja de marca, levemente mais claro no dark */
     --primary-foreground: 0 0% 10%;
+    --primary-ink: 33 100% 72%;     /* laranja clareado p/ TEXTO sobre fundos escuros e tints /10 (AA) */
     --secondary: 0 0% 11%;          /* #1C1C1C */
     --secondary-foreground: 0 0% 96%;
     --muted: 0 0% 11%;
@@ -104,6 +112,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 45 93% 52%;
     --warning-foreground: 0 0% 10%;
+    --warning-ink: 45 95% 70%;      /* âmbar clareado p/ TEXTO sobre fundos escuros (AA) */
     --info: 221 83% 60%;
     --info-foreground: 0 0% 100%;
 
@@ -112,6 +121,11 @@
     --funnel-2: 28 98% 56%;
     --funnel-3: 14 98% 55%;
     --funnel-4: 4 95% 56%;
+    /* Variantes "ink" — TEXTO acessível sobre fundos escuros e tints /10 */
+    --funnel-1-ink: 36 100% 76%;
+    --funnel-2-ink: 28 100% 73%;
+    --funnel-3-ink: 14 98% 70%;
+    --funnel-4-ink: 4 95% 72%;
 
     --chart-1: 33 98% 55%;
     --chart-2: 4 95% 58%;
@@ -167,7 +181,7 @@
     @apply bg-success/10 text-success border-success/20;
   }
   .quality-warning {
-    @apply bg-warning/10 text-warning border-warning/20;
+    @apply bg-warning/10 text-warning-ink border-warning/20;
   }
   .quality-bad {
     @apply bg-destructive/10 text-destructive border-destructive/20;

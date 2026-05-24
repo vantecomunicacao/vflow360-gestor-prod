@@ -18,13 +18,13 @@ export function LeadOrigins({ leadOrigins, fillRate }: LeadOriginsProps) {
     <div className="dashboard-section animate-slide-up h-full">
       <div className="flex items-center justify-between mb-4">
         <h2 className="section-title mb-0">
-          <Globe className="w-5 h-5 text-primary" />
+          <Globe className="w-5 h-5 text-primary-ink" />
           Origens
           <SectionTooltip text="Distribuição das oportunidades por canal de origem. % preenchido indica quantas têm origem identificada." />
         </h2>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Preenchido:</span>
-          <span className={`font-bold ${fillRate > 50 ? "text-accent" : "text-warning"}`}>{fillRate.toFixed(1)}%</span>
+          <span className={`font-bold ${fillRate > 50 ? "text-success" : "text-warning-ink"}`}>{fillRate.toFixed(1)}%</span>
         </div>
       </div>
 

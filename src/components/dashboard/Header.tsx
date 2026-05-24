@@ -1,6 +1,8 @@
-import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Globe, Layers, X } from "lucide-react";
+import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Globe, Layers, X, SlidersHorizontal } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -157,7 +159,7 @@ function FilterSelect({
           className
         )}
       >
-        <Icon className={cn("w-3.5 h-3.5 shrink-0", selected ? "text-primary" : "text-muted-foreground")} />
+        <Icon className={cn("w-3.5 h-3.5 shrink-0", selected ? "text-primary-ink" : "text-muted-foreground")} />
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className="rounded-lg">
@@ -176,6 +178,7 @@ export function Header({
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { permissions } = usePermissions();
   const hasAdditionalRange = !!additionalDateRange?.from;
   const activeFilterCount = [selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin, hasAdditionalRange].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
@@ -328,6 +331,20 @@ export function Header({
             <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
+          {permissions.viewSettings && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 gap-1.5 text-xs"
+              asChild
+              title="Personalizar dashboard"
+            >
+              <Link to="/settings/dashboard">
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Personalizar</span>
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     </header>

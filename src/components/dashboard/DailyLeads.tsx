@@ -11,7 +11,7 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
     return (
       <div className="dashboard-section animate-slide-up">
         <h2 className="section-title">
-          <BarChart3 className="w-5 h-5 text-primary" />
+          <BarChart3 className="w-5 h-5 text-primary-ink" />
           Entrada de Oportunidades — Últimos 7 dias
         </h2>
         <p className="text-muted-foreground text-center py-8">Sem dados disponíveis.</p>
@@ -38,7 +38,7 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 dashboard-section animate-slide-up">
         <h2 className="section-title">
-          <BarChart3 className="w-5 h-5 text-primary" />
+          <BarChart3 className="w-5 h-5 text-primary-ink" />
           Entrada de Oportunidades — Últimos 7 dias
           <SectionTooltip text="Volume diário de novas oportunidades. A linha mostra a tendência ao longo do período." />
         </h2>
@@ -54,10 +54,10 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
               />
               <Bar dataKey="count" radius={[8, 8, 0, 0]}>
                 {data.map((entry, i) => (
-                  <Cell key={i} fill={entry.count === maxCount ? "hsl(var(--accent))" : "hsl(var(--primary))"} opacity={0.85} />
+                  <Cell key={i} fill={entry.count === maxCount ? "hsl(var(--funnel-3))" : "hsl(var(--primary))"} opacity={0.9} />
                 ))}
               </Bar>
-              <Line type="monotone" dataKey="count" stroke="hsl(var(--accent))" strokeWidth={2.5} dot={{ fill: "hsl(var(--accent))", r: 4, strokeWidth: 2, stroke: "hsl(var(--card))" }} activeDot={{ r: 6 }} name="trend" />
+              <Line type="monotone" dataKey="count" stroke="hsl(var(--funnel-3))" strokeWidth={2.5} dot={{ fill: "hsl(var(--funnel-3))", r: 4, strokeWidth: 2, stroke: "hsl(var(--card))" }} activeDot={{ r: 6 }} name="trend" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -65,7 +65,7 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
 
       <div className="dashboard-section animate-slide-up space-y-4">
         <h2 className="section-title">
-          <TrendingUp className="w-5 h-5 text-accent" />
+          <TrendingUp className="w-5 h-5 text-primary-ink" />
           Insights
         </h2>
         <div className="space-y-3">
@@ -81,11 +81,11 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
           </div>
           <div className="p-4 bg-accent/10 border border-accent/20 rounded-2xl">
             <div className="flex items-center gap-2 mb-1">
-              <ArrowUp className="w-3.5 h-3.5 text-accent" />
+              <ArrowUp className="w-3.5 h-3.5 text-primary-ink" />
               <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold">Melhor dia</p>
             </div>
             <p className="text-lg font-extrabold text-foreground">{maxDay.dayName} — {formatDate(maxDay.date)}</p>
-            <p className="text-xs text-accent font-bold">{maxDay.count} opps</p>
+            <p className="text-xs text-primary-ink font-bold">{maxDay.count} opps</p>
           </div>
           <div className="p-4 bg-secondary/50 rounded-2xl">
             <div className="flex items-center gap-2 mb-1">

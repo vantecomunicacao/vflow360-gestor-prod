@@ -14,7 +14,7 @@ export function DataQuality({ customFields, overallFillRate = 0 }: DataQualityPr
     return (
       <div className="dashboard-section animate-slide-up">
         <h2 className="section-title">
-          <ClipboardCheck className="w-5 h-5 text-primary" />
+          <ClipboardCheck className="w-5 h-5 text-primary-ink" />
           Qualidade de Preenchimento
         </h2>
         <p className="text-muted-foreground text-center py-8">Nenhum campo personalizado configurado.</p>
@@ -26,7 +26,7 @@ export function DataQuality({ customFields, overallFillRate = 0 }: DataQualityPr
     <div className="dashboard-section animate-slide-up">
       <div className="flex items-center justify-between mb-6">
         <h2 className="section-title mb-0">
-          <ClipboardCheck className="w-5 h-5 text-primary" />
+          <ClipboardCheck className="w-5 h-5 text-primary-ink" />
           Qualidade de Preenchimento
           <SectionTooltip text="Taxa de preenchimento dos campos personalizados nas oportunidades." />
         </h2>

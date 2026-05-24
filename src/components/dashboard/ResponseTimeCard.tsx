@@ -31,7 +31,7 @@ export function ResponseTimeCard({ responseTime }: ResponseTimeCardProps) {
   return (
     <div className="dashboard-section animate-slide-up h-full flex flex-col">
       <h2 className="section-title">
-        <Clock className="w-5 h-5 text-primary" />
+        <Clock className="w-5 h-5 text-primary-ink" />
         Tempo médio de resposta
         <SectionTooltip text={`Tempo médio que o vendedor (número conectado) leva para responder o cliente. Considera conversas dos leads do funil/etapa filtrado(a). Sem pipeline selecionado, restringe às etapas mapeadas no funil comercial. Expediente: ${start} às ${end}.`} />
       </h2>
