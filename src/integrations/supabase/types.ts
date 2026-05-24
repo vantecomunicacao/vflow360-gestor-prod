@@ -10,7 +10,32 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -291,6 +316,9 @@ export type Database = {
           funnel_stage_mapping: Json | null
           origin_field_name: string | null
           updated_at: string
+          utm_campaign_field_id: string | null
+          utm_medium_field_id: string | null
+          utm_source_field_id: string | null
           visible_custom_fields: string[] | null
           won_stage_keys: string[] | null
           workspace_id: string
@@ -306,6 +334,9 @@ export type Database = {
           funnel_stage_mapping?: Json | null
           origin_field_name?: string | null
           updated_at?: string
+          utm_campaign_field_id?: string | null
+          utm_medium_field_id?: string | null
+          utm_source_field_id?: string | null
           visible_custom_fields?: string[] | null
           won_stage_keys?: string[] | null
           workspace_id: string
@@ -321,6 +352,9 @@ export type Database = {
           funnel_stage_mapping?: Json | null
           origin_field_name?: string | null
           updated_at?: string
+          utm_campaign_field_id?: string | null
+          utm_medium_field_id?: string | null
+          utm_source_field_id?: string | null
           visible_custom_fields?: string[] | null
           won_stage_keys?: string[] | null
           workspace_id?: string
@@ -887,6 +921,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_workspace_member: {
+        Args: { _email: string; _workspace_id: string }
+        Returns: string
+      }
+      can_manage_workspace: {
+        Args: { _workspace_id: string }
+        Returns: boolean
+      }
       cleanup_old_system_logs: { Args: never; Returns: undefined }
       create_workspace: { Args: { _name: string }; Returns: string }
       get_my_permissions: {
@@ -908,6 +950,20 @@ export type Database = {
       is_workspace_member: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
+      }
+      list_workspace_members: {
+        Args: { _workspace_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          is_owner: boolean
+          role: string
+          user_id: string
+        }[]
+      }
+      remove_workspace_member: {
+        Args: { _user_id: string; _workspace_id: string }
+        Returns: undefined
       }
       trigger_ghl_sync_all: { Args: never; Returns: undefined }
     }
@@ -1038,6 +1094,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "user"],

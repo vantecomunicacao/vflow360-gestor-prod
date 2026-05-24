@@ -10,8 +10,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization";
 import { SellerPerformance } from "@/components/dashboard/SellerPerformance";
 import { TimePerStage } from "@/components/dashboard/TimePerStage";
-import { LeadOrigins } from "@/components/dashboard/LeadOrigins";
-import { SalesOrigins } from "@/components/dashboard/SalesOrigins";
+import { WonOrigins } from "@/components/dashboard/WonOrigins";
 import { DataQuality } from "@/components/dashboard/DataQuality";
 import { ResponseTimeCard } from "@/components/dashboard/ResponseTimeCard";
 import { CustomFieldCharts } from "@/components/dashboard/CustomFieldCharts";
@@ -22,6 +21,7 @@ import { LoadingState } from "@/components/dashboard/LoadingState";
 import { ErrorState } from "@/components/dashboard/ErrorState";
 import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
 import { AIUsageCard } from "@/components/dashboard/AIUsageCard";
+import { UTMOrigins } from "@/components/dashboard/UTMOrigins";
 
 type SavedFilters = {
   from?: string;
@@ -31,7 +31,8 @@ type SavedFilters = {
   pipelineId?: string | null;
   stageId?: string | null;
   sellerId?: string | null;
-  origin?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
 };
 
 const filtersStorageKey = (workspaceId: string) => `dashboard:filters:${workspaceId}`;
@@ -47,7 +48,8 @@ export default function Dashboard() {
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
-  const [selectedOrigin, setSelectedOrigin] = useState<string | null>(null);
+  const [selectedUtmMedium, setSelectedUtmMedium] = useState<string | null>(null);
+  const [selectedUtmCampaign, setSelectedUtmCampaign] = useState<string | null>(null);
 
   // Hidratar filtros salvos por workspace (ou aplicar pipeline padrão)
   useEffect(() => {
@@ -72,7 +74,8 @@ export default function Dashboard() {
           setSelectedPipelineId(saved.pipelineId ?? null);
           setSelectedStageId(saved.stageId ?? null);
           setSelectedSellerId(saved.sellerId ?? null);
-          setSelectedOrigin(saved.origin ?? null);
+          setSelectedUtmMedium(saved.utmMedium ?? null);
+          setSelectedUtmCampaign(saved.utmCampaign ?? null);
           restored = true;
         }
       } catch {
@@ -84,7 +87,8 @@ export default function Dashboard() {
         setDateRange({ from: subDays(new Date(), 6), to: new Date() });
         setAdditionalDateRange(undefined);
         setSelectedSellerId(null);
-        setSelectedOrigin(null);
+        setSelectedUtmMedium(null);
+        setSelectedUtmCampaign(null);
         setSelectedStageId(null);
         setSelectedPipelineId(null);
 
@@ -116,14 +120,15 @@ export default function Dashboard() {
       pipelineId: selectedPipelineId,
       stageId: selectedStageId,
       sellerId: selectedSellerId,
-      origin: selectedOrigin,
+      utmMedium: selectedUtmMedium,
+      utmCampaign: selectedUtmCampaign,
     };
     try {
       localStorage.setItem(filtersStorageKey(activeWorkspace.id), JSON.stringify(payload));
     } catch {
       // ignora quota cheia
     }
-  }, [hydrated, activeWorkspace?.id, dateRange, additionalDateRange, selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin]);
+  }, [hydrated, activeWorkspace?.id, dateRange, additionalDateRange, selectedPipelineId, selectedStageId, selectedSellerId, selectedUtmMedium, selectedUtmCampaign]);
 
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 6)), [dateRange?.from]);
@@ -145,11 +150,12 @@ export default function Dashboard() {
     pipelineId: selectedPipelineId,
     stageId: selectedStageId,
     sellerId: selectedSellerId,
-    sourceOrigin: selectedOrigin,
+    utmMedium: selectedUtmMedium,
+    utmCampaign: selectedUtmCampaign,
     workspaceId: activeWorkspace?.id || null,
     additionalStartDate,
     additionalEndDate,
-  }), [startDate, endDate, selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
+  }), [startDate, endDate, selectedPipelineId, selectedStageId, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
 
   const periodDays = useMemo(() => differenceInDays(endDate, startDate) + 1, [startDate, endDate]);
   const prevFilters: DashboardFilters = useMemo(() => ({
@@ -202,15 +208,18 @@ export default function Dashboard() {
         isLoading={isLoading}
         pipelines={data.pipelines}
         users={data.users}
-        origins={data.origins}
         selectedPipelineId={selectedPipelineId}
         selectedStageId={selectedStageId}
         selectedSellerId={selectedSellerId}
-        selectedOrigin={selectedOrigin}
+        utmMediumValues={data.utmMediumValues || []}
+        utmCampaignValues={data.utmCampaignValues || []}
+        selectedUtmMedium={selectedUtmMedium}
+        selectedUtmCampaign={selectedUtmCampaign}
         onPipelineChange={(id) => { setSelectedPipelineId(id); setSelectedStageId(null); }}
         onStageChange={setSelectedStageId}
         onSellerChange={setSelectedSellerId}
-        onOriginChange={setSelectedOrigin}
+        onUtmMediumChange={setSelectedUtmMedium}
+        onUtmCampaignChange={setSelectedUtmCampaign}
         cachedAt={cachedAt}
         additionalDateRange={additionalDateRange}
         onAdditionalDateRangeChange={setAdditionalDateRange}
@@ -240,18 +249,31 @@ export default function Dashboard() {
           />
         </div>
         <div className="lg:col-span-1">
-          <AIInsights />
+          <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
         </div>
       </AnimatedSection>
 
-      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
-        <LeadOrigins leadOrigins={data.origemDistribution} fillRate={data.origemFillRate} />
-        <SalesOrigins
-          wonOrigins={data.wonOrigemDistribution || []}
-          fillRate={data.wonOrigemFillRate || 0}
-          totalWon={data.funnelStages.find((s) => s.id === "venda_ganha")?.count || 0}
+      <AnimatedSection delay={0.05}>
+        <UTMOrigins
+          source={{ distribution: data.utmSourceDistribution || [], fillRate: data.utmSourceFillRate || 0 }}
+          medium={{ distribution: data.utmMediumDistribution || [], fillRate: data.utmMediumFillRate || 0 }}
+          campaign={{ distribution: data.utmCampaignDistribution || [], fillRate: data.utmCampaignFillRate || 0 }}
+          configured={data.utmConfigured || { source: false, medium: false, campaign: false }}
+          activeMedium={selectedUtmMedium}
+          activeCampaign={selectedUtmCampaign}
+          onSelectMedium={setSelectedUtmMedium}
+          onSelectCampaign={setSelectedUtmCampaign}
         />
-        <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
+      </AnimatedSection>
+
+      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
+        <WonOrigins
+          distribution={data.wonUtmSourceDistribution || []}
+          fillRate={data.wonUtmSourceFillRate || 0}
+          totalWon={data.funnelStages.find((s) => s.id === "venda_ganha")?.count || 0}
+          configured={data.utmConfigured?.source || false}
+        />
+        <AIInsights />
       </AnimatedSection>
 
       <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>

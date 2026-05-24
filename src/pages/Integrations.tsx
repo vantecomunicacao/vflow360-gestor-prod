@@ -72,6 +72,28 @@ const Integrations = () => {
     return result.data;
   }, []);
 
+  const callEvolution = useCallback(async (action: string, extra?: Record<string, unknown>) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not authenticated");
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-manage`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ action, ...extra }),
+      },
+    );
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error || "Unknown error");
+    return result.data;
+  }, []);
+
   const callGhl = useCallback(
     async (action: string, extra?: Record<string, unknown>) => {
       const {
@@ -236,6 +258,25 @@ const Integrations = () => {
         /* silent */
       }
 
+      // Fetch Evolution instances (via edge function — checks live status)
+      try {
+        const data = await callEvolution("status", { workspace_id: activeWorkspace.id });
+        if (data?.instances && data.instances.length > 0) {
+          for (const inst of data.instances) {
+            allInstances.push({
+              id: inst.id,
+              instanceName: inst.instanceName || "",
+              label: inst.label || inst.instanceName || "Evolution",
+              status: inst.status as WhatsAppStatus,
+              provider: "evolution",
+              ghlUserId: inst.ghl_user_id || null,
+            });
+          }
+        }
+      } catch {
+        /* silent */
+      }
+
       // Fetch Stevo instances from DB
       try {
         const { data: stevoIntegrations } = await supabase
@@ -343,7 +384,7 @@ const Integrations = () => {
       }
     };
     checkStatus();
-  }, [activeWorkspace, callUazap, callGhl, resetGhlState]);
+  }, [activeWorkspace, callUazap, callEvolution, callGhl, resetGhlState]);
 
   useEffect(() => {
     if (ghlConnected) {
@@ -351,22 +392,27 @@ const Integrations = () => {
     }
   }, [ghlConnected, fetchGhlFieldsAndStages]);
 
-  // Poll for connecting Uazap instances only
+  // Poll for connecting Uazap & Evolution instances
   useEffect(() => {
-    const connectingInstances = instances.filter((i) => i.status === "connecting" && i.provider === "uazap");
+    const connectingInstances = instances.filter(
+      (i) => i.status === "connecting" && (i.provider === "uazap" || i.provider === "evolution"),
+    );
     if (connectingInstances.length === 0) return;
 
     const interval = setInterval(async () => {
       for (const inst of connectingInstances) {
         try {
-          const data = await callUazap("status", { integration_id: inst.id });
+          const data =
+            inst.provider === "uazap"
+              ? await callUazap("status", { integration_id: inst.id })
+              : await callEvolution("status", { integration_id: inst.id });
           if (data?.status === "connected" || data?.instance?.status === "connected") {
             setInstances((prev) =>
               prev.map((i) => (i.id === inst.id ? { ...i, status: "connected", qrCode: null } : i)),
             );
             toast({ title: `${inst.label} conectado com sucesso!` });
           } else {
-            const newQr = data?.instance?.qrcode || data?.qrcode;
+            const newQr = data?.qrcode || data?.instance?.qrcode;
             if (newQr) {
               setInstances((prev) => prev.map((i) => (i.id === inst.id ? { ...i, qrCode: newQr } : i)));
             }
@@ -377,7 +423,7 @@ const Integrations = () => {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [instances, callUazap, toast]);
+  }, [instances, callUazap, callEvolution, toast]);
 
   const updateInstance = (id: string, updates: Partial<WhatsAppInstance>) => {
     setInstances((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)));
@@ -413,6 +459,44 @@ const Integrations = () => {
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : "Erro ao criar instância",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingNew(false);
+    }
+  };
+
+  const handleCreateEvolutionInstance = async () => {
+    setCreatingNew(true);
+    setShowProviderPicker(false);
+    try {
+      if (!activeWorkspace) throw new Error("No active workspace");
+      const data = await callEvolution("create", { workspace_id: activeWorkspace.id });
+      const newId = data.integration_id;
+      const qr = data?.qrcode || null;
+
+      const newInst: WhatsAppInstance = {
+        id: newId,
+        instanceName: data.instanceName || "",
+        label: `Evolution #${instances.filter((i) => i.provider === "evolution").length + 1}`,
+        status: "connecting",
+        provider: "evolution",
+        qrCode: qr,
+      };
+
+      if (!qr) {
+        try {
+          const statusData = await callEvolution("status", { integration_id: newId });
+          newInst.qrCode = statusData?.qrcode || null;
+        } catch { /* ignore */ }
+      }
+
+      setInstances((prev) => [...prev, newInst]);
+      toast({ title: "Instância Evolution criada!", description: "Escaneie o QR Code para conectar." });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao criar instância Evolution",
         variant: "destructive",
       });
     } finally {
@@ -581,15 +665,22 @@ const Integrations = () => {
   };
 
   const handleReconnect = async (inst: WhatsAppInstance) => {
-    if (inst.provider !== "uazap") return;
+    if (inst.provider !== "uazap" && inst.provider !== "evolution") return;
     updateInstance(inst.id, { loading: true });
     try {
-      const connectData = await callUazap("connect", { integration_id: inst.id });
-      const qr = connectData?.qrcode || connectData?.instance?.qrcode || connectData?.base64 || null;
+      const connectData =
+        inst.provider === "uazap"
+          ? await callUazap("connect", { integration_id: inst.id })
+          : await callEvolution("connect", { integration_id: inst.id });
+      const qr =
+        connectData?.qrcode || connectData?.instance?.qrcode || connectData?.base64 || null;
       if (qr) {
         updateInstance(inst.id, { status: "connecting", qrCode: qr, loading: false });
       } else {
-        const statusData = await callUazap("status", { integration_id: inst.id });
+        const statusData =
+          inst.provider === "uazap"
+            ? await callUazap("status", { integration_id: inst.id })
+            : await callEvolution("status", { integration_id: inst.id });
         const statusQr = statusData?.instance?.qrcode || statusData?.qrcode || null;
         updateInstance(inst.id, { status: "connecting", qrCode: statusQr, loading: false });
       }
@@ -604,10 +695,14 @@ const Integrations = () => {
   };
 
   const handleDisconnect = async (inst: WhatsAppInstance) => {
-    if (inst.provider !== "uazap") return;
+    if (inst.provider !== "uazap" && inst.provider !== "evolution") return;
     updateInstance(inst.id, { loading: true });
     try {
-      await callUazap("disconnect", { integration_id: inst.id });
+      if (inst.provider === "uazap") {
+        await callUazap("disconnect", { integration_id: inst.id });
+      } else {
+        await callEvolution("disconnect", { integration_id: inst.id });
+      }
       updateInstance(inst.id, { status: "disconnected", qrCode: null, loading: false });
       toast({ title: `${inst.label} desconectado` });
     } catch (error) {
@@ -626,6 +721,8 @@ const Integrations = () => {
     try {
       if (inst.provider === "uazap") {
         await callUazap("delete", { integration_id: inst.id });
+      } else if (inst.provider === "evolution") {
+        await callEvolution("delete", { integration_id: inst.id });
       } else {
         await supabase.from("integrations").delete().eq("id", inst.id);
       }
@@ -810,6 +907,7 @@ const Integrations = () => {
               onCreateUazap={handleCreateUazapInstance}
               onCreateStevo={handleCreateStevoInstance}
               onCreateStevoOficial={handleCreateStevoOficialInstance}
+              onCreateEvolution={handleCreateEvolutionInstance}
               uazapEnabled={UAZAP_ENABLED}
             />
           </div>
@@ -824,7 +922,10 @@ const Integrations = () => {
               <p className="text-sm text-muted-foreground text-center">
                 Conecte seu WhatsApp para começar a receber e analisar mensagens automaticamente.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button onClick={handleCreateEvolutionInstance} disabled={creatingNew} variant="outline">
+                  Evolution API (QR Code)
+                </Button>
                 {UAZAP_ENABLED && (
                   <Button onClick={handleCreateUazapInstance} disabled={creatingNew} variant="outline">
                     Uazap (QR Code)

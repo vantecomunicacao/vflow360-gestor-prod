@@ -36,7 +36,9 @@ export default function DashboardSettings() {
 
   const [defaultPipelines, setDefaultPipelines] = useState<string[]>([]);
   const [stageMapping, setStageMapping] = useState<Record<string, string>>({}); // stageId -> bucket key
-  const [originField, setOriginField] = useState<string>("__source__");
+  const [utmSourceField, setUtmSourceField] = useState<string>("");
+  const [utmMediumField, setUtmMediumField] = useState<string>("");
+  const [utmCampaignField, setUtmCampaignField] = useState<string>("");
   const [additionalDateField, setAdditionalDateField] = useState<string>("");
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [chartFields, setChartFields] = useState<string[]>([]);
@@ -70,7 +72,9 @@ export default function DashboardSettings() {
       if (settings) {
         setDefaultPipelines(settings.default_pipeline_ids || []);
         setStageMapping((settings.funnel_stage_mapping as any) || {});
-        setOriginField(settings.origin_field_name || "__source__");
+        setUtmSourceField((settings as any).utm_source_field_id || "");
+        setUtmMediumField((settings as any).utm_medium_field_id || "");
+        setUtmCampaignField((settings as any).utm_campaign_field_id || "");
         setAdditionalDateField(settings.additional_date_field || "");
         setVisibleFields(settings.visible_custom_fields || []);
         setChartFields((settings as any).chart_custom_fields || []);
@@ -93,7 +97,9 @@ export default function DashboardSettings() {
         workspace_id: activeWorkspace.id,
         default_pipeline_ids: defaultPipelines,
         funnel_stage_mapping: stageMapping,
-        origin_field_name: originField,
+        utm_source_field_id: utmSourceField || null,
+        utm_medium_field_id: utmMediumField || null,
+        utm_campaign_field_id: utmCampaignField || null,
         additional_date_field: additionalDateField || null,
         visible_custom_fields: visibleFields,
         chart_custom_fields: chartFields.filter((id) => visibleFields.includes(id)),
@@ -310,22 +316,40 @@ export default function DashboardSettings() {
         </CardContent>
       </Card>
 
-      {/* Campo de origem */}
+      {/* Campos UTM */}
       <Card>
         <CardHeader>
-          <CardTitle>Campo de origem</CardTitle>
-          <CardDescription>De onde vem o dado de "origem" do lead nos gráficos</CardDescription>
+          <CardTitle>Campos UTM</CardTitle>
+          <CardDescription>
+            Mapeie quais custom fields do GHL correspondem aos parâmetros UTM. Os 3 alimentam o card "Origem dos leads" no dashboard.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Select value={originField} onValueChange={setOriginField}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__source__">Source padrão da Opportunity</SelectItem>
-              {customFields.map((f) => (
-                <SelectItem key={f.id} value={f.ghl_id}>{f.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <CardContent className="space-y-3">
+          {[
+            { key: "source", label: "UTM Source", value: utmSourceField, setter: setUtmSourceField, hint: "Plataforma (ex.: google, facebook, instagram)" },
+            { key: "medium", label: "UTM Medium", value: utmMediumField, setter: setUtmMediumField, hint: "Tipo de mídia (ex.: cpc, social, organic, email)" },
+            { key: "campaign", label: "UTM Campaign", value: utmCampaignField, setter: setUtmCampaignField, hint: "Campanha específica (ex.: black-friday, lançamento-x)" },
+          ].map((utm) => (
+            <div key={utm.key} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+              <div>
+                <Label className="text-sm font-medium">{utm.label}</Label>
+                <p className="text-xs text-muted-foreground">{utm.hint}</p>
+              </div>
+              <div className="md:col-span-2">
+                <Select value={utm.value || "__none__"} onValueChange={(v) => utm.setter(v === "__none__" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um campo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— não configurado —</SelectItem>
+                    {customFields
+                      .filter((f) => (f.model || "").toLowerCase() === "opportunity")
+                      .map((f) => (
+                        <SelectItem key={f.id} value={f.ghl_id}>{f.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
 

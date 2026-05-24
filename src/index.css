@@ -1,142 +1,200 @@
+/* Satoshi via Fontshare — fonte oficial do DS Vante */
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   /* ============================================================
-     DESIGN SYSTEM VANTE — tokens mapeados para a convenção shadcn
-     Marca: gradiente #FD2516 → #FD8E06 | acento laranja | Satoshi
-     Texto ESCURO sobre laranja chapado (contraste); BRANCO sobre o
-     gradiente (selo de marca). Verde só como semântica de sucesso.
+     DESIGN SYSTEM VANTE — tokens espelhados da skill vante-design
+     (~/.claude/skills/vante-design/colors_and_type.css)
+     Mapeados para os nomes que o shadcn/Tailwind esperam.
      ============================================================ */
   :root {
-    /* TEMA CLARO */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 5%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 5%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 5%;
-    --primary: 33 98% 51%;          /* laranja-700 #FD8E06 */
-    --primary-foreground: 0 0% 10%; /* texto escuro p/ contraste sobre laranja */
-    --primary-ink: 18 92% 36%;      /* laranja escurecido p/ TEXTO sobre fundos claros (AA) */
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 240 5% 96%;
+    /* ===== Escala laranja Vante (HSL p/ Tailwind) ===== */
+    --laranja-50:  14 100% 96%;
+    --laranja-100: 14 100% 91%;
+    --laranja-200: 14 100% 81%;
+    --laranja-300: 14 100% 72%;
+    --laranja-400: 11 99% 62%;
+    --laranja-500: 4 98% 54%;    /* #FD2516 — início do gradiente */
+    --laranja-600: 19 98% 53%;
+    --laranja-700: 33 98% 51%;   /* #FD8E06 — fim do gradiente, marca */
+    --laranja-800: 33 95% 39%;   /* #C56F05 — texto sobre fundo claro */
+    --laranja-900: 32 95% 27%;
+
+    /* ===== Escala neutra Vante (HSL) ===== */
+    --neutro-0:    0 0% 100%;
+    --neutro-50:   0 0% 98%;
+    --neutro-100:  240 5% 96%;
+    --neutro-200:  240 5% 91%;
+    --neutro-300:  240 5% 84%;
+    --neutro-400:  240 4% 65%;
+    --neutro-500:  0 0% 42%;
+    --neutro-600:  240 4% 33%;
+    --neutro-700:  240 5% 26%;
+    --neutro-800:  0 0% 11%;
+    --neutro-900:  0 0% 5%;
+
+    /* ============================================================
+       TEMA CLARO — aliases shadcn → tokens Vante
+       ============================================================ */
+    --background: var(--neutro-50);   /* #FAFAFA — off-white do DS, contrasta com cards brancos */
+    --foreground: var(--neutro-900);
+    --card: var(--neutro-0);
+    --card-foreground: var(--neutro-900);
+    --popover: var(--neutro-0);
+    --popover-foreground: var(--neutro-900);
+
+    /* Marca (superfícies) — usa laranja-700 puro */
+    --primary: var(--laranja-700);
+    --primary-foreground: var(--neutro-900);
+    /* Texto/ícone laranja sobre fundo neutro — laranja-800 (AA no claro) */
+    --primary-ink: var(--laranja-800);
+
+    --secondary: var(--neutro-100);
+    --secondary-foreground: var(--neutro-900);
+    --muted: var(--neutro-100);
     --muted-foreground: 0 0% 42%;
-    --accent: 28 100% 95%;          /* tint quente p/ hover/seleção */
-    --accent-foreground: 20 90% 25%;
-    --destructive: 0 72% 51%;       /* erro-base #DC2626 */
+    /* Tint quente p/ hover/seleção (acento-fraco do DS) */
+    --accent: var(--laranja-50);
+    --accent-foreground: var(--laranja-900);
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5% 91%;           /* neutro-200 #E8E8EA */
-    --input: 240 5% 91%;
-    --ring: 33 98% 51%;
-    --radius: 0.625rem;             /* 10px = --raio-md Vante */
+    --border: var(--neutro-200);
+    --input: var(--neutro-200);
+    --ring: var(--laranja-700);
+    --radius: 0.625rem;          /* 10px = --raio-md Vante */
 
-    /* Sidebar — escura em ambos os temas (superfícies neutras Vante) */
-    --sidebar-background: 0 0% 6%;
-    --sidebar-foreground: 0 0% 70%;
-    --sidebar-primary: 33 98% 51%;
-    --sidebar-primary-foreground: 0 0% 10%;
-    --sidebar-accent: 0 0% 12%;
-    --sidebar-accent-foreground: 0 0% 96%;
+    /* Sidebar — preta em ambos os temas (DS Vante: --neutro-900) */
+    --sidebar-background: var(--neutro-900);    /* #0D0D0D — preto da marca */
+    --sidebar-foreground: 0 0% 70%;              /* rgba(255,255,255,0.7) */
+    --sidebar-primary: var(--laranja-700);
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 14%;                  /* hover sutil — item ativo usa gradient via classe gradient-primary */
+    --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 0 0% 14%;
-    --sidebar-ring: 33 98% 51%;
+    --sidebar-ring: var(--laranja-700);
 
-    --success: 142 71% 36%;         /* sucesso-base #16A34A */
+    /* Semânticas (DS Vante) */
+    --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
-    --warning: 45 93% 47%;          /* aviso-base #EAB308 */
+    --warning: 45 93% 47%;
     --warning-foreground: 0 0% 10%;
-    --warning-ink: 32 95% 30%;      /* âmbar escurecido p/ TEXTO sobre fundos claros (AA) */
-    --info: 221 83% 53%;            /* info-base #2563EB */
+    --warning-ink: 35 80% 29%;     /* aviso-fg do DS — texto âmbar acessível */
+    --info: 221 83% 53%;
     --info-foreground: 0 0% 100%;
 
-    /* Funil — progressão monocromática de marca (laranja → vermelho) */
-    --funnel-1: 36 100% 60%;
-    --funnel-2: 28 98% 53%;
-    --funnel-3: 14 98% 52%;
-    --funnel-4: 4 90% 48%;
-    /* Variantes "ink" do funil — TEXTO acessível em fundos claros e sobre tints /10 */
-    --funnel-1-ink: 28 95% 36%;
-    --funnel-2-ink: 18 95% 38%;
-    --funnel-3-ink: 10 92% 40%;
-    --funnel-4-ink: 0 80% 42%;
+    /* Funil — progressão laranja → vermelho da marca */
+    --funnel-1: var(--laranja-300);
+    --funnel-2: var(--laranja-600);
+    --funnel-3: var(--laranja-500);
+    --funnel-4: var(--laranja-700);
+    /* Inks p/ texto sobre tints (acessível em ambos os temas) */
+    --funnel-1-ink: var(--laranja-800);
+    --funnel-2-ink: var(--laranja-800);
+    --funnel-3-ink: var(--laranja-800);
+    --funnel-4-ink: var(--laranja-900);
 
-    /* Gráficos — marca + cores de apoio distinguíveis */
-    --chart-1: 33 98% 51%;          /* laranja */
-    --chart-2: 4 98% 54%;           /* vermelho */
-    --chart-3: 45 93% 47%;          /* âmbar */
-    --chart-4: 221 83% 53%;         /* azul info */
-    --chart-5: 142 50% 45%;         /* verde */
+    /* Gráficos — marca + cores de apoio do DS */
+    --chart-1: var(--laranja-700);
+    --chart-2: var(--laranja-500);
+    --chart-3: 45 93% 47%;       /* âmbar (aviso-base) */
+    --chart-4: 221 83% 53%;      /* info-base */
+    --chart-5: 142 76% 36%;      /* sucesso-base */
 
-    --gradient-primary: linear-gradient(135deg, hsl(4 98% 54%), hsl(33 98% 51%));
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 98%));
-    --shadow-card: 0 2px 6px rgba(13, 13, 13, 0.08), 0 1px 2px rgba(13, 13, 13, 0.04);
-    --shadow-elevated: 0 8px 24px rgba(13, 13, 13, 0.10), 0 2px 6px rgba(13, 13, 13, 0.04);
+    /* Gradientes do DS */
+    --gradient-primary: linear-gradient(90deg, #FD2516 0%, #FD8E06 100%);
+    --gradient-primary-135: linear-gradient(135deg, #FD2516 0%, #FD8E06 100%);
+    --gradient-card: linear-gradient(180deg, hsl(var(--neutro-0)), hsl(var(--neutro-50)));
+
+    /* Sombras (DS Vante) */
+    --shadow-1: 0 1px 2px rgba(13, 13, 13, 0.06);
+    --shadow-2: 0 2px 6px rgba(13, 13, 13, 0.08), 0 1px 2px rgba(13, 13, 13, 0.04);
+    --shadow-3: 0 8px 24px rgba(13, 13, 13, 0.10), 0 2px 6px rgba(13, 13, 13, 0.04);
+    --shadow-4: 0 20px 48px rgba(13, 13, 13, 0.18), 0 4px 12px rgba(13, 13, 13, 0.06);
     --shadow-brand: 0 8px 24px rgba(253, 142, 6, 0.28);
+
+    /* Raios (DS Vante) */
+    --raio-xs: 4px;
+    --raio-sm: 6px;
+    --raio-md: 10px;
+    --raio-lg: 14px;
+    --raio-xl: 20px;
+    --raio-2xl: 28px;
   }
 
   .dark {
-    /* TEMA ESCURO (default do VFlow360) */
-    --background: 0 0% 4%;          /* #0A0A0A */
-    --foreground: 0 0% 96%;         /* #F5F5F5 */
-    --card: 0 0% 7%;                /* #131313 */
+    /* ============================================================
+       TEMA ESCURO (default do VFlow360)
+       ============================================================ */
+    --background: 0 0% 4%;           /* #0A0A0A — --fundo */
+    --foreground: 0 0% 96%;          /* #F5F5F5 — --texto */
+    --card: 0 0% 7%;                 /* #131313 — --superficie */
     --card-foreground: 0 0% 96%;
-    --popover: 0 0% 9%;             /* #161616 */
+    --popover: 0 0% 9%;              /* #161616 — --fundo-elevado */
     --popover-foreground: 0 0% 96%;
-    --primary: 33 98% 53%;          /* laranja de marca, levemente mais claro no dark */
-    --primary-foreground: 0 0% 10%;
-    --primary-ink: 33 100% 72%;     /* laranja clareado p/ TEXTO sobre fundos escuros e tints /10 (AA) */
-    --secondary: 0 0% 11%;          /* #1C1C1C */
+
+    /* Marca (superfícies) — mantém laranja-700; bg-primary mantém a marca */
+    --primary: var(--laranja-700);
+    --primary-foreground: var(--neutro-900);
+    /* Texto/ícone laranja sobre fundo escuro — laranja-300 (AA no escuro) */
+    --primary-ink: var(--laranja-300);
+
+    --secondary: 0 0% 11%;           /* #1C1C1C — --superficie-2 */
     --secondary-foreground: 0 0% 96%;
     --muted: 0 0% 11%;
-    --muted-foreground: 0 0% 54%;   /* #8A8A8A */
-    --accent: 18 55% 14%;           /* tint quente escuro p/ hover/seleção */
+    --muted-foreground: 0 0% 54%;    /* #8A8A8A — --texto-3 */
+    --accent: 18 55% 14%;            /* tint quente escuro */
     --accent-foreground: 0 0% 96%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 16%;             /* #2A2A2A */
+    --border: 0 0% 16%;              /* #2A2A2A — --borda */
     --input: 0 0% 16%;
-    --ring: 33 98% 53%;
+    --ring: var(--laranja-700);
 
     --sidebar-background: 0 0% 4%;
     --sidebar-foreground: 0 0% 62%;
-    --sidebar-primary: 33 98% 53%;
+    --sidebar-primary: var(--laranja-700);
     --sidebar-primary-foreground: 0 0% 10%;
     --sidebar-accent: 0 0% 11%;
     --sidebar-accent-foreground: 0 0% 96%;
     --sidebar-border: 0 0% 14%;
-    --sidebar-ring: 33 98% 53%;
+    --sidebar-ring: var(--laranja-700);
 
     --success: 142 65% 42%;
     --success-foreground: 0 0% 100%;
     --warning: 45 93% 52%;
     --warning-foreground: 0 0% 10%;
-    --warning-ink: 45 95% 70%;      /* âmbar clareado p/ TEXTO sobre fundos escuros (AA) */
+    --warning-ink: 48 96% 75%;       /* âmbar clareado p/ texto no dark */
     --info: 221 83% 60%;
     --info-foreground: 0 0% 100%;
 
-    /* Funil dark — mesma progressão de marca, mais luminosa */
-    --funnel-1: 36 100% 62%;
-    --funnel-2: 28 98% 56%;
-    --funnel-3: 14 98% 55%;
-    --funnel-4: 4 95% 56%;
-    /* Variantes "ink" — TEXTO acessível sobre fundos escuros e tints /10 */
-    --funnel-1-ink: 36 100% 76%;
-    --funnel-2-ink: 28 100% 73%;
-    --funnel-3-ink: 14 98% 70%;
-    --funnel-4-ink: 4 95% 72%;
+    /* Funil dark — usa mesma escala, com inks clareados */
+    --funnel-1: var(--laranja-300);
+    --funnel-2: var(--laranja-600);
+    --funnel-3: var(--laranja-500);
+    --funnel-4: var(--laranja-700);
+    --funnel-1-ink: var(--laranja-200);
+    --funnel-2-ink: var(--laranja-300);
+    --funnel-3-ink: var(--laranja-300);
+    --funnel-4-ink: var(--laranja-300);
 
-    --chart-1: 33 98% 55%;
-    --chart-2: 4 95% 58%;
+    --chart-1: var(--laranja-700);
+    --chart-2: var(--laranja-500);
     --chart-3: 45 93% 55%;
     --chart-4: 221 83% 62%;
-    --chart-5: 142 55% 50%;
+    --chart-5: 142 65% 50%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(4 98% 54%), hsl(33 98% 51%));
+    --gradient-primary: linear-gradient(90deg, #FD2516 0%, #FD8E06 100%);
+    --gradient-primary-135: linear-gradient(135deg, #FD2516 0%, #FD8E06 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 9%), hsl(0 0% 7%));
-    --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-4: 0 20px 48px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.5);
     --shadow-brand: 0 8px 24px rgba(253, 37, 22, 0.35);
   }
 }
@@ -149,16 +207,24 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "ss01";
   }
-  /* Tema escuro é o padrão do VFlow360 — classe `dark` aplicada no <html> (index.html) */
+  /* Tema escuro é o padrão do VFlow360 — classe `dark` aplicada no <html> */
 }
 
 @layer components {
-  /* Metric Cards */
+  /* Metric Cards — herda raio/sombra do DS */
   .metric-card {
-    @apply bg-card rounded-xl border border-border px-3.5 py-3 sm:px-4 sm:py-3 shadow-sm transition-all duration-200;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--raio-md);
+    padding: 0.875rem 1rem;
+    box-shadow: var(--shadow-1);
+    transition: box-shadow 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+                border-color 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+                transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .metric-card:hover {
-    @apply shadow-md border-border/80;
+    box-shadow: var(--shadow-2);
+    border-color: hsl(var(--border) / 0.7);
     transform: translateY(-1px);
   }
   .metric-value {
@@ -168,15 +234,25 @@
     @apply text-[10px] font-semibold text-muted-foreground uppercase tracking-wider;
   }
 
-  /* Dashboard Section */
+  /* Dashboard Section — card "elevado" do DS */
   .dashboard-section {
-    @apply bg-card rounded-xl lg:rounded-2xl border border-border p-4 sm:p-6 lg:p-7 shadow-sm;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--raio-lg);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-2);
+  }
+  @media (min-width: 640px) {
+    .dashboard-section { padding: 1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .dashboard-section { padding: 1.75rem; border-radius: var(--raio-xl); }
   }
   .section-title {
     @apply text-[15px] font-bold text-foreground mb-5 flex items-center gap-2.5;
   }
 
-  /* Data Quality Indicators */
+  /* Data Quality Indicators (badges semânticas do DS) */
   .quality-good {
     @apply bg-success/10 text-success border-success/20;
   }
@@ -188,9 +264,7 @@
   }
 
   /* Table Styles */
-  .data-table {
-    @apply w-full text-sm;
-  }
+  .data-table { @apply w-full text-sm; }
   .data-table th {
     @apply text-left text-[11px] font-bold text-muted-foreground uppercase tracking-widest py-3.5 px-5 border-b border-border;
   }
@@ -202,34 +276,28 @@
   }
 
   /* Custom scrollbar */
-  .custom-scrollbar::-webkit-scrollbar {
-    @apply w-1.5;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-transparent rounded-full;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/15 rounded-full;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/25;
-  }
+  .custom-scrollbar::-webkit-scrollbar { @apply w-1.5; }
+  .custom-scrollbar::-webkit-scrollbar-track { @apply bg-transparent rounded-full; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-muted-foreground/15 rounded-full; }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/25; }
 }
 
 @layer utilities {
   .glass-card {
-    @apply bg-card border border-border rounded-lg;
-    box-shadow: var(--shadow-card);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--raio-md);
+    box-shadow: var(--shadow-2);
   }
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
+  .gradient-primary { background: var(--gradient-primary); }
+  .gradient-primary-135 { background: var(--gradient-primary-135); }
   .text-gradient {
     background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  .shadow-brand { box-shadow: var(--shadow-brand); }
 
   .animate-slide-up {
     animation: slideUp 0.4s ease-out forwards;

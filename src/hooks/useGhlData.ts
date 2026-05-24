@@ -65,6 +65,18 @@ export interface DashboardData {
   origemFillRate: number;
   wonOrigemDistribution: LeadOrigin[];
   wonOrigemFillRate: number;
+  utmSourceDistribution: LeadOrigin[];
+  utmSourceFillRate: number;
+  utmSourceValues: string[];
+  utmMediumDistribution: LeadOrigin[];
+  utmMediumFillRate: number;
+  utmMediumValues: string[];
+  utmCampaignDistribution: LeadOrigin[];
+  utmCampaignFillRate: number;
+  utmCampaignValues: string[];
+  wonUtmSourceDistribution: LeadOrigin[];
+  wonUtmSourceFillRate: number;
+  utmConfigured: { source: boolean; medium: boolean; campaign: boolean };
   customFields: CustomField[];
   customFieldDistributions?: CustomFieldDistribution[];
   averageTimePerStage: AverageTimePerStage;
@@ -88,7 +100,8 @@ export interface DashboardFilters {
   pipelineId: string | null;
   stageId: string | null;
   sellerId: string | null;
-  sourceOrigin: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
   workspaceId: string | null;
   additionalStartDate?: Date | null;
   additionalEndDate?: Date | null;
@@ -154,7 +167,8 @@ export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
           pipelineId: filters.pipelineId,
           stageId: filters.stageId,
           sellerId: filters.sellerId,
-          sourceOrigin: filters.sourceOrigin,
+          utmMedium: filters.utmMedium,
+          utmCampaign: filters.utmCampaign,
           additionalStartDate: filters.additionalStartDate ? filters.additionalStartDate.toISOString() : null,
           additionalEndDate: filters.additionalEndDate ? filters.additionalEndDate.toISOString() : null,
         },
@@ -175,7 +189,7 @@ export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.startDate.getTime(), filters.endDate.getTime(),
-    filters.pipelineId, filters.stageId, filters.sellerId, filters.sourceOrigin, filters.workspaceId,
+    filters.pipelineId, filters.stageId, filters.sellerId, filters.utmMedium, filters.utmCampaign, filters.workspaceId,
     filters.additionalStartDate?.getTime(), filters.additionalEndDate?.getTime(),
   ]);
 

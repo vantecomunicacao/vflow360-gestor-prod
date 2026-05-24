@@ -31,7 +31,7 @@ Deno.test("resolveAiModel: OpenAI with null model falls back to gpt-4o-mini", ()
 });
 
 Deno.test("resolveAiModel: global key (no user provider) uses gpt-4o-mini", () => {
-  const result = resolveAiModel({ provider: "lovable", api_key: undefined, model: undefined });
+  const result = resolveAiModel({ provider: "other", api_key: undefined, model: undefined });
   assertEquals(result.useOpenAI, false);
   assertEquals(result.model, "gpt-4o-mini");
   assertEquals(result.providerLabel, "openai");

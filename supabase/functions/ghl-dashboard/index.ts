@@ -116,6 +116,8 @@ serve(async (req) => {
     const filterStageId: string | null = payload.stageId || null;
     const filterUserId: string | null = payload.sellerId || null;
     const filterOrigin: string | null = payload.sourceOrigin || null;
+    const filterUtmMedium: string | null = payload.utmMedium || null;
+    const filterUtmCampaign: string | null = payload.utmCampaign || null;
     const additionalStartDate: string | null = payload.additionalStartDate || null;
     const additionalEndDate: string | null = payload.additionalEndDate || null;
 
@@ -200,6 +202,10 @@ serve(async (req) => {
 
     // Origin field name from settings (fallback "source")
     const originFieldName: string | null = settings?.origin_field_name || null;
+    // UTM custom fields mapeados nas configurações (ghl_id, field_key ou name)
+    const utmSourceFieldId: string | null = settings?.utm_source_field_id || null;
+    const utmMediumFieldId: string | null = settings?.utm_medium_field_id || null;
+    const utmCampaignFieldId: string | null = settings?.utm_campaign_field_id || null;
 
     // ===== Query opportunities com filtros =====
     let q = supabase
@@ -280,8 +286,25 @@ serve(async (req) => {
       return o.source || null;
     };
 
+    // Lê o valor de um custom field UTM por id (aceita ghl_id, field_key ou name)
+    const getUtm = (o: any, fieldId: string | null): string | null => {
+      if (!fieldId) return null;
+      const def = customFieldDefs.find(d =>
+        d.ghl_id === fieldId || d.field_key === fieldId || d.name === fieldId
+      );
+      const keys = def ? [def.ghl_id, def.field_key, def.name, fieldId] : [fieldId];
+      const v = extractCfValue(o.custom_fields, keys);
+      return cfValueToString(v);
+    };
+
     if (filterOrigin) {
       opps = opps.filter(o => getOrigin(o) === filterOrigin);
+    }
+    if (filterUtmMedium && utmMediumFieldId) {
+      opps = opps.filter(o => getUtm(o, utmMediumFieldId) === filterUtmMedium);
+    }
+    if (filterUtmCampaign && utmCampaignFieldId) {
+      opps = opps.filter(o => getUtm(o, utmCampaignFieldId) === filterUtmCampaign);
     }
 
     // Quando não há filtro de pipeline, restringe aos pipelines ativos (default_pipeline_ids ou todos)
@@ -435,6 +458,55 @@ serve(async (req) => {
       .map(([name, count]) => ({ name, count, percentage: safeRate(count, wonOriginsFilled) }))
       .sort((a, b) => b.count - a.count);
     const wonOrigemFillRate = safeRate(wonOriginsFilled, wonOpps.length);
+
+    // ===== UTM distributions (source / medium / campaign) =====
+    // Para cada dimensão UTM: distribuição (donut) + fill rate + lista de valores únicos (filtros).
+    const buildUtmDistribution = (fieldId: string | null) => {
+      if (!fieldId) return { distribution: [] as Array<{ name: string; count: number; percentage: number }>, fillRate: 0, values: [] as string[] };
+      const counts = new Map<string, number>();
+      let filled = 0;
+      for (const o of opps) {
+        const v = getUtm(o, fieldId);
+        if (v) {
+          filled++;
+          counts.set(v, (counts.get(v) || 0) + 1);
+        }
+      }
+      const distribution = Array.from(counts.entries())
+        .map(([name, count]) => ({ name, count, percentage: safeRate(count, filled) }))
+        .sort((a, b) => b.count - a.count);
+      return {
+        distribution,
+        fillRate: safeRate(filled, totalLeads),
+        values: distribution.map(d => d.name),
+      };
+    };
+
+    const utmSource = buildUtmDistribution(utmSourceFieldId);
+    const utmMedium = buildUtmDistribution(utmMediumFieldId);
+    const utmCampaign = buildUtmDistribution(utmCampaignFieldId);
+
+    // Won leads por UTM Source — pra card "Origem das vendas"
+    const buildWonUtmSource = () => {
+      if (!utmSourceFieldId) return { distribution: [] as Array<{ name: string; count: number; percentage: number }>, fillRate: 0 };
+      const counts = new Map<string, number>();
+      let filled = 0;
+      for (const o of wonOpps) {
+        const v = getUtm(o, utmSourceFieldId);
+        if (v) {
+          filled++;
+          counts.set(v, (counts.get(v) || 0) + 1);
+        }
+      }
+      const distribution = Array.from(counts.entries())
+        .map(([name, count]) => ({ name, count, percentage: safeRate(count, filled) }))
+        .sort((a, b) => b.count - a.count);
+      return {
+        distribution,
+        fillRate: safeRate(filled, wonOpps.length),
+      };
+    };
+    const wonUtmSource = buildWonUtmSource();
 
     // ===== Custom fields fill rate =====
     // visible_custom_fields pode conter ghl_id, field_key ou name (legado)
@@ -740,6 +812,22 @@ serve(async (req) => {
       origemFillRate,
       wonOrigemDistribution,
       wonOrigemFillRate,
+      utmSourceDistribution: utmSource.distribution,
+      utmSourceFillRate: utmSource.fillRate,
+      utmSourceValues: utmSource.values,
+      utmMediumDistribution: utmMedium.distribution,
+      utmMediumFillRate: utmMedium.fillRate,
+      utmMediumValues: utmMedium.values,
+      utmCampaignDistribution: utmCampaign.distribution,
+      utmCampaignFillRate: utmCampaign.fillRate,
+      utmCampaignValues: utmCampaign.values,
+      wonUtmSourceDistribution: wonUtmSource.distribution,
+      wonUtmSourceFillRate: wonUtmSource.fillRate,
+      utmConfigured: {
+        source: !!utmSourceFieldId,
+        medium: !!utmMediumFieldId,
+        campaign: !!utmCampaignFieldId,
+      },
       customFields,
       customFieldDistributions,
       averageTimePerStage,

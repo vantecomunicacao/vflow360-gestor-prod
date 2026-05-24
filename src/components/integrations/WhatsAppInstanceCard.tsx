@@ -63,7 +63,13 @@ const statusBadge = (status: WhatsAppStatus) => {
 };
 
 const providerLabel = (p: WhatsAppInstance["provider"]) =>
-  p === "uazap" ? "Uazap" : p === "stevo" ? "Stevo" : "Stevo Oficial";
+  p === "uazap"
+    ? "Uazap"
+    : p === "evolution"
+      ? "Evolution"
+      : p === "stevo"
+        ? "Stevo"
+        : "Stevo Oficial";
 
 export const WhatsAppInstanceCard = ({
   inst,
@@ -117,7 +123,7 @@ export const WhatsAppInstanceCard = ({
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          {inst.provider === "uazap" && statusBadge(inst.status)}
+          {(inst.provider === "uazap" || inst.provider === "evolution") && statusBadge(inst.status)}
           {(inst.provider === "stevo" || inst.provider === "stevo_oficial") &&
             (inst.lastWebhookAt ? (
               <Badge variant="outline" className="text-success border-success/30">
@@ -159,8 +165,8 @@ export const WhatsAppInstanceCard = ({
         </Select>
       </div>
 
-      {/* Uazap-specific UI */}
-      {inst.provider === "uazap" && inst.status === "connecting" && (
+      {/* Uazap & Evolution share the same QR/status UI */}
+      {(inst.provider === "uazap" || inst.provider === "evolution") && inst.status === "connecting" && (
         <div className="bg-muted rounded-lg p-4 flex flex-col items-center gap-3">
           {inst.qrCode ? (
             <>
@@ -188,7 +194,7 @@ export const WhatsAppInstanceCard = ({
         </div>
       )}
 
-      {inst.provider === "uazap" && inst.status === "disconnected" && (
+      {(inst.provider === "uazap" || inst.provider === "evolution") && inst.status === "disconnected" && (
         <div className="bg-muted rounded-lg p-3 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">Instância desconectada</p>
           <Button size="sm" variant="outline" onClick={() => onReconnect(inst)} disabled={inst.loading}>
@@ -198,7 +204,7 @@ export const WhatsAppInstanceCard = ({
         </div>
       )}
 
-      {inst.provider === "uazap" && inst.status === "connected" && (
+      {(inst.provider === "uazap" || inst.provider === "evolution") && inst.status === "connected" && (
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => onReconnect(inst)} disabled={inst.loading}>
             <RefreshCw className="w-3 h-3 mr-1" /> Reconectar

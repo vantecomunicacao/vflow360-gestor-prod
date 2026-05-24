@@ -1,8 +1,41 @@
 // Centralized error reporter — sends errors to n8n webhook AND persists in DB.
+import { toast } from "sonner";
+
 const WEBHOOK_URL = "https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable";
 const LOG_EVENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/log-event`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const PROJECT = "VFlowGHL";
+
+const CHUNK_LOAD_PATTERNS = [
+  /failed to fetch dynamically imported module/i,
+  /loading chunk \S+ failed/i,
+  /chunkloaderror/i,
+  /error loading dynamically imported module/i,
+  /importing a module script failed/i,
+];
+
+function isChunkLoadError(message: string | undefined | null): boolean {
+  if (!message) return false;
+  return CHUNK_LOAD_PATTERNS.some((p) => p.test(message));
+}
+
+let staleVersionToastShown = false;
+
+function notifyStaleVersion() {
+  if (staleVersionToastShown) return;
+  staleVersionToastShown = true;
+  toast.info("Nova versão disponível", {
+    description: "Atualize a página para carregar a versão mais recente.",
+    duration: Infinity,
+    action: {
+      label: "Atualizar agora",
+      onClick: () => window.location.reload(),
+    },
+    onDismiss: () => {
+      staleVersionToastShown = false;
+    },
+  });
+}
 
 type ReportPayload = {
   level?: "error" | "warning" | "info";
@@ -73,9 +106,14 @@ export function installGlobalErrorReporter() {
 
   window.addEventListener("error", (event) => {
     const err = event.error as Error | undefined;
+    const message = err?.message || event.message || "Unknown error";
+    if (isChunkLoadError(message)) {
+      notifyStaleVersion();
+      return;
+    }
     void reportError({
       source: "frontend:window.onerror",
-      message: err?.message || event.message || "Unknown error",
+      message,
       stack: err?.stack,
       context: {
         filename: event.filename,
@@ -91,6 +129,10 @@ export function installGlobalErrorReporter() {
       typeof reason === "string"
         ? reason
         : reason?.message || JSON.stringify(reason ?? "unhandledrejection");
+    if (isChunkLoadError(message)) {
+      notifyStaleVersion();
+      return;
+    }
     void reportError({
       source: "frontend:unhandledrejection",
       message,

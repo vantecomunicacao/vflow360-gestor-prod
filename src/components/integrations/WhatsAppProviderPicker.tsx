@@ -8,6 +8,7 @@ interface Props {
   onCreateUazap: () => void;
   onCreateStevo: () => void;
   onCreateStevoOficial: () => void;
+  onCreateEvolution: () => void;
   /** Uazap desabilitado por enquanto (estava gerando muitos erros). */
   uazapEnabled?: boolean;
 }
@@ -19,6 +20,7 @@ export const WhatsAppProviderPicker = ({
   onCreateUazap,
   onCreateStevo,
   onCreateStevoOficial,
+  onCreateEvolution,
   uazapEnabled = false,
 }: Props) => {
   return (
@@ -36,9 +38,16 @@ export const WhatsAppProviderPicker = ({
       </Button>
       {open && (
         <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-10 w-56">
+          <button
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-t-lg"
+            onClick={onCreateEvolution}
+          >
+            <span className="font-medium text-foreground">Evolution API</span>
+            <p className="text-xs text-muted-foreground">Conexão via QR Code</p>
+          </button>
           {uazapEnabled && (
             <button
-              className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors rounded-t-lg"
+              className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors border-t border-border"
               onClick={onCreateUazap}
             >
               <span className="font-medium text-foreground">Uazap</span>
@@ -46,7 +55,7 @@ export const WhatsAppProviderPicker = ({
             </button>
           )}
           <button
-            className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors border-t border-border first:border-t-0 first:rounded-t-lg"
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors border-t border-border"
             onClick={onCreateStevo}
           >
             <span className="font-medium text-foreground">Stevo</span>

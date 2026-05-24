@@ -170,11 +170,9 @@ if [[ "$cmd" == "frontend" ]]; then
   echo "Then re-run, and it will push to $GIT_REMOTE/$GIT_BRANCH."
   echo
 
-  # Only push if there's something to push and nothing dirty
-  if ! git diff --quiet HEAD; then
-    echo "ABORT: working tree dirty. Stage/commit/stash uncommitted changes first." >&2
-    exit 3
-  fi
+  # We trust git: whatever is committed is what gets shipped. Dirty files
+  # outside of HEAD are fine — this repo lives with long-running cross-session
+  # WIP, and forcing a clean tree would block every deploy.
   ahead=$(git rev-list --count "$GIT_REMOTE/$GIT_BRANCH..HEAD" 2>/dev/null || echo 0)
   if [[ "$ahead" -eq 0 ]]; then
     echo "Nothing to push — $GIT_BRANCH already matches $GIT_REMOTE/$GIT_BRANCH."

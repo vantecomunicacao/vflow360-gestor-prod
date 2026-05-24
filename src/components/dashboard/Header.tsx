@@ -1,4 +1,4 @@
-import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Globe, Layers, X, SlidersHorizontal } from "lucide-react";
+import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Layers, X, SlidersHorizontal, Megaphone, Target } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -22,15 +22,18 @@ interface HeaderProps {
   isLoading?: boolean;
   pipelines: Pipeline[];
   users: User[];
-  origins: string[];
   selectedPipelineId: string | null;
   selectedStageId?: string | null;
   selectedSellerId: string | null;
-  selectedOrigin: string | null;
+  utmMediumValues?: string[];
+  utmCampaignValues?: string[];
+  selectedUtmMedium?: string | null;
+  selectedUtmCampaign?: string | null;
   onPipelineChange: (id: string | null) => void;
   onStageChange?: (id: string | null) => void;
   onSellerChange: (id: string | null) => void;
-  onOriginChange: (o: string | null) => void;
+  onUtmMediumChange?: (v: string | null) => void;
+  onUtmCampaignChange?: (v: string | null) => void;
   cachedAt?: string | null;
   additionalDateRange?: DateRange | undefined;
   onAdditionalDateRangeChange?: (r: DateRange | undefined) => void;
@@ -172,15 +175,19 @@ function FilterSelect({
 
 export function Header({
   dateRange, onDateRangeChange, onRefresh, isLoading,
-  pipelines, users, origins,
-  selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin,
-  onPipelineChange, onStageChange, onSellerChange, onOriginChange, cachedAt,
+  pipelines, users,
+  selectedPipelineId, selectedStageId, selectedSellerId,
+  utmMediumValues = [], utmCampaignValues = [],
+  selectedUtmMedium = null, selectedUtmCampaign = null,
+  onPipelineChange, onStageChange, onSellerChange,
+  onUtmMediumChange, onUtmCampaignChange,
+  cachedAt,
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { permissions } = usePermissions();
   const hasAdditionalRange = !!additionalDateRange?.from;
-  const activeFilterCount = [selectedPipelineId, selectedStageId, selectedSellerId, selectedOrigin, hasAdditionalRange].filter(Boolean).length;
+  const activeFilterCount = [selectedPipelineId, selectedStageId, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const stages = selectedPipeline?.stages || [];
@@ -189,7 +196,8 @@ export function Header({
     onPipelineChange(null);
     onStageChange?.(null);
     onSellerChange(null);
-    onOriginChange(null);
+    onUtmMediumChange?.(null);
+    onUtmCampaignChange?.(null);
     onAdditionalDateRangeChange?.(undefined);
   };
 
@@ -242,15 +250,29 @@ export function Header({
         />
       </Field>
 
-      <Field label="Origem">
-        <FilterSelect
-          value={selectedOrigin}
-          onChange={onOriginChange}
-          placeholder="Origem"
-          icon={Globe}
-          options={origins.map((o) => ({ id: o, name: o }))}
-        />
-      </Field>
+      {onUtmMediumChange && utmMediumValues.length > 0 && (
+        <Field label="Tipo de origem">
+          <FilterSelect
+            value={selectedUtmMedium}
+            onChange={onUtmMediumChange}
+            placeholder="Tipo"
+            icon={Megaphone}
+            options={utmMediumValues.map((v) => ({ id: v, name: v }))}
+          />
+        </Field>
+      )}
+
+      {onUtmCampaignChange && utmCampaignValues.length > 0 && (
+        <Field label="Campanha">
+          <FilterSelect
+            value={selectedUtmCampaign}
+            onChange={onUtmCampaignChange}
+            placeholder="Campanha"
+            icon={Target}
+            options={utmCampaignValues.map((v) => ({ id: v, name: v }))}
+          />
+        </Field>
+      )}
 
       {showAdditional && (
         <>

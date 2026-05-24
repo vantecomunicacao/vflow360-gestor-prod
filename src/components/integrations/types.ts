@@ -23,7 +23,7 @@ export interface GhlPipelineStage {
 }
 
 export type WhatsAppStatus = "not_created" | "disconnected" | "connecting" | "connected";
-export type WhatsAppProvider = "uazap" | "stevo" | "stevo_oficial";
+export type WhatsAppProvider = "uazap" | "stevo" | "stevo_oficial" | "evolution";
 
 export interface WhatsAppInstance {
   id: string;
