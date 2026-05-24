@@ -249,7 +249,7 @@ export default function Dashboard() {
           />
         </div>
         <div className="lg:col-span-1">
-          <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
+          <AIInsights />
         </div>
       </AnimatedSection>
 
@@ -273,7 +273,7 @@ export default function Dashboard() {
           totalWon={data.funnelStages.find((s) => s.id === "venda_ganha")?.count || 0}
           configured={data.utmConfigured?.source || false}
         />
-        <AIInsights />
+        <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
       </AnimatedSection>
 
       <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
