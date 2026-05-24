@@ -93,7 +93,6 @@ const App = () => (
                   <Route path="workspace" element={lazyRoute(<Workspaces />, <GenericPageSkeleton />)} />
                   <Route path="ai" element={lazyRoute(<AiSettings />, <GenericPageSkeleton />)} />
                   <Route path="dashboard" element={lazyRoute(<DashboardSettings />, <GenericPageSkeleton />)} />
-                  <Route path="integrations" element={lazyRoute(<Integrations />, <GenericPageSkeleton />)} />
                 </Route>
                 <Route path="/workspaces" element={<Navigate to="/settings/workspace" replace />} />
                 <Route path="/admin" element={lazyRoute(<Admin />, <GenericPageSkeleton />)} />

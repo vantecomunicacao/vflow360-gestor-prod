@@ -36,7 +36,6 @@ export function AppSidebar() {
     { title: "Conversas", url: "/conversations", icon: MessageSquare, show: true },
     { title: "Sugestões IA", url: "/suggestions", icon: Sparkles, show: viewSuggestions },
     { title: "Integrações", url: "/integrations", icon: Plug, show: viewIntegrations },
-    { title: "Configurações", url: "/settings", icon: Settings, show: viewSettings, end: false },
     { title: "Documentação", url: "/docs", icon: BookOpen, show: true },
     { title: "Admin", url: "/admin", icon: ShieldCheck, show: isAdmin },
     { title: "Logs", url: "/admin/logs", icon: ScrollText, show: isAdmin },
@@ -94,6 +93,21 @@ export function AppSidebar() {
           <ThemeToggle placement="inline" />
         </div>
         <SidebarMenu>
+          {viewSettings && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <NavLink
+                  to="/settings"
+                  end={false}
+                  className="flex items-center gap-3 px-3 py-2 rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                  activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                >
+                  <Settings className="w-5 h-5 shrink-0" />
+                  {!collapsed && <span>Configurações</span>}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={handleSignOut}

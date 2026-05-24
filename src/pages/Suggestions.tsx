@@ -206,21 +206,29 @@ const Suggestions = () => {
 
   const toggleContactAI = async (phone: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!phone) return;
+    if (!phone || !activeWorkspace) return;
     const isDisabled = disabledContacts.has(phone);
     try {
       if (isDisabled) {
-        await supabase.from("disabled_contacts").delete().eq("contact_phone", phone);
+        await supabase
+          .from("disabled_contacts")
+          .delete()
+          .eq("contact_phone", phone)
+          .eq("workspace_id", activeWorkspace.id);
         setDisabledContacts(prev => { const next = new Set(prev); next.delete(phone); return next; });
         toast({ title: "IA ativada", description: "A IA voltará a analisar este contato." });
       } else {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        await supabase.from("disabled_contacts").insert({ user_id: user.id, contact_phone: phone });
+        await supabase.from("disabled_contacts").insert({
+          user_id: user.id,
+          contact_phone: phone,
+          workspace_id: activeWorkspace.id,
+        });
         setDisabledContacts(prev => new Set(prev).add(phone));
         toast({ title: "IA desativada", description: "A IA não analisará mais este contato." });
       }
-      queryClient.invalidateQueries({ queryKey: ["disabled_contacts", activeWorkspace?.id] });
+      queryClient.invalidateQueries({ queryKey: ["disabled_contacts", activeWorkspace.id] });
     } catch {
       toast({ title: "Erro", description: "Não foi possível alterar a configuração.", variant: "destructive" });
     }

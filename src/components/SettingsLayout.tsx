@@ -1,13 +1,12 @@
 import { Outlet } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
-import { User, Building2, Brain, SlidersHorizontal, Plug } from "lucide-react";
+import { User, Building2, Brain, SlidersHorizontal } from "lucide-react";
 
 const tabs = [
   { to: "/settings/account", label: "Minha Conta", icon: User },
   { to: "/settings/workspace", label: "Workspace", icon: Building2 },
   { to: "/settings/ai", label: "IA", icon: Brain },
   { to: "/settings/dashboard", label: "Dashboard", icon: SlidersHorizontal },
-  { to: "/settings/integrations", label: "Integrações", icon: Plug },
 ];
 
 export default function SettingsLayout() {

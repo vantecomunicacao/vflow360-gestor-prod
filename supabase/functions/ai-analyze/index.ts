@@ -116,12 +116,13 @@ serve(async (req) => {
       }
     }
 
-    // 2b. Check if this contact is disabled for AI analysis
-    if (conversation?.contact_phone) {
+    // 2b. Check if this contact is disabled for AI analysis (per-workspace)
+    if (conversation?.contact_phone && conversation?.workspace_id) {
       const { data: disabledEntry } = await supabase
         .from("disabled_contacts")
         .select("id")
         .eq("user_id", resolvedUserId)
+        .eq("workspace_id", conversation.workspace_id)
         .eq("contact_phone", conversation.contact_phone)
         .maybeSingle();
 
