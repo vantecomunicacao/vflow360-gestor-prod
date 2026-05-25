@@ -80,44 +80,43 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     fetchWorkspaces();
   }, [fetchWorkspaces]);
 
-  const setActiveWorkspaceId = (id: string) => {
+  const setActiveWorkspaceId = useCallback((id: string) => {
     setActiveId(id);
     localStorage.setItem(ACTIVE_WS_KEY, id);
-  };
+  }, []);
 
-  const createWorkspace = async (name: string): Promise<Workspace> => {
+  const createWorkspace = useCallback(async (name: string): Promise<Workspace> => {
     if (!user) throw new Error("Not authenticated");
-    
+
     const { data: workspaceId, error: rpcError } = await supabase
       .rpc("create_workspace", { _name: name });
-    
+
     if (rpcError) throw rpcError;
 
-    // Fetch the created workspace
     const { data, error } = await supabase
       .from("workspaces")
       .select("*")
       .eq("id", workspaceId)
       .single();
-    
+
     if (error) throw error;
 
     const ws = data as Workspace;
     setWorkspaces(prev => [...prev, ws]);
     setActiveWorkspaceId(ws.id);
     return ws;
-  };
+  }, [user, setActiveWorkspaceId]);
 
-  const renameWorkspace = async (id: string, name: string) => {
+  const renameWorkspace = useCallback(async (id: string, name: string) => {
     const { error } = await supabase
       .from("workspaces")
       .update({ name })
       .eq("id", id);
     if (error) throw error;
     setWorkspaces(prev => prev.map(w => w.id === id ? { ...w, name } : w));
-  };
+  }, []);
 
-  const deleteWorkspace = async (id: string) => {
+  const deleteWorkspace = useCallback(async (id: string) => {
     if (workspaces.length <= 1) throw new Error("Não é possível excluir o único workspace");
     // Soft delete: vai para a lixeira (expurgo automático em 30 dias via pg_cron).
     const { error } = await supabase
@@ -132,9 +131,9 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       }
       return remaining;
     });
-  };
+  }, [workspaces.length, activeId, setActiveWorkspaceId]);
 
-  const restoreWorkspace = async (id: string) => {
+  const restoreWorkspace = useCallback(async (id: string) => {
     const { data, error } = await supabase
       .from("workspaces")
       .update({ deleted_at: null })
@@ -148,9 +147,9 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         ? prev
         : [...prev, ws].sort((a, b) => a.created_at.localeCompare(b.created_at))
     );
-  };
+  }, []);
 
-  const listTrashedWorkspaces = async (): Promise<Workspace[]> => {
+  const listTrashedWorkspaces = useCallback(async (): Promise<Workspace[]> => {
     const { data, error } = await supabase
       .from("workspaces")
       .select("*")
@@ -158,9 +157,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       .order("deleted_at", { ascending: false });
     if (error) throw error;
     return (data || []) as Workspace[];
-  };
+  }, []);
 
-  // Stable reference: only recompute when id or workspaces actually change
   const activeWorkspace = useMemo(
     () => workspaces.find(w => w.id === activeId) || null,
     [workspaces, activeId]
@@ -178,7 +176,17 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       listTrashedWorkspaces,
       loading,
     }),
-    [workspaces, activeWorkspace, loading]
+    [
+      workspaces,
+      activeWorkspace,
+      loading,
+      setActiveWorkspaceId,
+      createWorkspace,
+      renameWorkspace,
+      deleteWorkspace,
+      restoreWorkspace,
+      listTrashedWorkspaces,
+    ]
   );
 
   return (
