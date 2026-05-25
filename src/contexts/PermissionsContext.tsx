@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "./AuthContext";
 
 export interface Permissions {
   viewSuggestions: boolean;
@@ -16,7 +16,19 @@ const DEFAULT: Permissions = {
   isAdmin: false,
 };
 
-export function usePermissions() {
+interface PermissionsContextType {
+  permissions: Permissions;
+  loading: boolean;
+}
+
+const PermissionsContext = createContext<PermissionsContextType>({
+  permissions: DEFAULT,
+  loading: true,
+});
+
+export const usePermissions = () => useContext(PermissionsContext);
+
+export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [permissions, setPermissions] = useState<Permissions>(DEFAULT);
   const [loading, setLoading] = useState(true);
@@ -49,5 +61,7 @@ export function usePermissions() {
     };
   }, [user]);
 
-  return { permissions, loading };
-}
+  const value = useMemo(() => ({ permissions, loading }), [permissions, loading]);
+
+  return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>;
+};

@@ -3,7 +3,7 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,

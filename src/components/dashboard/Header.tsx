@@ -2,7 +2,7 @@ import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Layers,
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

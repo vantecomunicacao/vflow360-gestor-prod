@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
+import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionGuard from "@/components/PermissionGuard";
 import AppLayout from "./components/AppLayout";
@@ -62,8 +63,9 @@ const App = () => (
       <ThemeToggle />
       <BrowserRouter>
         <AuthProvider>
-          <WorkspaceProvider>
-            <Routes>
+          <PermissionsProvider>
+            <WorkspaceProvider>
+              <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -100,8 +102,9 @@ const App = () => (
                 <Route path="/docs" element={lazyRoute(<Documentation />, <GenericPageSkeleton />)} />
               </Route>
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </WorkspaceProvider>
+              </Routes>
+            </WorkspaceProvider>
+          </PermissionsProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

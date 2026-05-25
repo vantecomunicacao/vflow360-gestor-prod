@@ -1,5 +1,5 @@
 import { Navigate } from "react-router-dom";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Loader2 } from "lucide-react";
 
 type PermKey = "viewSuggestions" | "viewIntegrations" | "viewSettings";
