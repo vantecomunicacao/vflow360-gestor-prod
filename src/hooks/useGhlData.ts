@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -107,6 +108,11 @@ export interface DashboardFilters {
   additionalEndDate?: Date | null;
 }
 
+interface UseGhlDataOptions {
+  /** Defaults true. Pass false to hold the fetch (eg. wait for the primary query). */
+  enabled?: boolean;
+}
+
 interface UseGhlDataReturn {
   data: DashboardData | null;
   isLoading: boolean;
@@ -115,50 +121,44 @@ interface UseGhlDataReturn {
   cachedAt: string | null;
 }
 
-export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [cachedAt, setCachedAt] = useState<string | null>(null);
+const COOLDOWN_MS = 2 * 60 * 1000;
+
+export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions = {}): UseGhlDataReturn {
+  const { enabled = true } = options;
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const fetchData = useCallback(async (forceRefresh = false) => {
-    if (!filters.workspaceId) {
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      if (forceRefresh) {
-        // Cooldown client-side de 2min para sync manual por workspace
-        const ckey = `ghl-sync-last:${filters.workspaceId}`;
-        const lastStr = localStorage.getItem(ckey);
-        const last = lastStr ? Number(lastStr) : 0;
-        const elapsed = Date.now() - last;
-        const COOLDOWN = 2 * 60 * 1000;
-        if (last && elapsed < COOLDOWN) {
-          const wait = Math.ceil((COOLDOWN - elapsed) / 1000);
-          toast({
-            title: "Aguarde para sincronizar novamente",
-            description: `Você pode sincronizar novamente em ${wait}s.`,
-          });
-          setIsLoading(false);
-          return;
-        }
-        localStorage.setItem(ckey, String(Date.now()));
+  const queryKey = useMemo(
+    () => [
+      "ghl-dashboard",
+      filters.workspaceId,
+      filters.startDate.getTime(),
+      filters.endDate.getTime(),
+      filters.pipelineId,
+      filters.stageId,
+      filters.sellerId,
+      filters.utmMedium,
+      filters.utmCampaign,
+      filters.additionalStartDate?.getTime() ?? null,
+      filters.additionalEndDate?.getTime() ?? null,
+    ],
+    [
+      filters.workspaceId,
+      filters.startDate,
+      filters.endDate,
+      filters.pipelineId,
+      filters.stageId,
+      filters.sellerId,
+      filters.utmMedium,
+      filters.utmCampaign,
+      filters.additionalStartDate,
+      filters.additionalEndDate,
+    ],
+  );
 
-        const { data: syncData, error: syncError } = await supabase.functions.invoke("ghl-sync", {
-          body: { workspace_id: filters.workspaceId },
-        });
-        const syncErrMsg = (syncData as any)?.error;
-        if (syncErrMsg) {
-          toast({ title: "Sincronização", description: syncErrMsg });
-        } else if (syncError) {
-          console.warn("Sync warning:", syncError.message);
-        }
-      }
-
+  const query = useQuery<DashboardData, Error>({
+    queryKey,
+    queryFn: async () => {
       const { data: responseData, error: functionError } = await supabase.functions.invoke("ghl-dashboard", {
         body: {
           workspace_id: filters.workspaceId,
@@ -173,30 +173,82 @@ export function useGhlData(filters: DashboardFilters): UseGhlDataReturn {
           additionalEndDate: filters.additionalEndDate ? filters.additionalEndDate.toISOString() : null,
         },
       });
-
       if (functionError) throw new Error(functionError.message);
       if ((responseData as any)?.error) throw new Error((responseData as any).error);
-
-      setData(responseData as DashboardData);
-      setCachedAt((responseData as any)?.cachedAt || null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
-      setError(msg);
-      toast({ title: "Erro ao carregar dashboard", description: msg, variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    filters.startDate.getTime(), filters.endDate.getTime(),
-    filters.pipelineId, filters.stageId, filters.sellerId, filters.utmMedium, filters.utmCampaign, filters.workspaceId,
-    filters.additionalStartDate?.getTime(), filters.additionalEndDate?.getTime(),
-  ]);
+      return responseData as DashboardData;
+    },
+    enabled: enabled && !!filters.workspaceId,
+    placeholderData: keepPreviousData,
+  });
 
   useEffect(() => {
-    const t = setTimeout(() => fetchData(), 200);
-    return () => clearTimeout(t);
-  }, [fetchData]);
+    if (query.error) {
+      toast({
+        title: "Erro ao carregar dashboard",
+        description: query.error.message,
+        variant: "destructive",
+      });
+    }
+  }, [query.error, toast]);
 
-  return { data, isLoading, error, refetch: fetchData, cachedAt };
+  const syncMutation = useMutation<void, Error, void>({
+    mutationFn: async () => {
+      if (!filters.workspaceId) throw new Error("Sem workspace ativo");
+      const ckey = `ghl-sync-last:${filters.workspaceId}`;
+      const lastStr = localStorage.getItem(ckey);
+      const last = lastStr ? Number(lastStr) : 0;
+      const elapsed = Date.now() - last;
+      if (last && elapsed < COOLDOWN_MS) {
+        const wait = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
+        throw new Error(`COOLDOWN:${wait}`);
+      }
+      localStorage.setItem(ckey, String(Date.now()));
+
+      const { data: syncData, error: syncError } = await supabase.functions.invoke("ghl-sync", {
+        body: { workspace_id: filters.workspaceId },
+      });
+      const syncErrMsg = (syncData as any)?.error;
+      if (syncErrMsg) throw new Error(syncErrMsg);
+      if (syncError) {
+        console.warn("Sync warning:", syncError.message);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ghl-dashboard", filters.workspaceId] });
+    },
+    onError: (err) => {
+      if (err.message.startsWith("COOLDOWN:")) {
+        const wait = err.message.split(":")[1];
+        toast({
+          title: "Aguarde para sincronizar novamente",
+          description: `Você pode sincronizar novamente em ${wait}s.`,
+        });
+      } else {
+        toast({ title: "Sincronização", description: err.message });
+      }
+    },
+  });
+
+  const refetch = useCallback(
+    async (forceRefresh = false) => {
+      if (forceRefresh) {
+        try {
+          await syncMutation.mutateAsync();
+        } catch {
+          // handled in onError
+        }
+      } else {
+        await queryClient.refetchQueries({ queryKey });
+      }
+    },
+    [syncMutation, queryClient, queryKey],
+  );
+
+  return {
+    data: query.data ?? null,
+    isLoading: query.isLoading || syncMutation.isPending,
+    error: query.error ? query.error.message : null,
+    refetch,
+    cachedAt: query.data?.cachedAt ?? null,
+  };
 }

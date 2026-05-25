@@ -167,7 +167,7 @@ export default function Dashboard() {
   }), [filters, startDate, periodDays]);
 
   const { data, isLoading, error, refetch, cachedAt } = useGhlData(filters);
-  const { data: prevData } = useGhlData(prevFilters);
+  const { data: prevData } = useGhlData(prevFilters, { enabled: !!data });
 
   if (!activeWorkspace) {
     return <ErrorState error="Selecione uma conta para visualizar o dashboard." onRetry={() => window.location.reload()} />;
