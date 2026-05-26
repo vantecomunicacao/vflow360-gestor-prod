@@ -325,7 +325,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
             }
           } else if (msgType === "video") {
             const caption = msg.video?.caption || "";
-            content = caption ? `🎬 [Vídeo]: ${caption}` : "[Enviado uma mídia não suportada]";
+            content = caption ? `🎬 [Vídeo]: ${caption}` : "[🎬 Vídeo recebido]";
           } else if (msgType === "document") {
             const fileName = msg.document?.filename || "documento";
             const docMime = msg.document?.mime_type || "";
@@ -343,8 +343,15 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
                     },
                     body: JSON.stringify({ pdf_base64: dl.base64, file_name: fileName, user_id: userId }),
                   });
-                  const pdfJson = await pdfResp.json();
-                  content = pdfJson?.message || `📄 [PDF]: ${fileName}`;
+                  if (!pdfResp.ok) {
+                    console.error("Stevo Oficial PDF extract HTTP", pdfResp.status, await pdfResp.text());
+                    content = `📄 [PDF]: ${fileName} — Erro ao processar.`;
+                  } else {
+                    const pdfJson = await pdfResp.json();
+                    content = pdfJson?.error
+                      ? `📄 [PDF]: ${fileName} — Erro ao processar.`
+                      : (pdfJson?.message || `📄 [PDF]: ${fileName}`);
+                  }
                 } catch (e) {
                   console.error("PDF extract failed:", e);
                   content = `📄 [PDF]: ${fileName} — Erro ao processar.`;
@@ -371,7 +378,7 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
               msg.interactive?.list_reply?.title ||
               "[Resposta interativa]";
           } else {
-            content = "[Enviado uma mídia não suportada]";
+            content = "[Tipo de mídia não suportado]";
           }
 
           if (!content) {

@@ -391,8 +391,15 @@ serve(async (req) => {
                   user_id: userId,
                 }),
               });
-              const pdfJson = await pdfResp.json();
-              content = pdfJson?.message || `📄 [PDF]: ${fileName}`;
+              if (!pdfResp.ok) {
+                console.error("Evolution PDF extract HTTP", pdfResp.status, await pdfResp.text());
+                content = `📄 [PDF]: ${fileName} — Erro ao processar.`;
+              } else {
+                const pdfJson = await pdfResp.json();
+                content = pdfJson?.error
+                  ? `📄 [PDF]: ${fileName} — Erro ao processar.`
+                  : (pdfJson?.message || `📄 [PDF]: ${fileName}`);
+              }
             } catch (e) {
               console.error("Evolution PDF extract failed:", e);
               content = `📄 [PDF]: ${fileName} — Erro ao processar.`;
@@ -405,7 +412,7 @@ serve(async (req) => {
         } else if (mediaType === "sticker") {
           content = "[🎨 Figurinha recebida]";
         } else {
-          content = "[Mídia recebida]";
+          content = "[Tipo de mídia não suportado]";
         }
 
         if (textContent) content += `\nLegenda: ${textContent}`;

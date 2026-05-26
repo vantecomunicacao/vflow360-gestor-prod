@@ -21,3 +21,6 @@ verify_jwt = false
 
 [functions.evolution-pairing-public]
 verify_jwt = false
+
+[functions.pdf-extract]
+verify_jwt = false

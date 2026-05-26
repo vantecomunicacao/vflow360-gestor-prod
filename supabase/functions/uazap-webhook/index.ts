@@ -588,7 +588,7 @@ serve(async (req) => {
         } else if (media.type === "image") {
           content = "[📷 Imagem recebida]";
         } else if (media.type === "video") {
-          content = "[Enviado uma mídia não suportada]";
+          content = "[🎬 Vídeo recebido]";
         } else if (media.type === "document") {
           const fileName = (message?.fileName as string) || (message?.filename as string) || "documento";
           const isPdf = (mediaMime || "").toLowerCase().includes("pdf") || fileName.toLowerCase().endsWith(".pdf");
@@ -607,8 +607,15 @@ serve(async (req) => {
                   user_id: userId,
                 }),
               });
-              const pdfJson = await pdfResp.json();
-              content = pdfJson?.message || `📄 [PDF]: ${fileName}`;
+              if (!pdfResp.ok) {
+                console.error("Uazap PDF extract HTTP", pdfResp.status, await pdfResp.text());
+                content = `📄 [PDF]: ${fileName} — Erro ao processar.`;
+              } else {
+                const pdfJson = await pdfResp.json();
+                content = pdfJson?.error
+                  ? `📄 [PDF]: ${fileName} — Erro ao processar.`
+                  : (pdfJson?.message || `📄 [PDF]: ${fileName}`);
+              }
             } catch (e) {
               console.error("Uazap PDF extract failed:", e);
               content = `📄 [PDF]: ${fileName} — Erro ao processar.`;
@@ -623,7 +630,7 @@ serve(async (req) => {
         } else if (media.type === "sticker") {
           content = "[🎨 Figurinha recebida]";
         } else {
-          content = "[Enviado uma mídia não suportada]";
+          content = "[Tipo de mídia não suportado]";
         }
 
         // If there's also a caption/text with the media, append it
