@@ -39,12 +39,13 @@ const Suggestions = lazy(() => import("./pages/Suggestions"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const AccountSettings = lazy(() => import("./pages/settings/AccountSettings"));
 const AiSettings = lazy(() => import("./pages/settings/AiSettings"));
-const DashboardSettings = lazy(() => import("./pages/DashboardSettings"));
+const DashboardSettings = lazy(() => import("./pages/settings/DashboardSettings"));
 const Workspaces = lazy(() => import("./pages/Workspaces"));
 const Admin = lazy(() => import("./pages/Admin"));
 const SystemLogs = lazy(() => import("./pages/SystemLogs"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const PairingPublic = lazy(() => import("./pages/PairingPublic"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,6 +72,7 @@ const App = () => (
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/conectar/:token" element={lazyRoute(<PairingPublic />, <GenericPageSkeleton />)} />
               <Route
                 path="/onboarding"
                 element={<ProtectedRoute>{lazyRoute(<Onboarding />, <GenericPageSkeleton />)}</ProtectedRoute>}

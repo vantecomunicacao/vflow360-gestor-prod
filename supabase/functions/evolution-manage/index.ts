@@ -15,6 +15,31 @@ function mapState(state: string | undefined | null): "connected" | "disconnected
   return "disconnected";
 }
 
+async function sha256Hex(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input);
+  const buf = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function generatePairingToken(): Promise<{ plaintext: string; hash: string; prefix: string }> {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const plaintext = base64UrlEncode(bytes);
+  const hash = await sha256Hex(plaintext);
+  return { plaintext, hash, prefix: plaintext.slice(0, 8) };
+}
+
+function buildPairingUrl(token: string): string {
+  const base = (Deno.env.get("APP_PUBLIC_BASE_URL") || "https://gestor.vflow360.com.br").replace(/\/+$/, "");
+  return `${base}/conectar/${token}`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -42,7 +67,7 @@ serve(async (req) => {
     if (claimsError || !claimsData?.claims?.sub) throw new Error("Unauthorized");
 
     const user = { id: claimsData.claims.sub as string };
-    const { action, instanceName, integration_id, label, workspace_id } = await req.json();
+    const { action, instanceName, integration_id, label, workspace_id, token_id } = await req.json();
 
     const webhookUrl = `${SUPABASE_URL}/functions/v1/evolution-webhook`;
     const apiHeaders = {
@@ -321,6 +346,164 @@ serve(async (req) => {
           .eq("id", integration.id);
 
         return new Response(JSON.stringify({ success: true, data: { updated: true } }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "get_or_create_pairing_link": {
+        if (!integration_id) throw new Error("integration_id is required");
+        const integration = await getIntegration(integration_id);
+        if (!integration) throw new Error("Evolution instance not found");
+
+        const { data: existing } = await supabase
+          .from("integration_pairing_tokens")
+          .select("id, token_prefix, last_paired_at, use_count, created_at")
+          .eq("integration_id", integration.id)
+          .is("revoked_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                token_id: existing.id,
+                token_prefix: existing.token_prefix,
+                last_paired_at: existing.last_paired_at,
+                use_count: existing.use_count,
+                created_at: existing.created_at,
+                url: null,
+                is_existing: true,
+              },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        const { plaintext, hash, prefix } = await generatePairingToken();
+        const { data: inserted, error: insertErr } = await supabase
+          .from("integration_pairing_tokens")
+          .insert({
+            integration_id: integration.id,
+            workspace_id: integration.workspace_id,
+            created_by_user_id: user.id,
+            token_hash: hash,
+            token_prefix: prefix,
+          })
+          .select("id, token_prefix, created_at")
+          .single();
+        if (insertErr) throw new Error(`Failed to create pairing token: ${insertErr.message}`);
+
+        await supabase.from("system_logs").insert({
+          level: "info",
+          source: "edge:evolution-manage",
+          message: "Link de pareamento gerado",
+          context: { integration_id: integration.id, token_id: inserted.id, token_prefix: prefix },
+          workspace_id: integration.workspace_id,
+          user_id: user.id,
+          env: "edge",
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              token_id: inserted.id,
+              token_prefix: inserted.token_prefix,
+              created_at: inserted.created_at,
+              last_paired_at: null,
+              use_count: 0,
+              url: buildPairingUrl(plaintext),
+              is_existing: false,
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      case "rotate_pairing_link": {
+        if (!integration_id) throw new Error("integration_id is required");
+        const integration = await getIntegration(integration_id);
+        if (!integration) throw new Error("Evolution instance not found");
+
+        // Revoga todos os tokens ativos da integração
+        await supabase
+          .from("integration_pairing_tokens")
+          .update({ revoked_at: new Date().toISOString() })
+          .eq("integration_id", integration.id)
+          .is("revoked_at", null);
+
+        const { plaintext, hash, prefix } = await generatePairingToken();
+        const { data: inserted, error: insertErr } = await supabase
+          .from("integration_pairing_tokens")
+          .insert({
+            integration_id: integration.id,
+            workspace_id: integration.workspace_id,
+            created_by_user_id: user.id,
+            token_hash: hash,
+            token_prefix: prefix,
+          })
+          .select("id, token_prefix, created_at")
+          .single();
+        if (insertErr) throw new Error(`Failed to rotate pairing token: ${insertErr.message}`);
+
+        await supabase.from("system_logs").insert({
+          level: "info",
+          source: "edge:evolution-manage",
+          message: "Link de pareamento rotacionado",
+          context: { integration_id: integration.id, token_id: inserted.id, token_prefix: prefix },
+          workspace_id: integration.workspace_id,
+          user_id: user.id,
+          env: "edge",
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              token_id: inserted.id,
+              token_prefix: inserted.token_prefix,
+              created_at: inserted.created_at,
+              last_paired_at: null,
+              use_count: 0,
+              url: buildPairingUrl(plaintext),
+              is_existing: false,
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      case "revoke_pairing_link": {
+        if (!token_id) throw new Error("token_id is required");
+        // Ownership: token precisa pertencer a integração do usuário.
+        const { data: tokenRow } = await supabase
+          .from("integration_pairing_tokens")
+          .select("id, integration_id, workspace_id")
+          .eq("id", token_id)
+          .maybeSingle();
+        if (!tokenRow) throw new Error("Pairing token not found");
+        const integration = await getIntegration(tokenRow.integration_id);
+        if (!integration) throw new Error("Pairing token not found");
+
+        await supabase
+          .from("integration_pairing_tokens")
+          .update({ revoked_at: new Date().toISOString() })
+          .eq("id", tokenRow.id);
+
+        await supabase.from("system_logs").insert({
+          level: "info",
+          source: "edge:evolution-manage",
+          message: "Link de pareamento revogado",
+          context: { integration_id: integration.id, token_id: tokenRow.id },
+          workspace_id: tokenRow.workspace_id,
+          user_id: user.id,
+          env: "edge",
+        });
+
+        return new Response(JSON.stringify({ success: true, data: { revoked: true } }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

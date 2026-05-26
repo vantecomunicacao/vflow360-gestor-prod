@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { WhatsAppProviderPicker } from "@/components/integrations/WhatsAppProviderPicker";
 import { WhatsAppInstanceCard } from "@/components/integrations/WhatsAppInstanceCard";
+import { PairingLinkDialog } from "@/components/integrations/PairingLinkDialog";
 import { GhlSection } from "@/components/integrations/GhlSection";
 import { AiPipelineFilter } from "@/components/integrations/AiPipelineFilter";
 import { callEdge } from "@/lib/edgeClient";
@@ -45,6 +46,7 @@ const Integrations = () => {
     "Você é um assistente de CRM. Ao analisar conversas, leve em conta os campos personalizados e etapas do funil mapeados abaixo para gerar sugestões precisas.",
   );
   const [ghlUsers, setGhlUsers] = useState<GhlUserOption[]>([]);
+  const [pairingDialogInstance, setPairingDialogInstance] = useState<WhatsAppInstance | null>(null);
   const { toast } = useToast();
   const { activeWorkspace } = useWorkspace();
 
@@ -895,6 +897,7 @@ const Integrations = () => {
                   onSaveAccessToken={handleSaveAccessToken}
                   ghlUsers={ghlUsers}
                   onChangeGhlUser={handleChangeGhlUser}
+                  onOpenPairingLink={setPairingDialogInstance}
                 />
               ))}
             </div>
@@ -931,6 +934,14 @@ const Integrations = () => {
       <div className="hidden xl:block w-80 shrink-0">
         <WebhookLogs />
       </div>
+
+      <PairingLinkDialog
+        open={pairingDialogInstance !== null}
+        onOpenChange={(open) => {
+          if (!open) setPairingDialogInstance(null);
+        }}
+        integration={pairingDialogInstance}
+      />
     </div>
   );
 };

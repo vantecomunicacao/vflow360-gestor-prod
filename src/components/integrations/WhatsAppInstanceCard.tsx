@@ -2,6 +2,7 @@ import {
   CheckCircle,
   Clock,
   Copy,
+  Link2,
   Loader2,
   MessageSquare,
   Pencil,
@@ -31,6 +32,7 @@ interface Props {
   onSaveAccessToken: (inst: WhatsAppInstance, token: string) => void;
   ghlUsers: GhlUserOption[];
   onChangeGhlUser: (inst: WhatsAppInstance, ghlUserId: string | null) => void;
+  onOpenPairingLink?: (inst: WhatsAppInstance) => void;
 }
 
 const statusBadge = (status: WhatsAppStatus) => {
@@ -85,6 +87,7 @@ export const WhatsAppInstanceCard = ({
   onSaveAccessToken,
   ghlUsers,
   onChangeGhlUser,
+  onOpenPairingLink,
 }: Props) => {
   const NONE = "__none__";
   return (
@@ -164,6 +167,19 @@ export const WhatsAppInstanceCard = ({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Evolution: botão de link de pareamento compartilhável (sempre visível) */}
+      {inst.provider === "evolution" && onOpenPairingLink && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => onOpenPairingLink(inst)}
+          disabled={inst.loading}
+        >
+          <Link2 className="w-3 h-3 mr-1" /> Link de pareamento (compartilhar com o cliente)
+        </Button>
+      )}
 
       {/* Uazap & Evolution share the same QR/status UI */}
       {(inst.provider === "uazap" || inst.provider === "evolution") && inst.status === "connecting" && (
