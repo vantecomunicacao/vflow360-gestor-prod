@@ -353,7 +353,9 @@ async function processWebhook(rawPayload: unknown, integrationId: string, instan
                 content = `📄 [PDF]: ${fileName}`;
               }
             } else {
-              content = fileName ? `📎 [Documento]: ${fileName}` : "[Enviado uma mídia não suportada]";
+              content = fileName
+                ? `📎 [${fileName}] — tipo de arquivo não suportado. Apenas PDF (até 5 MB).`
+                : "📎 Arquivo enviado — tipo não suportado. Apenas PDF (até 5 MB).";
             }
           } else if (msgType === "sticker") {
             content = "[🎨 Figurinha recebida]";

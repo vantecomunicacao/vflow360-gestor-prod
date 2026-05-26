@@ -11,7 +11,7 @@ const corsHeaders = {
 };
 
 // Limits
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_PAGES = 50;
 const MAX_CHARS = 50_000;
 

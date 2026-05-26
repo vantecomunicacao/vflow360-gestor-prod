@@ -616,7 +616,9 @@ serve(async (req) => {
           } else if (isPdf) {
             content = `📄 [PDF]: ${fileName} — Não foi possível baixar o arquivo.`;
           } else {
-            content = "[Enviado uma mídia não suportada]";
+            content = fileName
+              ? `📎 [${fileName}] — tipo de arquivo não suportado. Apenas PDF (até 5 MB).`
+              : "📎 Arquivo enviado — tipo não suportado. Apenas PDF (até 5 MB).";
           }
         } else if (media.type === "sticker") {
           content = "[🎨 Figurinha recebida]";

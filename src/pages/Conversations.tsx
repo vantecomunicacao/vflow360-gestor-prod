@@ -127,10 +127,10 @@ const Conversations = () => {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "PDF muito grande",
-        description: "O limite é de 10 MB. Reduza o arquivo e tente novamente.",
+        description: "O limite é de 5 MB. Reduza o arquivo e tente novamente.",
         variant: "destructive",
       });
       return;
@@ -406,7 +406,7 @@ const Conversations = () => {
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingPdf}
-                  title="Enviar PDF (até 10 MB)"
+                  title="Enviar PDF (até 5 MB)"
                 >
                   {uploadingPdf ? (
                     <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Processando...</>
