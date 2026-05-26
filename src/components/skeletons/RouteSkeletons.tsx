@@ -144,7 +144,7 @@ export function IntegrationsSkeleton() {
 }
 
 /**
- * Skeleton genérico para rotas mais simples (Settings, Workspaces, Admin, Docs, Onboarding).
+ * Skeleton genérico para rotas mais simples (Settings, Workspaces, Admin, Docs).
  */
 export function GenericPageSkeleton() {
   return (

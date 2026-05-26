@@ -44,7 +44,6 @@ const Workspaces = lazy(() => import("./pages/Workspaces"));
 const Admin = lazy(() => import("./pages/Admin"));
 const SystemLogs = lazy(() => import("./pages/SystemLogs"));
 const Documentation = lazy(() => import("./pages/Documentation"));
-const Onboarding = lazy(() => import("./pages/Onboarding"));
 const PairingPublic = lazy(() => import("./pages/PairingPublic"));
 
 const queryClient = new QueryClient({
@@ -73,10 +72,6 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/conectar/:token" element={lazyRoute(<PairingPublic />, <GenericPageSkeleton />)} />
-              <Route
-                path="/onboarding"
-                element={<ProtectedRoute>{lazyRoute(<Onboarding />, <GenericPageSkeleton />)}</ProtectedRoute>}
-              />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={lazyRoute(<Dashboard />, <DashboardSkeleton />)} />
                 <Route path="/conversations" element={lazyRoute(<Conversations />, <ConversationsSkeleton />)} />

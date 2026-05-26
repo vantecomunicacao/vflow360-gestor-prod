@@ -41,7 +41,7 @@ const Register = () => {
       toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Conta criada com sucesso!", description: "Verifique seu email para confirmar." });
-      navigate("/onboarding");
+      navigate("/dashboard");
     }
   };
 
