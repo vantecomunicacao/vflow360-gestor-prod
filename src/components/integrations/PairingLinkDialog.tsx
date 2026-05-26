@@ -211,7 +211,7 @@ export const PairingLinkDialog = ({ open, onOpenChange, integration }: Props) =>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-muted rounded-lg p-3">
-                <p className="text-muted-foreground">Vezes aberto</p>
+                <p className="text-muted-foreground">Acessos</p>
                 <p className="text-base font-semibold text-foreground">{link.use_count}</p>
               </div>
               <div className="bg-muted rounded-lg p-3">

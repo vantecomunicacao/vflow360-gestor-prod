@@ -5,7 +5,7 @@ import { CheckCircle2, Loader2, MessageSquare, ShieldAlert, Smartphone } from "l
 type State =
   | { kind: "loading" }
   | { kind: "qr"; qrcode: string | null; label: string | null }
-  | { kind: "connected"; label: string | null }
+  | { kind: "connected"; pairedName: string | null; pairedPhone: string | null }
   | { kind: "expired" }
   | { kind: "error" };
 
@@ -35,7 +35,11 @@ const PairingPublic = () => {
         return;
       }
       if (json.status === "connected") {
-        setState({ kind: "connected", label: json.label ?? null });
+        setState({
+          kind: "connected",
+          pairedName: json.paired_name ?? null,
+          pairedPhone: json.paired_phone ?? null,
+        });
         return;
       }
       setState({ kind: "qr", qrcode: json.qrcode ?? null, label: json.label ?? null });
@@ -128,12 +132,17 @@ const PairingPublic = () => {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-foreground">WhatsApp conectado!</h2>
-              {state.label && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Conta <span className="font-medium text-foreground">{state.label}</span> está ativa.
-                </p>
+              {(state.pairedName || state.pairedPhone) && (
+                <div className="mt-3 space-y-0.5">
+                  {state.pairedName && (
+                    <p className="text-base font-medium text-foreground">{state.pairedName}</p>
+                  )}
+                  {state.pairedPhone && (
+                    <p className="text-sm text-muted-foreground">{state.pairedPhone}</p>
+                  )}
+                </div>
               )}
-              <p className="text-sm text-muted-foreground mt-2">Você pode fechar esta janela.</p>
+              <p className="text-sm text-muted-foreground mt-3">Você pode fechar esta janela.</p>
             </div>
           </div>
         )}

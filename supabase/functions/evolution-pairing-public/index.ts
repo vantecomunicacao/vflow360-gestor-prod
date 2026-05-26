@@ -41,6 +41,52 @@ function mapState(state: string | undefined | null): "connected" | "disconnected
   return "disconnected";
 }
 
+// Considera "nova abertura" se nunca acessou ou se a última vista foi há +5 min.
+// Evita contar cada poll (que roda a cada 4s) como uma abertura nova.
+const SESSION_WINDOW_MS = 5 * 60 * 1000;
+function isNewSession(lastSeenAt: string | null | undefined): boolean {
+  if (!lastSeenAt) return true;
+  const last = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(last)) return true;
+  return Date.now() - last > SESSION_WINDOW_MS;
+}
+
+// Formata um JID do WhatsApp (`5511999999999@s.whatsapp.net`) em string amigável.
+function formatPhone(jid: string | null | undefined): string | null {
+  if (!jid) return null;
+  const digits = jid.split("@")[0].replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  if (digits.startsWith("55") && digits.length >= 12) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    if (rest.length === 9) return `+55 (${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`;
+    if (rest.length === 8) return `+55 (${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+  }
+  return `+${digits}`;
+}
+
+async function fetchPairedProfile(
+  baseUrl: string,
+  apiKey: string,
+  instanceName: string,
+): Promise<{ paired_name: string | null; paired_phone: string | null }> {
+  try {
+    const resp = await fetch(
+      `${baseUrl}/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`,
+      { method: "GET", headers: { apikey: apiKey } },
+    );
+    if (!resp.ok) return { paired_name: null, paired_phone: null };
+    const data = await resp.json().catch(() => null);
+    const entry = Array.isArray(data) ? data[0] : data?.instance ?? data;
+    const profileName = entry?.profileName || entry?.instance?.profileName || null;
+    const ownerJid =
+      entry?.ownerJid || entry?.owner || entry?.instance?.owner || entry?.number || null;
+    return { paired_name: profileName, paired_phone: formatPhone(ownerJid) };
+  } catch {
+    return { paired_name: null, paired_phone: null };
+  }
+}
+
 serve(async (req) => {
   const origin = req.headers.get("origin");
   const cors = corsFor(origin);
@@ -69,7 +115,7 @@ serve(async (req) => {
 
     const { data: row } = await supabase
       .from("integration_pairing_tokens")
-      .select("id, integration_id, workspace_id, revoked_at, use_count, last_paired_at")
+      .select("id, integration_id, workspace_id, revoked_at, use_count, last_paired_at, last_seen_at")
       .eq("token_hash", tokenHash)
       .maybeSingle();
 
@@ -77,14 +123,15 @@ serve(async (req) => {
       return ok({ ok: false, reason: "invalid_or_expired" }, cors);
     }
 
-    // Atualiza telemetria (não bloqueia se falhar)
+    // Telemetria: incrementa use_count só em nova sessão (gap > 5 min);
+    // last_seen_at é atualizado a cada poll. Não bloqueia se falhar.
     const userAgent = (req.headers.get("user-agent") || "").slice(0, 200);
+    const newSession = isNewSession(row.last_seen_at);
+    const telemetryUpdate: Record<string, unknown> = { last_seen_at: new Date().toISOString() };
+    if (newSession) telemetryUpdate.use_count = (row.use_count || 0) + 1;
     supabase
       .from("integration_pairing_tokens")
-      .update({
-        use_count: (row.use_count || 0) + 1,
-        last_seen_at: new Date().toISOString(),
-      })
+      .update(telemetryUpdate)
       .eq("id", row.id)
       .then(() => {});
 
@@ -135,6 +182,8 @@ serve(async (req) => {
         .update({ last_paired_at: new Date().toISOString() })
         .eq("id", row.id);
 
+      const profile = await fetchPairedProfile(EVOLUTION_BASE_URL, EVOLUTION_API_KEY, cfg.instanceName);
+
       // Auditoria somente em transições para connected, evitando log a cada poll
       if (integration.status !== "connected") {
         await supabase.from("system_logs").insert({
@@ -145,6 +194,8 @@ serve(async (req) => {
             integration_id: integration.id,
             token_id: row.id,
             user_agent: userAgent,
+            paired_name: profile.paired_name,
+            paired_phone: profile.paired_phone,
           },
           workspace_id: integration.workspace_id,
           env: "edge",
@@ -156,6 +207,8 @@ serve(async (req) => {
           ok: true,
           status: "connected",
           label: cfg.label || null,
+          paired_name: profile.paired_name,
+          paired_phone: profile.paired_phone,
         },
         cors,
       );
