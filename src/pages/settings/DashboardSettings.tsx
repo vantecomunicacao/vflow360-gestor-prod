@@ -11,19 +11,11 @@ import { toast } from "sonner";
 import { Loader2, Save, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-const FUNNEL_BUCKETS = [
-  { key: "contato_inicial", label: "Contato Inicial" },
-  { key: "proposta_enviada", label: "Proposta Enviada" },
-  { key: "fechamento", label: "Fechamento" },
-  { key: "venda_ganha", label: "Venda Ganha" },
-];
+import { FUNNEL_BUCKETS, DATE_TYPES } from "@/lib/dashboard-funnel";
 
 interface Stage { id: string; name: string; }
 interface Pipeline { id: string; ghl_id: string; name: string; stages: Stage[]; }
 interface CustomField { id: string; ghl_id: string; name: string; field_key: string | null; data_type?: string | null; model?: string | null; }
-
-const DATE_TYPES = ["DATE", "DATETIME", "DATE_TIME", "date", "datetime", "Date", "DateTime"];
 
 export default function DashboardSettings() {
   const { activeWorkspace } = useWorkspace();
