@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import IntegrationStatusWatcher from "@/components/IntegrationStatusWatcher";
 
 const AppLayout = () => {
   // Marca que estamos dentro do app (sidebar presente) para ocultar o
@@ -13,6 +14,7 @@ const AppLayout = () => {
 
   return (
     <SidebarProvider>
+      <IntegrationStatusWatcher />
       <div className="h-screen flex w-full overflow-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0 h-screen relative">

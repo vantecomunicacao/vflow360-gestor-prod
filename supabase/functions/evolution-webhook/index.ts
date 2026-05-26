@@ -221,10 +221,48 @@ serve(async (req) => {
       const state = payload?.data?.state || payload?.data?.connection;
       const newStatus =
         state === "open" ? "connected" : state === "connecting" ? "connecting" : "disconnected";
+      const previousStatus = integration.status;
+
       await supabase
         .from("integrations")
         .update({ status: newStatus })
         .eq("id", integration.id);
+
+      const justDisconnected =
+        newStatus === "disconnected" &&
+        (previousStatus === "connected" || previousStatus === "connecting");
+
+      const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+      if (justDisconnected && RESEND_API_KEY) {
+        try {
+          const { data: userData } = await supabase.auth.admin.getUserById(userId);
+          const email = userData?.user?.email;
+          if (email) {
+            const fromAddress =
+              Deno.env.get("RESEND_FROM_EMAIL") ||
+              "VFlow360 <notificacao@vflow360.com.br>";
+            await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${RESEND_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                from: fromAddress,
+                to: [email],
+                subject: `WhatsApp desconectado — ${integrationLabel}`,
+                html: `<p>Olá,</p>
+<p>A instância <strong>${integrationLabel}</strong> (${instanceName}) foi desconectada do WhatsApp.</p>
+<p>Para reconectar, acesse <a href="https://gestor.vflow360.com.br/integrations">VFlow360 → Integrações</a> e gere um novo QR Code.</p>
+<p>— VFlow360</p>`,
+              }),
+            });
+          }
+        } catch (e) {
+          console.error("Resend notify failed:", e);
+        }
+      }
+
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
