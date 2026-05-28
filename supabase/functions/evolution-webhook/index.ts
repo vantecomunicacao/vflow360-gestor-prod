@@ -232,35 +232,68 @@ serve(async (req) => {
         newStatus === "disconnected" &&
         (previousStatus === "connected" || previousStatus === "connecting");
 
-      const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-      if (justDisconnected && RESEND_API_KEY) {
+      if (justDisconnected) {
+        // WhatsApp notification via n8n webhook. n8n is responsible for
+        // routing (number to notify, sender instance, fallback) — this
+        // function only emits the disconnect event.
         try {
           const { data: userData } = await supabase.auth.admin.getUserById(userId);
-          const email = userData?.user?.email;
-          if (email) {
-            const fromAddress =
-              Deno.env.get("RESEND_FROM_EMAIL") ||
-              "VFlow360 <notificacao@vflow360.com.br>";
-            await fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${RESEND_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                from: fromAddress,
-                to: [email],
-                subject: `WhatsApp desconectado — ${integrationLabel}`,
-                html: `<p>Olá,</p>
-<p>A instância <strong>${integrationLabel}</strong> (${instanceName}) foi desconectada do WhatsApp.</p>
-<p>Para reconectar, acesse <a href="https://gestor.vflow360.com.br/integrations">VFlow360 → Integrações</a> e gere um novo QR Code.</p>
-<p>— VFlow360</p>`,
-              }),
-            });
-          }
+          const ownerEmail = userData?.user?.email ?? null;
+          await fetch("https://n8n-webhook.boliqf.easypanel.host/webhook/erro-vflow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "whatsapp_disconnected",
+              instance: instanceName,
+              label: integrationLabel,
+              integration_id: integration.id,
+              user_id: userId,
+              workspace_id: workspaceId,
+              owner_email: ownerEmail,
+              previous_status: previousStatus,
+              new_status: newStatus,
+              occurred_at: new Date().toISOString(),
+              reconnect_url: "https://gestor.vflow360.com.br/integrations",
+            }),
+          });
         } catch (e) {
-          console.error("Resend notify failed:", e);
+          console.error("n8n disconnect notify failed:", e);
         }
+
+        // Email via Resend is on standby. Keep this commented block so we
+        // can reactivate later by uncommenting and ensuring RESEND_API_KEY
+        // (and optionally RESEND_FROM_EMAIL with a verified domain) are set.
+        //
+        // const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+        // if (RESEND_API_KEY) {
+        //   try {
+        //     const { data: userData } = await supabase.auth.admin.getUserById(userId);
+        //     const email = userData?.user?.email;
+        //     if (email) {
+        //       const fromAddress =
+        //         Deno.env.get("RESEND_FROM_EMAIL") ||
+        //         "VFlow360 <notificacao@vflow360.com.br>";
+        //       await fetch("https://api.resend.com/emails", {
+        //         method: "POST",
+        //         headers: {
+        //           Authorization: `Bearer ${RESEND_API_KEY}`,
+        //           "Content-Type": "application/json",
+        //         },
+        //         body: JSON.stringify({
+        //           from: fromAddress,
+        //           to: [email],
+        //           subject: `WhatsApp desconectado — ${integrationLabel}`,
+        //           html: `<p>Olá,</p>
+        // <p>A instância <strong>${integrationLabel}</strong> (${instanceName}) foi desconectada do WhatsApp.</p>
+        // <p>Para reconectar, acesse <a href="https://gestor.vflow360.com.br/integrations">VFlow360 → Integrações</a> e gere um novo QR Code.</p>
+        // <p>— VFlow360</p>`,
+        //         }),
+        //       });
+        //     }
+        //   } catch (e) {
+        //     console.error("Resend notify failed:", e);
+        //   }
+        // }
       }
 
       return new Response(JSON.stringify({ ok: true }), {
