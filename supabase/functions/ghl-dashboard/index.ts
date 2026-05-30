@@ -696,7 +696,8 @@ serve(async (req) => {
     const totalMonetary = opps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
     const wonMonetary = wonOpps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
     const negotiatingMonetary = opps.reduce((a, o) => {
-      const b = bucketOf(o.stage_id);
+      if ((o.status || "").toLowerCase() === "lost") return a;
+      const b = stageBucket(o.stage_id);
       return (b === "proposta_enviada" || b === "fechamento") ? a + (Number(o.monetary_value) || 0) : a;
     }, 0);
 
