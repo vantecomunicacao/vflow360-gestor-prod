@@ -14,6 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -43,7 +44,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <div className="px-4 py-5 flex items-center">
+      <div className="px-4 py-5 flex items-center justify-between gap-2">
         {collapsed ? (
           /* Símbolo "V" recortado do logo p/ a sidebar colapsada */
           <div className="w-7 h-7 overflow-hidden shrink-0" aria-label="VFlow360">
@@ -55,7 +56,10 @@ export function AppSidebar() {
             />
           </div>
         ) : (
-          <img src="/vflow360-logo-escuro.png" alt="VFlow360" className="h-7 w-auto" />
+          <>
+            <img src="/vflow360-logo-escuro.png" alt="VFlow360" className="h-7 w-auto" />
+            <SidebarTrigger className="h-7 w-7 shrink-0 text-sidebar-foreground border border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
+          </>
         )}
       </div>
 

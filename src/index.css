@@ -208,6 +208,20 @@
     font-feature-settings: "ss01";
   }
   /* Tema escuro é o padrão do VFlow360 — classe `dark` aplicada no <html> */
+
+  /* Auto-scale: laptops 13"-14" (1024-1440px) usam fonte raiz menor para
+     encolher proporcionalmente todo o app baseado em rem. Mobile e telas
+     wide mantêm 16px (padrão). */
+  @media (min-width: 1024px) and (max-width: 1440px) {
+    html {
+      font-size: 13px;
+    }
+  }
+  @media (min-width: 1441px) and (max-width: 1680px) {
+    html {
+      font-size: 14px;
+    }
+  }
 }
 
 @layer components {
@@ -305,5 +319,22 @@
   @keyframes slideUp {
     from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-slide-up,
+    .animate-spin,
+    .animate-pulse,
+    .animate-bounce,
+    .animate-ping,
+    [class*="animate-in"],
+    [class*="animate-out"] {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

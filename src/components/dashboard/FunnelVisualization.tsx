@@ -11,6 +11,8 @@ interface FunnelVisualizationProps {
   conversionRates: ConversionRates;
   lostLeads: number;
   lostLeadsDetail?: StageLead[];
+  /** Conteúdo renderizado abaixo do card "Oportunidades Perdidas" na coluna direita. */
+  belowLostCard?: React.ReactNode;
 }
 
 const formatPercentage = (v: number) => `${v.toFixed(1)}%`;
@@ -57,7 +59,7 @@ const stageAccents = [
   { bg: "bg-funnel-4", border: "border-funnel-4/40", icon: "text-funnel-4-ink" },
 ];
 
-export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [] }: FunnelVisualizationProps) {
+export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [], belowLostCard }: FunnelVisualizationProps) {
   const [selectedStage, setSelectedStage] = useState<{ title: string; leads: StageLead[] } | null>(null);
 
   const conversionLabels = [
@@ -86,9 +88,9 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* Main Funnel Flow */}
-        <div className="lg:col-span-2 flex flex-col items-center">
+        <div className="lg:col-span-3 flex flex-col items-center">
           {funnelStages.map((stage, index) => {
             const isLast = index === funnelStages.length - 1;
             const accent = stageAccents[index] || stageAccents[stageAccents.length - 1];
@@ -141,33 +143,43 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
         </div>
 
         {/* Lost Opportunities Card */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-2">
           <div
-            className="relative bg-card border border-border rounded-2xl p-6 shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+            className="relative bg-card border border-border rounded-2xl p-5 shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            role="button"
+            tabIndex={0}
+            aria-label={`Ver ${lostLeads} oportunidades perdidas`}
             onClick={() => setSelectedStage({ title: "Oportunidades Perdidas", leads: lostLeadsDetail })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setSelectedStage({ title: "Oportunidades Perdidas", leads: lostLeadsDetail });
+              }
+            }}
           >
             <div className="absolute -top-12 -right-12 w-32 h-32 bg-destructive/10 blur-3xl rounded-full pointer-events-none"></div>
 
             <div className="relative">
-              <div className="flex items-center gap-2 mb-6">
+              <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
                   <XCircle className="w-5 h-5 text-destructive" />
                 </div>
-                <h4 className="font-bold text-foreground">Oportunidades Perdidas</h4>
+                <h3 className="font-bold text-foreground">Oportunidades Perdidas</h3>
+                <SectionTooltip text="Refere-se a leads que saíram do funil antes de atingir a etapa de Venda Ganha." />
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Total acumulado</div>
-                  <div className="text-4xl font-black text-destructive tabular-nums">{lostLeads}</div>
+                  <div className="text-xs text-muted-foreground mb-0.5">Total acumulado</div>
+                  <div className="text-3xl font-black text-destructive tabular-nums leading-none">{lostLeads}</div>
                 </div>
 
-                <div className="pt-6 border-t border-border">
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-sm font-medium text-muted-foreground">Taxa de perda</span>
-                    <span className="text-xl font-bold text-foreground">{formatPercentage(lostPercentage)}</span>
+                <div className="pt-4 border-t border-border">
+                  <div className="flex justify-between items-end mb-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">Taxa de perda</span>
+                    <span className="text-lg font-bold text-foreground tabular-nums leading-none">{formatPercentage(lostPercentage)}</span>
                   </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full bg-destructive rounded-full transition-all"
                       style={{ width: `${Math.min(100, Math.max(2, lostPercentage))}%` }}
@@ -175,12 +187,11 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
                   </div>
                 </div>
 
-                <p className="text-xs leading-relaxed text-muted-foreground italic">
-                  Refere-se a leads que saíram do funil antes de atingir a etapa de Venda Ganha.
-                </p>
               </div>
             </div>
           </div>
+
+          {belowLostCard && <div className="mt-4">{belowLostCard}</div>}
         </div>
       </div>
 

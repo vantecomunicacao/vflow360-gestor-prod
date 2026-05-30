@@ -206,6 +206,8 @@ serve(async (req) => {
     const utmSourceFieldId: string | null = settings?.utm_source_field_id || null;
     const utmMediumFieldId: string | null = settings?.utm_medium_field_id || null;
     const utmCampaignFieldId: string | null = settings?.utm_campaign_field_id || null;
+    const utmContentFieldId: string | null = settings?.utm_content_field_id || null;
+    const utmTermFieldId: string | null = settings?.utm_term_field_id || null;
 
     // ===== Query opportunities com filtros =====
     let q = supabase
@@ -508,6 +510,45 @@ serve(async (req) => {
     };
     const wonUtmSource = buildWonUtmSource();
 
+    // ===== Origem (UTM Source + Campaign) — leads e vendas =====
+    // Combina source + campaign por opportunity. Percentages relativos ao TOTAL
+    // (não só os preenchidos), para que o pie represente 100% das opps do período.
+    // Opps sem UTM Source viram fatia "Não identificado". Desempate por contagem
+    // desc, depois alfabético.
+    const buildSourceCampaignDistribution = (oppsList: any[]) => {
+      if (!utmSourceFieldId) {
+        return { distribution: [] as Array<{ name: string; count: number; percentage: number }>, fillRate: 0 };
+      }
+      const counts = new Map<string, number>();
+      let filled = 0;
+      for (const o of oppsList) {
+        const source = getUtm(o, utmSourceFieldId);
+        if (!source) continue;
+        const campaign = utmCampaignFieldId ? getUtm(o, utmCampaignFieldId) : null;
+        const key = campaign ? `${source} · ${campaign}` : source;
+        filled++;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      const total = oppsList.length;
+      const distribution = Array.from(counts.entries())
+        .map(([name, count]) => ({ name, count, percentage: safeRate(count, total) }))
+        .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+      const unidentified = total - filled;
+      if (unidentified > 0) {
+        distribution.push({
+          name: "Não identificado",
+          count: unidentified,
+          percentage: safeRate(unidentified, total),
+        });
+      }
+      return {
+        distribution,
+        fillRate: safeRate(filled, total),
+      };
+    };
+    const leadsOrigin = buildSourceCampaignDistribution(opps);
+    const wonOrigin = buildSourceCampaignDistribution(wonOpps);
+
     // ===== Custom fields fill rate =====
     // visible_custom_fields pode conter ghl_id, field_key ou name (legado)
     // visible_custom_fields pode conter ghl_id, field_key ou name (legado)
@@ -604,6 +645,27 @@ serve(async (req) => {
       fechamento: counters.fechamento ? Math.round(sumHours.fechamento / counters.fechamento) : 0,
     };
 
+    // ===== Ciclos do funil (tempo de criação → desfecho) =====
+    // Média de dias entre ghl_created_at e last_status_change_at para opps ganhas/perdidas.
+    // Ignora opps sem last_status_change_at preenchido (sem histórico de mudança).
+    const cycleDays = (subset: any[]): { days: number; sampleSize: number } => {
+      let total = 0;
+      let n = 0;
+      for (const o of subset) {
+        if (!o.ghl_created_at || !o.last_status_change_at) continue;
+        const ms = new Date(o.last_status_change_at).getTime() - new Date(o.ghl_created_at).getTime();
+        if (ms < 0) continue;
+        total += ms;
+        n++;
+      }
+      if (n === 0) return { days: 0, sampleSize: 0 };
+      const avgMs = total / n;
+      const days = avgMs / DAY_MS;
+      return { days: Math.round(days * 10) / 10, sampleSize: n };
+    };
+    const cycleToWon = cycleDays(wonOpps);
+    const cycleToLost = cycleDays(lostOpps);
+
     // ===== Daily leads (últimos 7 dias da janela ou hoje) =====
     const endRef = endDate ? new Date(endDate) : new Date();
     const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -633,6 +695,10 @@ serve(async (req) => {
 
     const totalMonetary = opps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
     const wonMonetary = wonOpps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
+    const negotiatingMonetary = opps.reduce((a, o) => {
+      const b = bucketOf(o.stage_id);
+      return (b === "proposta_enviada" || b === "fechamento") ? a + (Number(o.monetary_value) || 0) : a;
+    }, 0);
 
     // ===== Tempo médio de resposta do vendedor =====
     // Considera APENAS conversas de leads das oportunidades filtradas pelo header.
@@ -708,6 +774,7 @@ serve(async (req) => {
     let totalResponseMinutes = 0;
     let responseCount = 0;
     let conversationsWithResponse = 0;
+    let conversationsWithInbound = 0;
     // Por vendedor
     const sellerResponse = new Map<string, { totalMinutes: number; count: number }>();
 
@@ -753,10 +820,15 @@ serve(async (req) => {
       for (const [convId, msgs] of byConv) {
         let lastInbound: number | null = null;
         let convHadResponse = false;
+        let convHadInbound = false;
         const sid = convToSeller.get(convId);
         const acc = sid ? (sellerResponse.get(sid) || { totalMinutes: 0, count: 0 }) : null;
         for (const m of msgs) {
           if (m.dir === "inbound") {
+            if (!convHadInbound) {
+              convHadInbound = true;
+              conversationsWithInbound++;
+            }
             if (lastInbound === null) lastInbound = m.t;
           } else if (m.dir === "outbound" && lastInbound !== null) {
             const minutes = businessMinutesBetween(lastInbound, m.t, startMin, endMin);
@@ -794,6 +866,7 @@ serve(async (req) => {
       averageMinutes: responseCount > 0 ? totalResponseMinutes / responseCount : 0,
       responseCount,
       conversationsAnalyzed: conversationsWithResponse,
+      conversationsWithInbound,
       businessHoursStart: businessStartStr,
       businessHoursEnd: businessEndStr,
     };
@@ -823,14 +896,24 @@ serve(async (req) => {
       utmCampaignValues: utmCampaign.values,
       wonUtmSourceDistribution: wonUtmSource.distribution,
       wonUtmSourceFillRate: wonUtmSource.fillRate,
+      leadsOriginDistribution: leadsOrigin.distribution,
+      leadsOriginFillRate: leadsOrigin.fillRate,
+      wonOriginDistribution: wonOrigin.distribution,
+      wonOriginFillRate: wonOrigin.fillRate,
       utmConfigured: {
         source: !!utmSourceFieldId,
         medium: !!utmMediumFieldId,
         campaign: !!utmCampaignFieldId,
+        content: !!utmContentFieldId,
+        term: !!utmTermFieldId,
       },
       customFields,
       customFieldDistributions,
       averageTimePerStage,
+      cycleToWonDays: cycleToWon.days,
+      cycleToWonSample: cycleToWon.sampleSize,
+      cycleToLostDays: cycleToLost.days,
+      cycleToLostSample: cycleToLost.sampleSize,
       dailyLeads,
       pipelines,
       users: usersOut,
@@ -840,6 +923,7 @@ serve(async (req) => {
       // métricas extra (GHL)
       totalMonetary,
       wonMonetary,
+      negotiatingMonetary,
       additionalDateFieldId,
       additionalDateFieldName,
       responseTime,

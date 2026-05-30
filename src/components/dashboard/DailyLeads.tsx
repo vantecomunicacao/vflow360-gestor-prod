@@ -7,12 +7,19 @@ interface DailyLeadsProps { dailyLeads: DailyLead[]; }
 
 export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
   const data = dailyLeads || [];
+  const periodLabel =
+    data.length === 0 ? "no período"
+    : data.length === 1 ? "no dia"
+    : data.length <= 31 ? `Últimos ${data.length} dias`
+    : "no período";
+  const titleSuffix = periodLabel.startsWith("Últimos") ? `— ${periodLabel}` : `— ${periodLabel}`;
+
   if (data.length === 0) {
     return (
       <div className="dashboard-section animate-slide-up">
         <h2 className="section-title">
           <BarChart3 className="w-5 h-5 text-primary-ink" />
-          Entrada de Oportunidades — Últimos 7 dias
+          Entrada de Oportunidades {titleSuffix}
         </h2>
         <p className="text-muted-foreground text-center py-8">Sem dados disponíveis.</p>
       </div>
@@ -29,6 +36,12 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
     : 0;
   const maxCount = Math.max(...data.map((d) => d.count), 1);
 
+  const chartDescription =
+    `Entrada de oportunidades ${periodLabel.startsWith("Últimos") ? `nos ${periodLabel.toLowerCase()}` : periodLabel}: ` +
+    `total ${totalWeek}, média ${avgPerDay.toFixed(1)} por dia. ` +
+    `Maior volume em ${maxDay.dayName} (${maxDay.count} oportunidades). ` +
+    `Hoje: ${today.count}${yesterday ? `, ontem: ${yesterday.count}` : ""}.`;
+
   const formatDate = (s: string) => {
     const d = new Date(s + "T12:00:00Z");
     return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
@@ -39,10 +52,10 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
       <div className="lg:col-span-2 dashboard-section animate-slide-up">
         <h2 className="section-title">
           <BarChart3 className="w-5 h-5 text-primary-ink" />
-          Entrada de Oportunidades — Últimos 7 dias
+          Entrada de Oportunidades {titleSuffix}
           <SectionTooltip text="Volume diário de novas oportunidades. A linha mostra a tendência ao longo do período." />
         </h2>
-        <div className="h-64">
+        <div className="h-64" role="img" aria-label={chartDescription}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} barCategoryGap="25%">
               <XAxis dataKey="dayName" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12, fontWeight: 500 }} />
@@ -64,15 +77,17 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
       </div>
 
       <div className="dashboard-section animate-slide-up space-y-4">
-        <h2 className="section-title">
+        <h3 className="section-title">
           <TrendingUp className="w-5 h-5 text-primary-ink" />
           Insights
-        </h2>
+        </h3>
         <div className="space-y-3">
           <div className="p-4 bg-secondary/50 rounded-2xl">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold">Total na semana</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold">Total no período</p>
             <p className="text-2xl font-extrabold text-foreground mt-1">{totalWeek}</p>
-            <p className="text-xs text-muted-foreground">opps nos últimos 7 dias</p>
+            <p className="text-xs text-muted-foreground">
+              {data.length === 1 ? "opp no dia" : `opps em ${data.length} dia${data.length === 1 ? "" : "s"}`}
+            </p>
           </div>
           <div className="p-4 bg-secondary/50 rounded-2xl">
             <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold">Média diária</p>

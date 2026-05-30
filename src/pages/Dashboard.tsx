@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { subDays, startOfDay, endOfDay, differenceInDays } from "date-fns";
 import { DateRange } from "react-day-picker";
-import { Users, TrendingUp, Target, BarChart3 } from "lucide-react";
+import { Users, TrendingUp, Target, Banknote, Receipt, HandCoins } from "lucide-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useGhlData, DashboardFilters } from "@/hooks/useGhlData";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,18 +10,18 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization";
 import { SellerPerformance } from "@/components/dashboard/SellerPerformance";
 import { TimePerStage } from "@/components/dashboard/TimePerStage";
-import { WonOrigins } from "@/components/dashboard/WonOrigins";
+import { OriginsCard } from "@/components/dashboard/OriginsCard";
+import { FunnelCycles } from "@/components/dashboard/FunnelCycles";
 import { DataQuality } from "@/components/dashboard/DataQuality";
 import { ResponseTimeCard } from "@/components/dashboard/ResponseTimeCard";
 import { CustomFieldCharts } from "@/components/dashboard/CustomFieldCharts";
 import { LossReasons } from "@/components/dashboard/LossReasons";
 import { DailyLeads } from "@/components/dashboard/DailyLeads";
 import { AIInsights } from "@/components/dashboard/AIInsights";
-import { LoadingState } from "@/components/dashboard/LoadingState";
+import { DashboardSkeleton } from "@/components/skeletons/RouteSkeletons";
 import { ErrorState } from "@/components/dashboard/ErrorState";
 import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
 import { AIUsageCard } from "@/components/dashboard/AIUsageCard";
-import { UTMOrigins } from "@/components/dashboard/UTMOrigins";
 
 type SavedFilters = {
   from?: string;
@@ -58,14 +58,17 @@ export default function Dashboard() {
     let cancelled = false;
 
     (async () => {
-      // 1) Tentar restaurar filtros salvos (período sempre dinâmico: últimos 7 dias)
+      // 1) Tentar restaurar filtros salvos (inclusive período)
       let restored = false;
       try {
         const raw = localStorage.getItem(filtersStorageKey(activeWorkspace.id));
         if (raw) {
           const saved = JSON.parse(raw) as SavedFilters;
-          // Período principal sempre recalculado para "últimos 7 dias" a partir de hoje
-          setDateRange({ from: subDays(new Date(), 6), to: new Date() });
+          setDateRange(
+            saved.from
+              ? { from: new Date(saved.from), to: saved.to ? new Date(saved.to) : undefined }
+              : { from: subDays(new Date(), 6), to: new Date() }
+          );
           setAdditionalDateRange(
             saved.addFrom
               ? { from: new Date(saved.addFrom), to: saved.addTo ? new Date(saved.addTo) : undefined }
@@ -172,11 +175,17 @@ export default function Dashboard() {
   if (!activeWorkspace) {
     return <ErrorState error="Selecione uma conta para visualizar o dashboard." onRetry={() => window.location.reload()} />;
   }
-  if (isLoading && !data) return <LoadingState />;
+  if (isLoading && !data) return <DashboardSkeleton />;
   if (error && !data) return <ErrorState error={error} onRetry={() => refetch(true)} />;
   if (!data) return <ErrorState error="Sem dados. Clique em Atualizar agora para sincronizar com o VFlow360." onRetry={() => refetch(true)} />;
 
   const formatPercentage = (v: number) => `${v.toFixed(1)}%`;
+  const formatBRL = (v: number) => {
+    if (v >= 100_000) {
+      return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: 1 }).format(v);
+    }
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
+  };
   const calcTrend = (cur: number, prev: number) => {
     if (prev === 0) return cur > 0 ? { value: 100, isPositive: true } : undefined;
     const ch = ((cur - prev) / prev) * 100;
@@ -185,19 +194,21 @@ export default function Dashboard() {
   };
 
   const currentWon = data.funnelStages.find((s) => s.id === "venda_ganha")?.count || 0;
-  const currentNeg =
-    (data.funnelStages.find((s) => s.id === "proposta_enviada")?.count || 0) +
-    (data.funnelStages.find((s) => s.id === "fechamento")?.count || 0);
   const prevWon = prevData?.funnelStages.find((s) => s.id === "venda_ganha")?.count || 0;
-  const prevNeg = prevData
-    ? (prevData.funnelStages.find((s) => s.id === "proposta_enviada")?.count || 0) +
-      (prevData.funnelStages.find((s) => s.id === "fechamento")?.count || 0)
-    : 0;
 
   const leadsTrend = prevData ? calcTrend(data.totalLeads, prevData.totalLeads) : undefined;
   const wonTrend = prevData ? calcTrend(currentWon, prevWon) : undefined;
-  const negTrend = prevData ? calcTrend(currentNeg, prevNeg) : undefined;
   const convTrend = prevData ? calcTrend(data.conversionRates.overallConversion, prevData.conversionRates.overallConversion) : undefined;
+
+  const wonRevenue = data.wonMonetary ?? 0;
+  const negotiatingRevenue = data.negotiatingMonetary ?? 0;
+  const ticketAvg = currentWon > 0 ? wonRevenue / currentWon : 0;
+  const prevWonRevenue = prevData?.wonMonetary ?? 0;
+  const prevNegotiatingRevenue = prevData?.negotiatingMonetary ?? 0;
+  const prevTicketAvg = prevWon > 0 ? prevWonRevenue / prevWon : 0;
+  const revenueTrend = prevData ? calcTrend(wonRevenue, prevWonRevenue) : undefined;
+  const negotiatingTrend = prevData ? calcTrend(negotiatingRevenue, prevNegotiatingRevenue) : undefined;
+  const ticketTrend = prevData ? calcTrend(ticketAvg, prevTicketAvg) : undefined;
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -231,11 +242,13 @@ export default function Dashboard() {
         <p className="text-muted-foreground">{activeWorkspace.name} · oportunidades VFlow360</p>
       </div>
 
-      <AnimatedSection className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
-        <MetricCard title="Total de Oportunidades" value={data.totalLeads} subtitle="no período selecionado" icon={Users} variant="default" tooltip="Quantidade total de oportunidades criadas no período filtrado." trend={leadsTrend} />
-        <MetricCard title="Vendas Ganhas" value={currentWon} subtitle="no período" icon={Target} variant="success" tooltip="Oportunidades que chegaram à etapa de venda ganha no período." trend={wonTrend} />
-        <MetricCard title="Em Negociação" value={currentNeg} subtitle="propostas + fechamento" icon={BarChart3} variant="accent" tooltip="Soma das oportunidades nas etapas de proposta e fechamento." trend={negTrend} />
-        <MetricCard title="Taxa de Conversão" value={formatPercentage(data.conversionRates.overallConversion)} subtitle="do funil completo" icon={TrendingUp} variant="accent" tooltip="Percentual da primeira etapa até venda ganha." trend={convTrend} />
+      <AnimatedSection className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5">
+        <MetricCard title="Total de Oportunidades" value={data.totalLeads} icon={Users} variant="default" tooltip="Quantidade total de oportunidades criadas no período filtrado." trend={leadsTrend} />
+        <MetricCard title="Vendas Ganhas" value={currentWon} icon={Target} variant="success" tooltip="Oportunidades que chegaram à etapa de venda ganha no período." trend={wonTrend} />
+        <MetricCard title="Taxa de Conversão" value={formatPercentage(data.conversionRates.overallConversion)} icon={TrendingUp} variant="accent" tooltip="Percentual da primeira etapa até venda ganha." trend={convTrend} />
+        <MetricCard title="Receita Ganha" value={formatBRL(wonRevenue)} icon={Banknote} variant="success" tooltip="Soma dos valores monetários das oportunidades marcadas como Venda Ganha no período." trend={revenueTrend} />
+        <MetricCard title="Em Negociação" value={formatBRL(negotiatingRevenue)} icon={HandCoins} variant="accent" tooltip="Soma dos valores monetários das oportunidades nas etapas Proposta Enviada e Fechamento — receita potencial em jogo no pipeline." trend={negotiatingTrend} />
+        <MetricCard title="Ticket Médio" value={formatBRL(ticketAvg)} icon={Receipt} variant="default" tooltip="Receita ganha dividida pela quantidade de vendas ganhas no período." trend={ticketTrend} />
       </AnimatedSection>
 
 
@@ -246,6 +259,14 @@ export default function Dashboard() {
             conversionRates={data.conversionRates}
             lostLeads={data.lostLeads || 0}
             lostLeadsDetail={data.lostLeadsDetail || []}
+            belowLostCard={
+              <FunnelCycles
+                cycleToWonDays={data.cycleToWonDays ?? 0}
+                cycleToWonSample={data.cycleToWonSample ?? 0}
+                cycleToLostDays={data.cycleToLostDays ?? 0}
+                cycleToLostSample={data.cycleToLostSample ?? 0}
+              />
+            }
           />
         </div>
         <div className="lg:col-span-1">
@@ -253,34 +274,20 @@ export default function Dashboard() {
         </div>
       </AnimatedSection>
 
-      <AnimatedSection delay={0.05}>
-        <UTMOrigins
-          source={{ distribution: data.utmSourceDistribution || [], fillRate: data.utmSourceFillRate || 0 }}
-          medium={{ distribution: data.utmMediumDistribution || [], fillRate: data.utmMediumFillRate || 0 }}
-          campaign={{ distribution: data.utmCampaignDistribution || [], fillRate: data.utmCampaignFillRate || 0 }}
-          configured={data.utmConfigured || { source: false, medium: false, campaign: false }}
-          activeMedium={selectedUtmMedium}
-          activeCampaign={selectedUtmCampaign}
-          onSelectMedium={setSelectedUtmMedium}
-          onSelectCampaign={setSelectedUtmCampaign}
+      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
+        <OriginsCard
+          mode="leads"
+          distribution={data.leadsOriginDistribution || []}
+          fillRate={data.leadsOriginFillRate || 0}
+          configured={data.utmConfigured?.source || false}
         />
-      </AnimatedSection>
-
-      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
-        <WonOrigins
-          distribution={data.wonUtmSourceDistribution || []}
-          fillRate={data.wonUtmSourceFillRate || 0}
-          totalWon={data.funnelStages.find((s) => s.id === "venda_ganha")?.count || 0}
+        <OriginsCard
+          mode="wins"
+          distribution={data.wonOriginDistribution || []}
+          fillRate={data.wonOriginFillRate || 0}
           configured={data.utmConfigured?.source || false}
         />
         <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
-      </AnimatedSection>
-
-      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
-        <div className="lg:col-span-2">
-          <DataQuality customFields={data.customFields} overallFillRate={data.overallFillRate} />
-        </div>
-        <ResponseTimeCard responseTime={data.responseTime} />
       </AnimatedSection>
 
       {data.customFieldDistributions && data.customFieldDistributions.length > 0 && (
@@ -289,19 +296,28 @@ export default function Dashboard() {
         </AnimatedSection>
       )}
 
+      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
+        <div className="lg:col-span-2">
+          <DataQuality customFields={data.customFields} overallFillRate={data.overallFillRate} />
+        </div>
+        <ResponseTimeCard responseTime={data.responseTime} prevResponseTime={prevData?.responseTime} />
+      </AnimatedSection>
+
       <AnimatedSection delay={0.05}>
-        <SellerPerformance sellers={data.sellers} />
+        <SellerPerformance
+          sellers={data.sellers}
+          selectedSellerId={selectedSellerId}
+          onSellerClick={setSelectedSellerId}
+        />
       </AnimatedSection>
 
       <AnimatedSection delay={0.05}>
         <DailyLeads dailyLeads={data.dailyLeads || []} />
       </AnimatedSection>
 
-
-      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
+      <AnimatedSection delay={0.05}>
         <TimePerStage averageTimePerStage={data.averageTimePerStage} />
       </AnimatedSection>
-
 
       <AnimatedSection delay={0.05}>
         <AIUsageCard startDate={startDate} endDate={endDate} />

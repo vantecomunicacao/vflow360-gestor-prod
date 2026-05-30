@@ -43,6 +43,9 @@ export function CustomFieldCharts({ fields }: CustomFieldChartsProps) {
         {fields.map((f) => {
           const data = compactDistribution(f.distribution);
           const hasData = data.length > 0;
+          const chartDescription = hasData
+            ? `Distribuição do campo ${f.name}: ${data.slice(0, 3).map((d) => `${d.name} ${d.percentage.toFixed(0)}%`).join(", ")}.`
+            : `Distribuição do campo ${f.name}: sem dados.`;
           return (
             <div key={f.key} className="border rounded-2xl p-3 bg-card/50">
               <div className="flex items-start justify-between gap-2 mb-1">
@@ -56,7 +59,7 @@ export function CustomFieldCharts({ fields }: CustomFieldChartsProps) {
                 <p className="text-xs text-muted-foreground text-center py-6">Sem dados</p>
               ) : (
                 <>
-                  <div className="h-28">
+                  <div className="h-28" role="img" aria-label={chartDescription}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie

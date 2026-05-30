@@ -10,6 +10,8 @@ const getProgressColor = (p: number) => (p >= 80 ? "bg-success" : p >= 50 ? "bg-
 const getQualityClass = (p: number) => (p >= 80 ? "quality-good" : p >= 50 ? "quality-warning" : "quality-bad");
 
 export function DataQuality({ customFields, overallFillRate = 0 }: DataQualityProps) {
+  const sortedFields = [...customFields].sort((a, b) => a.filledPercentage - b.filledPercentage);
+
   if (customFields.length === 0) {
     return (
       <div className="dashboard-section animate-slide-up">
@@ -40,25 +42,27 @@ export function DataQuality({ customFields, overallFillRate = 0 }: DataQualityPr
       </p>
 
       <div className="space-y-3">
-        {customFields.map((f) => {
+        {sortedFields.map((f) => {
           const Icon = f.filledPercentage >= 50 ? CheckCircle2 : AlertCircle;
           const iconColor = f.filledPercentage >= 50 ? "text-success" : "text-destructive";
           const bgColor = f.filledPercentage >= 50 ? "bg-success/5 border-success/10" : "bg-destructive/5 border-destructive/10";
           const textColor = f.filledPercentage >= 50 ? "text-success" : "text-destructive";
 
           return (
-            <div key={f.name} className={cn("p-4 border rounded-2xl", bgColor)}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Icon className={cn("w-4 h-4", iconColor)} />
-                  <span className="text-sm font-semibold">{f.name}</span>
+            <div key={f.name} className={cn("p-3 border rounded-2xl", bgColor)}>
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Icon className={cn("w-4 h-4 shrink-0", iconColor)} />
+                  <span className="text-sm font-semibold truncate">{f.name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                    · {f.filledCount}/{f.totalLeads}
+                  </span>
                 </div>
-                <span className={cn("text-sm font-bold", textColor)}>{formatPercentage(f.filledPercentage)}</span>
+                <span className={cn("text-sm font-bold tabular-nums shrink-0", textColor)}>{formatPercentage(f.filledPercentage)}</span>
               </div>
               <div className="h-2 bg-secondary rounded-full overflow-hidden">
                 <div className={cn("h-full rounded-full transition-all duration-500", getProgressColor(f.filledPercentage))} style={{ width: `${f.filledPercentage}%` }} />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">{f.filledCount} de {f.totalLeads} oportunidades preenchidas</p>
             </div>
           );
         })}

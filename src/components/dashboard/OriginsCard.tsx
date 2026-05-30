@@ -1,50 +1,96 @@
 import { useMemo } from "react";
-import { LossReason } from "@/hooks/useGhlData";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { XCircle, CheckCircle2, AlertCircle } from "lucide-react";
+import { LeadOrigin } from "@/hooks/useGhlData";
+import { Compass, Trophy, Settings as SettingsIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import { Link } from "react-router-dom";
 import { SectionTooltip } from "./SectionTooltip";
-import { groupTopN, NAO_INFORMADO_LABEL } from "@/lib/group-top-n";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { groupTopN } from "@/lib/group-top-n";
 import { getPieColor } from "@/lib/pie-palette";
 
-interface LossReasonsProps { lossReasons: LossReason[]; totalLost: number; }
+type Mode = "leads" | "wins";
 
-export function LossReasons({ lossReasons, totalLost }: LossReasonsProps) {
-  const distribution = useMemo(() => {
-    if (totalLost === 0) return [];
-    return lossReasons
-      .map((lr) => ({
-        name: lr.reason,
-        count: lr.count,
-        percentage: (lr.count / totalLost) * 100,
-      }))
-      .sort((a, b) => {
-        if (a.name === NAO_INFORMADO_LABEL) return 1;
-        if (b.name === NAO_INFORMADO_LABEL) return -1;
-        return (b.count - a.count) || a.name.localeCompare(b.name);
-      });
-  }, [lossReasons, totalLost]);
+interface OriginsCardProps {
+  mode: Mode;
+  distribution: LeadOrigin[];
+  fillRate: number;
+  configured: boolean;
+}
+
+const COPY: Record<Mode, {
+  icon: typeof Compass;
+  title: string;
+  tooltip: string;
+  unitLabel: string;
+  emptyData: string;
+  notConfiguredText: string;
+  showCta: boolean;
+}> = {
+  leads: {
+    icon: Compass,
+    title: "Origem dos leads",
+    tooltip: "Distribuição das oportunidades por UTM Source + Campaign. Mostra as 6 maiores origens; o restante é agrupado em 'Outras'.",
+    unitLabel: "leads",
+    emptyData: "Nenhum lead no período.",
+    notConfiguredText: "Mapeie o UTM Source nas configurações para visualizar a origem dos leads.",
+    showCta: true,
+  },
+  wins: {
+    icon: Trophy,
+    title: "Origem das vendas",
+    tooltip: "Distribuição das vendas ganhas por UTM Source + Campaign. Mostra as 6 maiores origens; o restante é agrupado em 'Outras'.",
+    unitLabel: "vendas",
+    emptyData: "Nenhuma venda ganha no período.",
+    notConfiguredText: "Configure o campo UTM Source nas configurações para visualizar de onde vêm suas vendas.",
+    showCta: true,
+  },
+};
+
+export function OriginsCard({ mode, distribution, fillRate, configured }: OriginsCardProps) {
+  const copy = COPY[mode];
+  const Icon = copy.icon;
 
   const grouped = useMemo(() => groupTopN(distribution, 6), [distribution]);
   const chartData = grouped.map((o) => ({ name: o.name, value: o.count }));
 
   const chartDescription = useMemo(() => {
-    if (grouped.length === 0) return "Nenhuma oportunidade perdida no período.";
+    if (grouped.length === 0) return copy.emptyData;
+    const total = grouped.reduce((sum, g) => sum + g.count, 0);
     const top = grouped.slice(0, 3).map((g) => `${g.name} ${g.percentage.toFixed(0)}%`).join(", ");
-    return `Motivos de perda: gráfico de pizza com ${grouped.length} fatia${grouped.length === 1 ? "" : "s"}, totalizando ${totalLost} oportunidade${totalLost === 1 ? "" : "s"} perdida${totalLost === 1 ? "" : "s"}. Maiores motivos: ${top}.`;
-  }, [grouped, totalLost]);
+    return `${copy.title}: gráfico de pizza com ${grouped.length} fatia${grouped.length === 1 ? "" : "s"}, totalizando ${total} ${copy.unitLabel}. Maiores: ${top}.`;
+  }, [grouped, copy]);
 
-  const filled = distribution
-    .filter((d) => d.name !== NAO_INFORMADO_LABEL)
-    .reduce((s, d) => s + d.count, 0);
-  const fillRate = totalLost > 0 ? (filled / totalLost) * 100 : 0;
+  if (!configured) {
+    return (
+      <div className="dashboard-section animate-slide-up h-full">
+        <h2 className="section-title">
+          <Icon className="w-5 h-5 text-primary-ink" />
+          {copy.title}
+        </h2>
+        <div className="flex flex-col items-center justify-center text-center py-10 gap-3">
+          <p className="text-sm text-muted-foreground max-w-md">
+            {copy.notConfiguredText}
+          </p>
+          {copy.showCta && (
+            <Link
+              to="/settings/dashboard"
+              className="inline-flex items-center gap-2 text-sm font-medium text-primary-ink hover:underline"
+            >
+              <SettingsIcon className="w-4 h-4" />
+              Configurar campos UTM
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-section animate-slide-up h-full">
       <div className="flex items-center justify-between mb-4">
         <h2 className="section-title mb-0">
-          <XCircle className="w-5 h-5 text-destructive" />
-          Motivos de Perda
-          <SectionTooltip text="Distribuição dos motivos para oportunidades marcadas como Perdidas. Mostra os 6 principais motivos; o restante é agrupado em 'Outras'. Perdas sem motivo registrado aparecem como 'Não informado'." />
+          <Icon className="w-5 h-5 text-primary-ink" />
+          {copy.title}
+          <SectionTooltip text={copy.tooltip} />
         </h2>
         <div
           className="flex items-center gap-1.5 text-sm"
@@ -63,7 +109,7 @@ export function LossReasons({ lossReasons, totalLost }: LossReasonsProps) {
       {grouped.length === 0 ? (
         <div className="flex items-center justify-center h-48">
           <p className="text-muted-foreground text-sm text-center">
-            Nenhuma oportunidade perdida no período.
+            {copy.emptyData}
           </p>
         </div>
       ) : (
@@ -93,7 +139,7 @@ export function LossReasons({ lossReasons, totalLost }: LossReasonsProps) {
                     boxShadow: "var(--shadow-2)",
                     fontSize: 13,
                   }}
-                  formatter={(v: number, name: string) => [`${v} opps`, name]}
+                  formatter={(v: number, name: string) => [`${v} ${copy.unitLabel}`, name]}
                 />
               </PieChart>
             </ResponsiveContainer>

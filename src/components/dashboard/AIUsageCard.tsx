@@ -14,8 +14,8 @@ export function AIUsageCard({ startDate, endDate }: Props) {
   const { data, isLoading } = useQuery({
     queryKey: ["ai-usage", activeWorkspace?.id, startDate.toISOString(), endDate.toISOString()],
     queryFn: async () => {
-      if (!activeWorkspace) return null;
-      const { data, error } = await (supabase as any)
+      if (!activeWorkspace) return [];
+      const { data, error } = await supabase
         .from("ai_usage_log")
         .select("provider, model, prompt_tokens, completion_tokens, total_tokens, cost_usd")
         .eq("workspace_id", activeWorkspace.id)
@@ -23,16 +23,13 @@ export function AIUsageCard({ startDate, endDate }: Props) {
         .lte("created_at", endDate.toISOString())
         .limit(10000);
       if (error) throw error;
-      return data || [];
+      return data ?? [];
     },
     enabled: !!activeWorkspace,
     staleTime: 60_000,
   });
 
-  const rows = (data || []) as Array<{
-    provider: string; model: string;
-    prompt_tokens: number; completion_tokens: number; total_tokens: number; cost_usd: number;
-  }>;
+  const rows = data ?? [];
 
   const totals = rows.reduce(
     (acc, r) => {
@@ -66,7 +63,7 @@ export function AIUsageCard({ startDate, endDate }: Props) {
           <Sparkles className="h-5 w-5 text-primary-ink" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-foreground">Consumo de IA (Sugestões)</h3>
+          <h2 className="text-lg font-semibold text-foreground">Consumo de IA (Sugestões)</h2>
           <p className="text-xs text-muted-foreground">No período filtrado · custo estimado</p>
         </div>
       </div>

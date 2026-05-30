@@ -50,6 +50,7 @@ export interface ResponseTime {
   averageMinutes: number;
   responseCount: number;
   conversationsAnalyzed: number;
+  conversationsWithInbound?: number;
   businessHoursStart: string;
   businessHoursEnd: string;
 }
@@ -77,10 +78,18 @@ export interface DashboardData {
   utmCampaignValues: string[];
   wonUtmSourceDistribution: LeadOrigin[];
   wonUtmSourceFillRate: number;
-  utmConfigured: { source: boolean; medium: boolean; campaign: boolean };
+  leadsOriginDistribution: LeadOrigin[];
+  leadsOriginFillRate: number;
+  wonOriginDistribution: LeadOrigin[];
+  wonOriginFillRate: number;
+  utmConfigured: { source: boolean; medium: boolean; campaign: boolean; content: boolean; term: boolean };
   customFields: CustomField[];
   customFieldDistributions?: CustomFieldDistribution[];
   averageTimePerStage: AverageTimePerStage;
+  cycleToWonDays?: number;
+  cycleToWonSample?: number;
+  cycleToLostDays?: number;
+  cycleToLostSample?: number;
   dailyLeads: DailyLead[];
   pipelines: Pipeline[];
   users: User[];
@@ -89,6 +98,7 @@ export interface DashboardData {
   lossReasons: LossReason[];
   totalMonetary?: number;
   wonMonetary?: number;
+  negotiatingMonetary?: number;
   cachedAt?: string;
   additionalDateFieldId?: string | null;
   additionalDateFieldName?: string | null;

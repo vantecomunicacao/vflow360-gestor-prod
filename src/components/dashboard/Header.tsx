@@ -61,7 +61,7 @@ function formatRangeLabel(range: DateRange | undefined) {
 }
 
 function DateRangePicker({
-  dateRange, onDateRangeChange, label, placeholder = "Período", icon: Icon = CalendarDays, className,
+  dateRange, onDateRangeChange, label, placeholder = "Período", icon: Icon = CalendarDays, className, clearable = false,
 }: {
   dateRange: DateRange | undefined;
   onDateRangeChange: (r: DateRange | undefined) => void;
@@ -69,6 +69,7 @@ function DateRangePicker({
   placeholder?: string;
   icon?: typeof CalendarDays;
   className?: string;
+  clearable?: boolean;
 }) {
   const [localRange, setLocalRange] = useState<DateRange | undefined>(dateRange);
   const [open, setOpen] = useState(false);
@@ -89,7 +90,11 @@ function DateRangePicker({
         <Button
           variant="outline"
           size="sm"
-          className={cn("gap-2 h-8 text-xs font-medium border-border/60 hover:bg-accent/50", className)}
+          className={cn(
+            "gap-2 h-8 text-xs font-medium border-border/60 hover:bg-accent/50",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
+            className
+          )}
         >
           <Icon className="w-3.5 h-3.5 text-muted-foreground" />
           {labelText ? (
@@ -100,10 +105,34 @@ function DateRangePicker({
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
-          <ChevronDown className="w-3 h-3 opacity-50 ml-auto" />
+          {clearable && labelText && (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Limpar período"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDateRangeChange(undefined);
+                setOpen(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDateRangeChange(undefined);
+                  setOpen(false);
+                }
+              }}
+              className="ml-1 p-0.5 rounded hover:bg-accent/60 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            >
+              <X className="w-3 h-3" />
+            </span>
+          )}
+          <ChevronDown className="w-3 h-3 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 rounded-xl" align="start">
+      <PopoverContent style={{ width: "fit-content" }} className="p-0 rounded-xl" align="start">
         <div className="flex">
           <div className="border-r border-border p-2 space-y-0.5 min-w-[140px]">
             <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-2 py-1.5">Atalhos</p>
@@ -158,6 +187,7 @@ function FilterSelect({
       <SelectTrigger
         className={cn(
           "h-8 text-xs font-medium border-border/60 hover:bg-accent/50 gap-2 px-3 w-auto min-w-[130px] max-w-[200px]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
           selected && "border-primary/40 bg-primary/5 text-foreground",
           className
         )}
@@ -281,6 +311,7 @@ export function Header({
             <DateRangePicker
               dateRange={additionalDateRange}
               onDateRangeChange={onAdditionalDateRangeChange!}
+              clearable
             />
           </Field>
         </>
@@ -349,8 +380,9 @@ export function Header({
             onClick={() => onRefresh(true)}
             disabled={isLoading}
             title="Forçar atualização"
+            aria-label="Atualizar dados do dashboard"
           >
-            <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
+            <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} aria-hidden="true" />
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
           {permissions.viewSettings && (
@@ -361,8 +393,8 @@ export function Header({
               asChild
               title="Personalizar dashboard"
             >
-              <Link to="/settings/dashboard">
-                <SlidersHorizontal className="w-3.5 h-3.5" />
+              <Link to="/settings/dashboard" aria-label="Personalizar dashboard">
+                <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
                 <span className="hidden sm:inline">Personalizar</span>
               </Link>
             </Button>

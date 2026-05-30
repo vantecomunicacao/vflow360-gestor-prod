@@ -9,7 +9,7 @@ export function AIInsights() {
           <div className="p-2 rounded-lg bg-accent/10">
             <Sparkles className="h-5 w-5 text-primary-ink" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground">Insights com I.A.</h3>
+          <h2 className="text-lg font-semibold text-foreground">Insights com I.A.</h2>
         </div>
         <Badge variant="secondary" className="text-xs">Em breve</Badge>
       </div>

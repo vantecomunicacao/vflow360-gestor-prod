@@ -31,6 +31,8 @@ export default function DashboardSettings() {
   const [utmSourceField, setUtmSourceField] = useState<string>("");
   const [utmMediumField, setUtmMediumField] = useState<string>("");
   const [utmCampaignField, setUtmCampaignField] = useState<string>("");
+  const [utmContentField, setUtmContentField] = useState<string>("");
+  const [utmTermField, setUtmTermField] = useState<string>("");
   const [additionalDateField, setAdditionalDateField] = useState<string>("");
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [chartFields, setChartFields] = useState<string[]>([]);
@@ -67,6 +69,8 @@ export default function DashboardSettings() {
         setUtmSourceField((settings as any).utm_source_field_id || "");
         setUtmMediumField((settings as any).utm_medium_field_id || "");
         setUtmCampaignField((settings as any).utm_campaign_field_id || "");
+        setUtmContentField((settings as any).utm_content_field_id || "");
+        setUtmTermField((settings as any).utm_term_field_id || "");
         setAdditionalDateField(settings.additional_date_field || "");
         setVisibleFields(settings.visible_custom_fields || []);
         setChartFields((settings as any).chart_custom_fields || []);
@@ -92,6 +96,8 @@ export default function DashboardSettings() {
         utm_source_field_id: utmSourceField || null,
         utm_medium_field_id: utmMediumField || null,
         utm_campaign_field_id: utmCampaignField || null,
+        utm_content_field_id: utmContentField || null,
+        utm_term_field_id: utmTermField || null,
         additional_date_field: additionalDateField || null,
         visible_custom_fields: visibleFields,
         chart_custom_fields: chartFields.filter((id) => visibleFields.includes(id)),
@@ -313,7 +319,7 @@ export default function DashboardSettings() {
         <CardHeader>
           <CardTitle>Campos UTM</CardTitle>
           <CardDescription>
-            Mapeie quais custom fields do GHL correspondem aos parâmetros UTM. Os 3 alimentam o card "Origem dos leads" no dashboard.
+            Mapeie quais custom fields do GHL correspondem aos parâmetros UTM. Source e Campaign alimentam os pies "Origem dos leads" e "Origem das vendas" no dashboard. Medium é usado como filtro. Content e Term ficam disponíveis para análises detalhadas.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -321,6 +327,8 @@ export default function DashboardSettings() {
             { key: "source", label: "UTM Source", value: utmSourceField, setter: setUtmSourceField, hint: "Plataforma (ex.: google, facebook, instagram)" },
             { key: "medium", label: "UTM Medium", value: utmMediumField, setter: setUtmMediumField, hint: "Tipo de mídia (ex.: cpc, social, organic, email)" },
             { key: "campaign", label: "UTM Campaign", value: utmCampaignField, setter: setUtmCampaignField, hint: "Campanha específica (ex.: black-friday, lançamento-x)" },
+            { key: "content", label: "UTM Content", value: utmContentField, setter: setUtmContentField, hint: "Variação criativa / anúncio (ex.: video-30s-v2, carrossel-azul)" },
+            { key: "term", label: "UTM Term", value: utmTermField, setter: setUtmTermField, hint: "Público-alvo, palavra-chave ou segmentação (ex.: lookalike-1pct)" },
           ].map((utm) => (
             <div key={utm.key} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
               <div>

@@ -1,9 +1,12 @@
-import { Clock } from "lucide-react";
+import { Clock, TrendingDown, TrendingUp, MessageCircleReply } from "lucide-react";
 import { ResponseTime as RT } from "@/hooks/useGhlData";
 import { SectionTooltip } from "./SectionTooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface ResponseTimeCardProps {
   responseTime: RT | null | undefined;
+  prevResponseTime?: RT | null;
 }
 
 function formatDuration(minutes: number): { value: string; unit: string } {
@@ -20,13 +23,50 @@ function formatDuration(minutes: number): { value: string; unit: string } {
   return { value: days.toFixed(1), unit: "dias" };
 }
 
-export function ResponseTimeCard({ responseTime }: ResponseTimeCardProps) {
+export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTimeCardProps) {
   const minutes = responseTime?.averageMinutes ?? 0;
   const { value, unit } = formatDuration(minutes);
   const responses = responseTime?.responseCount ?? 0;
   const convs = responseTime?.conversationsAnalyzed ?? 0;
   const start = responseTime?.businessHoursStart || "09:00";
   const end = responseTime?.businessHoursEnd || "18:00";
+
+  const prevMinutes = prevResponseTime?.averageMinutes ?? 0;
+  const trend = (() => {
+    if (minutes <= 0 || prevMinutes <= 0) return null;
+    const diff = ((minutes - prevMinutes) / prevMinutes) * 100;
+    if (Math.abs(diff) < 0.1) return null;
+    return {
+      value: Math.round(Math.abs(diff) * 10) / 10,
+      faster: diff < 0,
+    };
+  })();
+
+  const withInbound = responseTime?.conversationsWithInbound ?? 0;
+  const responseRate = withInbound > 0 ? (convs / withInbound) * 100 : null;
+  const rateColor =
+    responseRate === null ? "text-muted-foreground"
+    : responseRate >= 70 ? "text-success"
+    : responseRate >= 40 ? "text-warning-ink"
+    : "text-destructive";
+  const rateBarColor =
+    responseRate === null ? "bg-muted"
+    : responseRate >= 70 ? "bg-success"
+    : responseRate >= 40 ? "bg-warning"
+    : "bg-destructive";
+
+  const prevWithInbound = prevResponseTime?.conversationsWithInbound ?? 0;
+  const prevConvs = prevResponseTime?.conversationsAnalyzed ?? 0;
+  const prevResponseRate = prevWithInbound > 0 ? (prevConvs / prevWithInbound) * 100 : null;
+  const rateTrend = (() => {
+    if (responseRate === null || prevResponseRate === null) return null;
+    const diff = responseRate - prevResponseRate;
+    if (Math.abs(diff) < 0.1) return null;
+    return {
+      value: Math.round(Math.abs(diff) * 10) / 10,
+      isPositive: diff > 0,
+    };
+  })();
 
   return (
     <div className="dashboard-section animate-slide-up h-full flex flex-col">
@@ -47,11 +87,78 @@ export function ResponseTimeCard({ responseTime }: ResponseTimeCardProps) {
               <span className="text-5xl font-bold text-foreground tabular-nums">{value}</span>
               {unit && <span className="text-xl text-muted-foreground font-semibold">{unit}</span>}
             </div>
+            {trend && (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={cn(
+                        "mt-3 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full cursor-help",
+                        trend.faster ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
+                      )}
+                    >
+                      {trend.faster ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
+                      {trend.value}% {trend.faster ? "mais rápido" : "mais lento"}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[220px] text-xs leading-relaxed">
+                    Comparação com o período anterior de mesma duração.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <p className="text-xs text-muted-foreground mt-3">
               Baseado em <span className="font-bold text-foreground">{responses}</span> resposta{responses === 1 ? "" : "s"}
               {convs > 0 && <> em <span className="font-bold text-foreground">{convs}</span> conversa{convs === 1 ? "" : "s"}</>}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-1">
+
+            {responseRate !== null && (
+              <div className="w-full max-w-[260px] mt-5 pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MessageCircleReply className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Taxa de resposta</span>
+                    <SectionTooltip text="Percentual de conversas em que o vendedor respondeu pelo menos uma vez, considerando apenas conversas com mensagens recebidas do cliente no período." />
+                  </div>
+                  {rateTrend && (
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full cursor-help",
+                              rateTrend.isPositive ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
+                            )}
+                          >
+                            {rateTrend.isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                            {rateTrend.value}pp
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[220px] text-xs leading-relaxed">
+                          Variação em pontos percentuais vs. o período anterior.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className={cn("text-2xl font-bold tabular-nums", rateColor)}>
+                    {responseRate.toFixed(0)}%
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {convs} de {withInbound} conversa{withInbound === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
+                  <div
+                    className={cn("h-full rounded-full transition-all", rateBarColor)}
+                    style={{ width: `${Math.min(100, Math.max(2, responseRate))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <p className="text-[10px] text-muted-foreground mt-4">
               Expediente: {start} – {end}
             </p>
           </>

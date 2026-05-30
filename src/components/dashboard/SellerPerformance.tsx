@@ -1,8 +1,15 @@
+import { useMemo, useState } from "react";
 import { Seller } from "@/hooks/useGhlData";
-import { Users, Trophy, Medal } from "lucide-react";
+import { Users, Trophy, Medal, Search } from "lucide-react";
 import { SectionTooltip } from "./SectionTooltip";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
-interface SellerPerformanceProps { sellers: Seller[]; }
+interface SellerPerformanceProps {
+  sellers: Seller[];
+  selectedSellerId?: string | null;
+  onSellerClick?: (id: string | null) => void;
+}
 
 function formatResponseTime(minutes: number | null | undefined): string {
   if (minutes == null || !isFinite(minutes) || minutes <= 0) return "—";
@@ -18,8 +25,22 @@ function formatResponseTime(minutes: number | null | undefined): string {
   return `${days.toFixed(1)} dias`;
 }
 
-export function SellerPerformance({ sellers }: SellerPerformanceProps) {
-  const sortedSellers = [...sellers].sort((a, b) => b.vendaGanha - a.vendaGanha);
+export function SellerPerformance({ sellers, selectedSellerId, onSellerClick }: SellerPerformanceProps) {
+  const [query, setQuery] = useState("");
+  const sortedSellers = useMemo(
+    () => [...sellers].sort((a, b) => b.vendaGanha - a.vendaGanha),
+    [sellers]
+  );
+  const visibleSellers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sortedSellers;
+    return sortedSellers.filter((s) => s.name.toLowerCase().includes(q));
+  }, [sortedSellers, query]);
+  const interactive = !!onSellerClick;
+  const handleRowClick = (id: string | undefined) => {
+    if (!interactive || !id) return;
+    onSellerClick!(selectedSellerId === id ? null : id);
+  };
 
   const getRankBadge = (i: number) => {
     if (i === 0) return <Trophy className="w-4 h-4 text-warning-ink" />;
@@ -42,11 +63,40 @@ export function SellerPerformance({ sellers }: SellerPerformanceProps) {
 
   return (
     <div className="dashboard-section animate-slide-up">
-      <h2 className="section-title">
-        <Users className="w-5 h-5 text-primary-ink" />
-        Performance por Vendedor
-        <SectionTooltip text="Comparativo entre vendedores: oportunidades atribuídas por etapa, taxa de conversão e tempo médio de resposta individual." />
-      </h2>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h2 className="section-title mb-0">
+          <Users className="w-5 h-5 text-primary-ink" />
+          Performance por Vendedor
+          <SectionTooltip text={
+            interactive
+              ? "Comparativo entre vendedores: oportunidades atribuídas por etapa, taxa de conversão e tempo médio de resposta individual. Clique em uma linha para filtrar o dashboard inteiro por esse vendedor."
+              : "Comparativo entre vendedores: oportunidades atribuídas por etapa, taxa de conversão e tempo médio de resposta individual."
+          } />
+        </h2>
+        <div className="flex items-center gap-3 ml-auto">
+          {sellers.length > 5 && (
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar vendedor..."
+                className="h-8 w-48 pl-8 text-xs"
+              />
+            </div>
+          )}
+          {interactive && selectedSellerId && (
+            <button
+              type="button"
+              onClick={() => onSellerClick?.(null)}
+              className="text-xs font-medium text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            >
+              Limpar filtro de vendedor
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="overflow-x-auto">
         <table className="data-table">
@@ -63,13 +113,34 @@ export function SellerPerformance({ sellers }: SellerPerformanceProps) {
             </tr>
           </thead>
           <tbody>
-            {sortedSellers.map((s, i) => {
+            {visibleSellers.map((s) => {
+              const realIndex = sortedSellers.indexOf(s);
               const rate = s.contatoInicial > 0 ? ((s.vendaGanha / s.contatoInicial) * 100).toFixed(1) : "0.0";
               const respLabel = formatResponseTime(s.avgResponseMinutes);
+              const isSelected = !!selectedSellerId && s.id === selectedSellerId;
+              const canClick = interactive && !!s.id;
               return (
-                <tr key={(s.id || s.name) + i}>
+                <tr
+                  key={(s.id || s.name) + realIndex}
+                  onClick={canClick ? () => handleRowClick(s.id) : undefined}
+                  onKeyDown={canClick ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleRowClick(s.id);
+                    }
+                  } : undefined}
+                  tabIndex={canClick ? 0 : undefined}
+                  role={canClick ? "button" : undefined}
+                  aria-pressed={canClick ? isSelected : undefined}
+                  aria-label={canClick ? `${isSelected ? "Remover filtro de" : "Filtrar dashboard por"} ${s.name}` : undefined}
+                  className={cn(
+                    canClick && "cursor-pointer transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+                    isSelected && "bg-primary/5 hover:bg-primary/10",
+                  )}
+                  title={canClick ? (isSelected ? "Clique para limpar o filtro" : "Filtrar dashboard por este vendedor") : undefined}
+                >
                   <td className="font-semibold w-12">
-                    <div className="flex items-center gap-2">{getRankBadge(i)}{i + 1}</div>
+                    <div className="flex items-center gap-2">{getRankBadge(realIndex)}{realIndex + 1}</div>
                   </td>
                   <td className="font-semibold">{s.name}</td>
                   <td className="text-center">
@@ -94,6 +165,13 @@ export function SellerPerformance({ sellers }: SellerPerformanceProps) {
                 </tr>
               );
             })}
+            {visibleSellers.length === 0 && (
+              <tr>
+                <td colSpan={8} className="text-center text-muted-foreground py-8 text-sm">
+                  Nenhum vendedor encontrado para "{query}".
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
