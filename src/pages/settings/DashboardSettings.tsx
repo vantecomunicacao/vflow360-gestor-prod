@@ -412,7 +412,8 @@ export default function DashboardSettings() {
           <CardDescription>
             Período em que sua equipe está disponível. O cálculo de "Tempo médio de resposta" do dashboard
             ignora o tempo fora desse intervalo (ex: cliente manda mensagem de madrugada e o vendedor responde de manhã).
-            Para expediente que vira a noite (ex: 18h às 09h), basta inverter os horários.
+            {" "}<strong>Por padrão, sábados, domingos e feriados nacionais brasileiros não são contabilizados.</strong>
+            {" "}Para expediente que vira a noite (ex: 18h às 09h), basta inverter os horários.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
