@@ -22,36 +22,101 @@ interface FunnelMapping {
 
 const DAY_MS = 86_400_000;
 const MIN_MS = 60_000;
+const TZ_OFFSET_MS = 3 * 60 * MIN_MS; // Brasília (UTC-3, sem DST desde 2019)
 
-// Calcula minutos "úteis" entre dois timestamps, considerando apenas o intervalo de expediente
-// startMin/endMin em minutos desde 00:00 UTC-3 (Brasília). Se start > end, expediente vira a noite.
+// Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher), em UTC.
+function easterSunday(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function fmtDateKey(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+const HOLIDAY_CACHE = new Map<number, Set<string>>();
+function getBrazilianHolidays(year: number): Set<string> {
+  let s = HOLIDAY_CACHE.get(year);
+  if (s) return s;
+  const easter = easterSunday(year);
+  const shift = (days: number) => new Date(easter.getTime() + days * DAY_MS);
+  s = new Set([
+    `${year}-01-01`, // Confraternização Universal
+    `${year}-04-21`, // Tiradentes
+    `${year}-05-01`, // Dia do Trabalho
+    `${year}-09-07`, // Independência
+    `${year}-10-12`, // N. Sra. Aparecida
+    `${year}-11-02`, // Finados
+    `${year}-11-15`, // Proclamação da República
+    `${year}-11-20`, // Consciência Negra
+    `${year}-12-25`, // Natal
+    fmtDateKey(shift(-48)), // Segunda de Carnaval
+    fmtDateKey(shift(-47)), // Terça de Carnaval
+    fmtDateKey(shift(-2)),  // Sexta-feira Santa
+    fmtDateKey(shift(60)),  // Corpus Christi
+  ]);
+  HOLIDAY_CACHE.set(year, s);
+  return s;
+}
+
+// Verifica se um instante "local" (já com offset de Brasília aplicado) cai em dia útil.
+function isWorkingDay(localMs: number): boolean {
+  const d = new Date(localMs);
+  const dow = d.getUTCDay(); // 0=domingo, 6=sábado
+  if (dow === 0 || dow === 6) return false;
+  return !getBrazilianHolidays(d.getUTCFullYear()).has(fmtDateKey(d));
+}
+
+// Calcula minutos "úteis" entre dois timestamps, considerando expediente,
+// fins de semana e feriados nacionais brasileiros (UTC-3 / Brasília).
+// startMin/endMin em minutos desde 00:00. Se start > end, expediente vira a noite.
 function businessMinutesBetween(fromMs: number, toMs: number, startMin: number, endMin: number): number {
   if (toMs <= fromMs) return 0;
-  // 24h = expediente integral
-  if (startMin === endMin) return Math.round((toMs - fromMs) / MIN_MS);
 
-  // Trabalhar em fuso de Brasília (UTC-3) para alinhar com horário comercial local
-  const TZ_OFFSET_MS = 3 * 60 * MIN_MS;
-  const wraps = startMin > endMin; // expediente atravessa meia-noite
+  const fullDay = startMin === endMin; // 24h em dia útil
+  const wraps = startMin > endMin;
+  const dailyBusinessMin = fullDay ? 1440 : (wraps ? (1440 - startMin + endMin) : (endMin - startMin));
 
   const inBusiness = (ms: number): boolean => {
     const local = ms - TZ_OFFSET_MS;
+    if (!isWorkingDay(local)) return false;
+    if (fullDay) return true;
     const dayMs = ((local % DAY_MS) + DAY_MS) % DAY_MS;
     const min = dayMs / MIN_MS;
     return wraps ? (min >= startMin || min < endMin) : (min >= startMin && min < endMin);
   };
 
-  // Caminhar minuto a minuto seria pesado em diffs grandes. Subdividimos por blocos de 15 min
-  // e ajustamos com varredura fina nos limites. Para diffs muito grandes (>30 dias), aproximamos.
   const totalMin = (toMs - fromMs) / MIN_MS;
   if (totalMin > 60 * 24 * 30) {
-    // aproximação: razão de minutos úteis no dia
-    const dailyBusinessMin = wraps ? (1440 - startMin + endMin) : (endMin - startMin);
-    return Math.round(totalMin * (dailyBusinessMin / 1440));
+    // Para diffs >30 dias, conta dias úteis no intervalo e multiplica por minutos/dia.
+    // Perde precisão nas frações dos extremos, irrelevante nessa escala.
+    let workingDays = 0;
+    const startLocal = fromMs - TZ_OFFSET_MS;
+    const endLocal = toMs - TZ_OFFSET_MS;
+    const firstDay = Math.floor(startLocal / DAY_MS) * DAY_MS;
+    for (let d = firstDay; d < endLocal; d += DAY_MS) {
+      if (isWorkingDay(d)) workingDays++;
+    }
+    return Math.round(workingDays * dailyBusinessMin);
   }
 
   let count = 0;
-  // step de 1 min é exato; cap a 60*24*30 já evita explosão
   for (let t = fromMs; t < toMs; t += MIN_MS) {
     if (inBusiness(t)) count++;
   }
@@ -209,21 +274,6 @@ serve(async (req) => {
     const utmContentFieldId: string | null = settings?.utm_content_field_id || null;
     const utmTermFieldId: string | null = settings?.utm_term_field_id || null;
 
-    // ===== Query opportunities com filtros =====
-    let q = supabase
-      .from("ghl_opportunities")
-      .select("ghl_id,name,pipeline_id,stage_id,status,monetary_value,source,assigned_to,lost_reason_id,custom_fields,ghl_created_at,last_status_change_at,contact_phone")
-      .eq("workspace_id", workspaceId)
-      .limit(10000);
-    if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
-    if (filterStageId) q = q.eq("stage_id", filterStageId);
-    if (filterUserId) q = q.eq("assigned_to", filterUserId);
-    if (startDate) q = q.gte("ghl_created_at", startDate);
-    if (endDate) q = q.lte("ghl_created_at", endDate);
-    const { data: oppsRows, error: oppsErr } = await q;
-    if (oppsErr) throw oppsErr;
-    let opps = (oppsRows || []) as any[];
-
     // GHL custom_fields pode vir como:
     //   A) Array: [{id, type, fieldValue, fieldValueString, fieldValueArray, fieldValueNumber, ...}]
     //   B) Objeto: {ghl_id: value} ou {field_key: value} (legado)
@@ -270,6 +320,95 @@ serve(async (req) => {
       return s === "" ? null : s;
     };
 
+    // ===== Configuração do campo de data adicional (ex: "Data de Venda") =====
+    const additionalDateFieldId: string | null = settings?.additional_date_field || null;
+    const additionalDateFieldDef = additionalDateFieldId
+      ? customFieldDefs.find(d => d.ghl_id === additionalDateFieldId || d.field_key === additionalDateFieldId)
+      : null;
+    const additionalDateFieldName: string | null = additionalDateFieldDef?.name || null;
+    const useAdditionalUnion = !!(additionalDateFieldId && additionalStartDate && additionalEndDate);
+
+    // ===== Query opportunities com filtros =====
+    // Semântica de UNIÃO (lead aparece se A OR B):
+    //   - Query A: leads criados no período principal (ghl_created_at em [startDate, endDate]).
+    //   - Query B (apenas se filtro adicional ativo): leads cujo campo de data customizado
+    //     (ex: data de venda) caia no período adicional, independente de quando criados.
+    // Dedup por ghl_id ao mesclar A e B.
+    const SELECT_COLS = "ghl_id,name,pipeline_id,stage_id,status,monetary_value,source,assigned_to,lost_reason_id,custom_fields,ghl_created_at,last_status_change_at,contact_phone";
+    const baseQuery = () => {
+      let q = supabase
+        .from("ghl_opportunities")
+        .select(SELECT_COLS)
+        .eq("workspace_id", workspaceId)
+        .limit(10000);
+      if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
+      if (filterStageId) q = q.eq("stage_id", filterStageId);
+      if (filterUserId) q = q.eq("assigned_to", filterUserId);
+      return q;
+    };
+
+    let qA = baseQuery();
+    if (startDate) qA = qA.gte("ghl_created_at", startDate);
+    if (endDate) qA = qA.lte("ghl_created_at", endDate);
+
+    // Query B: sem filtro de ghl_created_at no intervalo principal, mas com
+    // .lte("ghl_created_at", additionalEndDate) como otimização — um lead não
+    // pode ser fechado antes de ser criado.
+    const qB = useAdditionalUnion
+      ? baseQuery().lte("ghl_created_at", additionalEndDate!)
+      : null;
+
+    const [resA, resB] = await Promise.all([
+      qA,
+      qB ? qB : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
+    if ((resA as any).error) throw (resA as any).error;
+    if ((resB as any).error) throw (resB as any).error;
+    const oppsA = (((resA as any).data) || []) as any[];
+    let oppsB = (((resB as any).data) || []) as any[];
+
+    // Filtra Query B em memória pelo campo de data customizado.
+    if (useAdditionalUnion) {
+      const addStart = new Date(additionalStartDate!).getTime();
+      const addEnd = new Date(additionalEndDate!).getTime();
+      const parseDateVal = (v: any): number | null => {
+        if (v == null || v === "") return null;
+        if (typeof v === "number") {
+          // Heurística: se for em segundos (10 dígitos), converte para ms
+          const ms = v < 1e12 ? v * 1000 : v;
+          const t = new Date(ms).getTime();
+          return isNaN(t) ? null : t;
+        }
+        if (typeof v === "string") {
+          const asNum = Number(v);
+          if (!isNaN(asNum) && v.trim() !== "") {
+            const ms = asNum < 1e12 ? asNum * 1000 : asNum;
+            const t = new Date(ms).getTime();
+            if (!isNaN(t)) return t;
+          }
+          const t = new Date(v).getTime();
+          return isNaN(t) ? null : t;
+        }
+        return null;
+      };
+      oppsB = oppsB.filter((o) => {
+        const raw = extractCfValue(o.custom_fields, [
+          additionalDateFieldId,
+          additionalDateFieldDef?.field_key,
+          additionalDateFieldDef?.name,
+        ]);
+        const t = parseDateVal(raw);
+        if (t === null) return false;
+        return t >= addStart && t <= addEnd;
+      });
+    }
+
+    // União A ∪ B com dedup por ghl_id.
+    const mergedOpps = new Map<string, any>();
+    for (const o of oppsA) mergedOpps.set(o.ghl_id, o);
+    for (const o of oppsB) mergedOpps.set(o.ghl_id, o);
+    let opps = Array.from(mergedOpps.values());
+
     // Origem: source nativo ou custom field configurado
     const getOrigin = (o: any): string | null => {
       if (originFieldName) {
@@ -312,49 +451,6 @@ serve(async (req) => {
     // Quando não há filtro de pipeline, restringe aos pipelines ativos (default_pipeline_ids ou todos)
     if (!filterPipelineId && activePipelineIds.size > 0) {
       opps = opps.filter(o => !o.pipeline_id || activePipelineIds.has(o.pipeline_id));
-    }
-
-    // ===== Filtro adicional por campo de data customizado =====
-    const additionalDateFieldId: string | null = settings?.additional_date_field || null;
-    const additionalDateFieldDef = additionalDateFieldId
-      ? customFieldDefs.find(d => d.ghl_id === additionalDateFieldId || d.field_key === additionalDateFieldId)
-      : null;
-    const additionalDateFieldName: string | null = additionalDateFieldDef?.name || null;
-
-    if (additionalDateFieldId && additionalStartDate && additionalEndDate) {
-      const addStart = new Date(additionalStartDate).getTime();
-      const addEnd = new Date(additionalEndDate).getTime();
-      const parseDateVal = (v: any): number | null => {
-        if (v == null || v === "") return null;
-        if (typeof v === "number") {
-          // Heurística: se for em segundos (10 dígitos), converte para ms
-          const ms = v < 1e12 ? v * 1000 : v;
-          const t = new Date(ms).getTime();
-          return isNaN(t) ? null : t;
-        }
-        if (typeof v === "string") {
-          // Tenta número primeiro
-          const asNum = Number(v);
-          if (!isNaN(asNum) && v.trim() !== "") {
-            const ms = asNum < 1e12 ? asNum * 1000 : asNum;
-            const t = new Date(ms).getTime();
-            if (!isNaN(t)) return t;
-          }
-          const t = new Date(v).getTime();
-          return isNaN(t) ? null : t;
-        }
-        return null;
-      };
-      opps = opps.filter((o) => {
-        const raw = extractCfValue(o.custom_fields, [
-          additionalDateFieldId,
-          additionalDateFieldDef?.field_key,
-          additionalDateFieldDef?.name,
-        ]);
-        const t = parseDateVal(raw);
-        if (t === null) return false;
-        return t >= addStart && t <= addEnd;
-      });
     }
 
     const totalLeads = opps.length;
@@ -728,19 +824,22 @@ serve(async (req) => {
     // Normaliza telefones (mantém apenas dígitos) para casar com conversations
     const normalizePhone = (p: string | null | undefined) => (p || "").replace(/\D+/g, "");
     const phoneSet = new Set<string>();
+    const allowedSellerIds = new Set<string>();
     for (const o of oppsForResponse) {
       const np = normalizePhone(o.contact_phone);
       if (np) phoneSet.add(np);
+      if (o.assigned_to) allowedSellerIds.add(o.assigned_to);
     }
 
-    // Pagina TODAS as conversas do workspace e filtra por phone match (sem filtro de data
-    // — conversas antigas podem ter respostas dentro do período).
-    // Quando há filtro de vendedor, também inclui conversas vinculadas à instância de WhatsApp
-    // daquele vendedor (conversations.ghl_user_id), mesmo sem oportunidade casada por telefone.
+    // Pagina TODAS as conversas do workspace e filtra por:
+    //  - phone match com oportunidades do escopo
+    //  - quando há filtro de vendedor: ghl_user_id == aquele vendedor
+    //  - quando NÃO há filtro de vendedor: ghl_user_id em qualquer vendedor com opp no escopo
+    //    (simétrico ao caso individual — equivalente a somar as conversas vendedor a vendedor)
     const convIds: string[] = [];
     const seenConvIds = new Set<string>();
     const convToSeller = new Map<string, string>(); // convId -> sellerId
-    if (phoneSet.size > 0 || filterUserId) {
+    if (phoneSet.size > 0 || filterUserId || allowedSellerIds.size > 0) {
       const PAGE = 1000;
       let from = 0;
       while (true) {
@@ -757,7 +856,9 @@ serve(async (req) => {
           const phone = normalizePhone((c as any).contact_phone);
           const convSeller = (c as any).ghl_user_id as string | null;
           const phoneMatch = phoneSet.has(phone);
-          const sellerMatch = !!filterUserId && convSeller === filterUserId;
+          const sellerMatch = filterUserId
+            ? convSeller === filterUserId
+            : !!convSeller && allowedSellerIds.has(convSeller);
           if (phoneMatch || sellerMatch) {
             convIds.push(id);
             seenConvIds.add(id);
