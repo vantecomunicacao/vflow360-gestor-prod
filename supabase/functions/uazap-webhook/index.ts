@@ -2,6 +2,15 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { reportEdgeError } from "../_shared/error-reporter.ts";
+import { verifyWebhookHmac } from "../_shared/webhook-hmac.ts";
+import {
+  type ExtractedMedia,
+  arrayBufferToBase64,
+  cleanBase64,
+  extractMediaData,
+  mergeMedia,
+  toText,
+} from "../_shared/media-extractor.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,115 +18,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-type ExtractedMedia = {
-  url?: string;
-  base64?: string;
-  mimetype?: string;
-};
-
-function toText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function cleanBase64(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-
-  const dataUrlMatch = trimmed.match(/^data:([^;]+);base64,(.+)$/s);
-  if (dataUrlMatch) {
-    return dataUrlMatch[2].replace(/\s/g, "");
-  }
-
-  const normalized = trimmed.replace(/\s/g, "");
-  if (normalized.length < 120) return "";
-  return /^[A-Za-z0-9+/=]+$/.test(normalized) ? normalized : "";
-}
-
-function extractDataUrl(value: string): ExtractedMedia {
-  const match = value.trim().match(/^data:([^;]+);base64,(.+)$/s);
-  if (!match) return {};
-  return {
-    mimetype: match[1],
-    base64: match[2].replace(/\s/g, ""),
-  };
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return btoa(binary);
-}
-
-function mergeMedia(primary: ExtractedMedia, fallback: ExtractedMedia): ExtractedMedia {
-  return {
-    url: primary.url || fallback.url,
-    base64: primary.base64 || fallback.base64,
-    mimetype: primary.mimetype || fallback.mimetype,
-  };
-}
-
-function extractMediaData(input: unknown, depth = 0, seen = new WeakSet<object>()): ExtractedMedia {
-  if (depth > 6 || input == null) return {};
-
-  if (typeof input === "string") {
-    const maybeDataUrl = extractDataUrl(input);
-    if (maybeDataUrl.base64) return maybeDataUrl;
-    if (/^https?:\/\//i.test(input.trim())) return { url: input.trim() };
-    const maybeBase64 = cleanBase64(input);
-    return maybeBase64 ? { base64: maybeBase64 } : {};
-  }
-
-  if (Array.isArray(input)) {
-    let acc: ExtractedMedia = {};
-    for (const item of input) {
-      acc = mergeMedia(acc, extractMediaData(item, depth + 1, seen));
-      if (acc.url && acc.base64 && acc.mimetype) break;
-    }
-    return acc;
-  }
-
-  if (typeof input !== "object") return {};
-  const obj = input as Record<string, unknown>;
-  if (seen.has(obj)) return {};
-  seen.add(obj);
-
-  const directUrl =
-    toText(obj.mediaUrl) ||
-    toText(obj.url) ||
-    toText(obj.link) ||
-    toText(obj.downloadUrl) ||
-    toText(obj.fileUrl) ||
-    toText(obj.directPath);
-
-  const directMime =
-    toText(obj.mimetype) ||
-    toText(obj.mimeType) ||
-    toText(obj.contentType) ||
-    toText(obj.fileType);
-
-  const directBase64 =
-    cleanBase64(toText(obj.base64)) ||
-    cleanBase64(toText(obj.data)) ||
-    cleanBase64(toText(obj.fileData)) ||
-    cleanBase64(toText(obj.body));
-
-  let acc: ExtractedMedia = {
-    url: /^https?:\/\//i.test(directUrl) ? directUrl : "",
-    base64: directBase64,
-    mimetype: directMime,
-  };
-
-  for (const value of Object.values(obj)) {
-    acc = mergeMedia(acc, extractMediaData(value, depth + 1, seen));
-    if (acc.url && acc.base64 && acc.mimetype) break;
-  }
-
-  return acc;
-}
+// Helpers de extração de mídia movidos para _shared/media-extractor.ts.
+// Atenção: a versão compartilhada normaliza URLs relativas para
+// `https://mmg.whatsapp.net/<path>` quando recebe um path absoluto — antes o
+// Uazap descartava esses casos. Sem efeito se o Uazap só enviar URLs absolutas
+// (caso esperado em produção); caso contrário, agora passa a baixar a mídia.
 
 // Download media via Uazap API
 async function downloadMediaViaUazap(
@@ -449,7 +354,24 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const payload = await req.json();
+    // HMAC opt-in. Uazap (admin) suporta secret configurável; header default "x-signature".
+    const rawBody = await req.text();
+    const hmac = await verifyWebhookHmac(
+      { prefix: "UAZAP", defaultHeader: "x-signature", format: "hex" },
+      req,
+      rawBody,
+      "edge:uazap-webhook",
+    );
+    if (hmac.reject) return hmac.reject;
+
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     console.log("Webhook event:", payload.EventType || payload.event, "instance:", payload.instanceName);
 
     const event = payload.EventType || payload.event || payload.type;

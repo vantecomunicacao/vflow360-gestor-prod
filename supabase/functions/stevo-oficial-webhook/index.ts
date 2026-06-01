@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { reportEdgeError } from "../_shared/error-reporter.ts";
+import { verifyWebhookHmac } from "../_shared/webhook-hmac.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -520,9 +521,20 @@ serve(async (req) => {
       return okResponse;
     }
 
+    // HMAC opt-in: Meta envia X-Hub-Signature-256 ("sha256=<hex>") quando o
+    // app secret está configurado no painel do WhatsApp Cloud API.
+    const rawBody = await req.text();
+    const hmac = await verifyWebhookHmac(
+      { prefix: "STEVO_OFICIAL", defaultHeader: "x-hub-signature-256", format: "sha256=hex" },
+      req,
+      rawBody,
+      "edge:stevo-oficial-webhook",
+    );
+    if (hmac.reject) return hmac.reject;
+
     let payload: unknown;
     try {
-      payload = await req.json();
+      payload = JSON.parse(rawBody);
     } catch {
       console.log("Stevo Oficial webhook: invalid JSON");
       return okResponse;

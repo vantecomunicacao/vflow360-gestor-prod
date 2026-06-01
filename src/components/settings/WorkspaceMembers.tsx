@@ -24,7 +24,7 @@ export function WorkspaceMembers({ workspaceId, canManage }: { workspaceId: stri
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await (supabase.rpc as any)("list_workspace_members", { _workspace_id: workspaceId });
+    const { data, error } = await supabase.rpc("list_workspace_members", { _workspace_id: workspaceId });
     if (error) toast.error(error.message);
     else setMembers((data || []) as Member[]);
     setLoading(false);
@@ -35,7 +35,7 @@ export function WorkspaceMembers({ workspaceId, canManage }: { workspaceId: stri
   const add = async () => {
     if (!email.trim()) return;
     setAdding(true);
-    const { error } = await (supabase.rpc as any)("add_workspace_member", {
+    const { error } = await supabase.rpc("add_workspace_member", {
       _workspace_id: workspaceId,
       _email: email.trim(),
     });
@@ -50,7 +50,7 @@ export function WorkspaceMembers({ workspaceId, canManage }: { workspaceId: stri
 
   const remove = async (m: Member) => {
     setRemovingId(m.user_id);
-    const { error } = await (supabase.rpc as any)("remove_workspace_member", {
+    const { error } = await supabase.rpc("remove_workspace_member", {
       _workspace_id: workspaceId,
       _user_id: m.user_id,
     });

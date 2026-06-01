@@ -60,10 +60,13 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
             <ComposedChart data={data} barCategoryGap="25%">
               <XAxis dataKey="dayName" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12, fontWeight: 500 }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} allowDecimals={false} />
-              <Tooltip
+              <Tooltip<number, string>
                 contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "16px", boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}
-                formatter={(v: number, n: string) => [`${v} opps`, n === "count" ? "Entrada" : "Tendência"]}
-                labelFormatter={(label, payload) => payload?.[0]?.payload?.date ? formatDate(payload[0].payload.date) : label}
+                formatter={(v, n) => [`${v} opps`, n === "count" ? "Entrada" : "Tendência"]}
+                labelFormatter={(label, payload) => {
+                  const p = payload?.[0]?.payload as { date?: string } | undefined;
+                  return p?.date ? formatDate(p.date) : label;
+                }}
               />
               <Bar dataKey="count" radius={[8, 8, 0, 0]}>
                 {data.map((entry, i) => (

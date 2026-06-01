@@ -71,19 +71,26 @@ export default function Admin() {
     view_settings: false,
   });
 
-  const callAdmin = async (action: string, payload: Record<string, unknown> = {}) => {
-    const { data, error } = await supabase.functions.invoke("admin-users", {
-      body: { action, ...payload },
-    });
+  const callAdmin = async <T = Record<string, unknown>>(
+    action: string,
+    payload: Record<string, unknown> = {},
+  ): Promise<T> => {
+    const { data, error } = await supabase.functions.invoke<T & { error?: string }>(
+      "admin-users",
+      { body: { action, ...payload } },
+    );
     if (error) throw new Error(error.message);
-    if ((data as any)?.error) throw new Error((data as any).error);
-    return data as any;
+    if (data && (data as { error?: string }).error) throw new Error((data as { error?: string }).error!);
+    return data as T;
   };
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const [u, w] = await Promise.all([callAdmin("list_users"), callAdmin("list_workspaces")]);
+      const [u, w] = await Promise.all([
+        callAdmin<{ users?: AdminUser[] }>("list_users"),
+        callAdmin<{ workspaces?: Workspace[] }>("list_workspaces"),
+      ]);
       setUsers(u.users || []);
       setWorkspaces(w.workspaces || []);
     } catch (e) {
@@ -100,10 +107,13 @@ export default function Admin() {
   const promoteSelf = async () => {
     setBootstrapping(true);
     try {
-      const { data, error } = await supabase.functions.invoke("admin-bootstrap");
+      const { data, error } = await supabase.functions.invoke<{
+        error?: string;
+        promoted?: boolean;
+      }>("admin-bootstrap");
       if (error) throw new Error(error.message);
-      if ((data as any)?.error) throw new Error((data as any).error);
-      if ((data as any)?.promoted) {
+      if (data?.error) throw new Error(data.error);
+      if (data?.promoted) {
         toast.success("Você é o admin master agora! Recarregando...");
         setTimeout(() => window.location.reload(), 800);
       } else {

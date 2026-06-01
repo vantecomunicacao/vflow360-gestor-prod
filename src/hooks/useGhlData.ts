@@ -184,7 +184,8 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
         },
       });
       if (functionError) throw new Error(functionError.message);
-      if ((responseData as any)?.error) throw new Error((responseData as any).error);
+      const errMaybe = (responseData as { error?: string } | null)?.error;
+      if (errMaybe) throw new Error(errMaybe);
       return responseData as DashboardData;
     },
     enabled: enabled && !!filters.workspaceId,
@@ -217,7 +218,7 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
       const { data: syncData, error: syncError } = await supabase.functions.invoke("ghl-sync", {
         body: { workspace_id: filters.workspaceId },
       });
-      const syncErrMsg = (syncData as any)?.error;
+      const syncErrMsg = (syncData as { error?: string } | null)?.error;
       if (syncErrMsg) throw new Error(syncErrMsg);
       if (syncError) {
         console.warn("Sync warning:", syncError.message);

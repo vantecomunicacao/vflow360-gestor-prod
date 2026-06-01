@@ -41,7 +41,7 @@ export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     setLoading(true);
-    (supabase.rpc as any)("get_my_permissions").then(({ data, error }: any) => {
+    supabase.rpc("get_my_permissions").then(({ data, error }) => {
       if (!active) return;
       if (error || !data || !data[0]) {
         setPermissions(DEFAULT);

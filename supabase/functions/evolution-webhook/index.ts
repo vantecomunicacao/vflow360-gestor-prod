@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { reportEdgeError } from "../_shared/error-reporter.ts";
+import { verifyWebhookHmac } from "../_shared/webhook-hmac.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -178,7 +179,24 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const payload = await req.json();
+    // HMAC opt-in. Evolution suporta secret configurável; header default "x-signature".
+    const rawBody = await req.text();
+    const hmac = await verifyWebhookHmac(
+      { prefix: "EVOLUTION", defaultHeader: "x-signature", format: "hex" },
+      req,
+      rawBody,
+      "edge:evolution-webhook",
+    );
+    if (hmac.reject) return hmac.reject;
+
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const event = (payload?.event || "").toLowerCase();
     const instanceName = payload?.instance || payload?.instanceName;
     console.log("Evolution webhook:", event, "instance:", instanceName);

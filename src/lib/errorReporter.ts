@@ -1,7 +1,9 @@
 // Centralized error reporter — sends errors to n8n webhook AND persists in DB.
 import { toast } from "sonner";
 
-const WEBHOOK_URL = "https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable";
+const WEBHOOK_URL =
+  import.meta.env.VITE_ERROR_WEBHOOK_URL ||
+  "https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable";
 const LOG_EVENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/log-event`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const PROJECT = "VFlowGHL";
@@ -99,10 +101,16 @@ export async function reportError(payload: ReportPayload): Promise<void> {
   }
 }
 
+declare global {
+  interface Window {
+    __errorReporterInstalled?: boolean;
+  }
+}
+
 export function installGlobalErrorReporter() {
   if (typeof window === "undefined") return;
-  if ((window as any).__errorReporterInstalled) return;
-  (window as any).__errorReporterInstalled = true;
+  if (window.__errorReporterInstalled) return;
+  window.__errorReporterInstalled = true;
 
   window.addEventListener("error", (event) => {
     const err = event.error as Error | undefined;
@@ -124,11 +132,13 @@ export function installGlobalErrorReporter() {
   });
 
   window.addEventListener("unhandledrejection", (event) => {
-    const reason: any = event.reason;
+    const reason = event.reason as { message?: string; stack?: string } | string | null;
     const message =
       typeof reason === "string"
         ? reason
-        : reason?.message || JSON.stringify(reason ?? "unhandledrejection");
+        : (reason && typeof reason === "object" && reason.message)
+          ? reason.message
+          : JSON.stringify(reason ?? "unhandledrejection");
     if (isChunkLoadError(message)) {
       notifyStaleVersion();
       return;
@@ -136,7 +146,7 @@ export function installGlobalErrorReporter() {
     void reportError({
       source: "frontend:unhandledrejection",
       message,
-      stack: reason?.stack,
+      stack: typeof reason === "object" && reason ? reason.stack : undefined,
     });
   });
 }

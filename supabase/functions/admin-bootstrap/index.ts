@@ -23,13 +23,17 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: auth } },
     });
     let userId: string | undefined;
+    let userEmail: string | undefined;
     try {
       const { data: claims } = await (userClient.auth as any).getClaims(token);
-      userId = claims?.sub || claims?.claims?.sub;
+      const c = claims?.claims ?? claims;
+      userId = c?.sub;
+      userEmail = c?.email;
     } catch (_) {}
     if (!userId) {
       const { data: u } = await userClient.auth.getUser(token);
       userId = u?.user?.id;
+      userEmail = u?.user?.email ?? userEmail;
     }
     if (!userId) return json({ error: "Unauthorized" }, 401);
 
@@ -47,6 +51,28 @@ Deno.serve(async (req) => {
         .eq("role", "admin")
         .maybeSingle();
       return json({ has_admin: true, is_admin: !!mine });
+    }
+
+    // Allowlist: se ADMIN_BOOTSTRAP_ALLOWLIST estiver setada (CSV de emails),
+    // só promove caller cujo email esteja na lista. Caso contrário (env vazia),
+    // mantém o comportamento original ("primeiro user autenticado vira admin").
+    const allowlistRaw = Deno.env.get("ADMIN_BOOTSTRAP_ALLOWLIST") || "";
+    if (allowlistRaw.trim().length > 0) {
+      const allowed = new Set(
+        allowlistRaw
+          .split(",")
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean),
+      );
+      const emailLower = (userEmail || "").toLowerCase();
+      if (!emailLower || !allowed.has(emailLower)) {
+        await reportEdgeError(
+          "edge:admin-bootstrap:allowlist-rejected",
+          new Error(`bootstrap rejected for ${emailLower || "(no email)"}`),
+          { level: "warning", userId },
+        );
+        return json({ error: "Forbidden" }, 403);
+      }
     }
 
     await admin.from("user_roles").upsert({ user_id: userId, role: "admin" });

@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       ai_config: {
@@ -317,8 +292,10 @@ export type Database = {
           origin_field_name: string | null
           updated_at: string
           utm_campaign_field_id: string | null
+          utm_content_field_id: string | null
           utm_medium_field_id: string | null
           utm_source_field_id: string | null
+          utm_term_field_id: string | null
           visible_custom_fields: string[] | null
           won_stage_keys: string[] | null
           workspace_id: string
@@ -335,8 +312,10 @@ export type Database = {
           origin_field_name?: string | null
           updated_at?: string
           utm_campaign_field_id?: string | null
+          utm_content_field_id?: string | null
           utm_medium_field_id?: string | null
           utm_source_field_id?: string | null
+          utm_term_field_id?: string | null
           visible_custom_fields?: string[] | null
           won_stage_keys?: string[] | null
           workspace_id: string
@@ -353,8 +332,10 @@ export type Database = {
           origin_field_name?: string | null
           updated_at?: string
           utm_campaign_field_id?: string | null
+          utm_content_field_id?: string | null
           utm_medium_field_id?: string | null
           utm_source_field_id?: string | null
+          utm_term_field_id?: string | null
           visible_custom_fields?: string[] | null
           won_stage_keys?: string[] | null
           workspace_id?: string
@@ -597,6 +578,66 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ghl_users_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_pairing_tokens: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          id: string
+          integration_id: string
+          last_paired_at: string | null
+          last_seen_at: string | null
+          revoked_at: string | null
+          token_hash: string
+          token_prefix: string
+          updated_at: string
+          use_count: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          id?: string
+          integration_id: string
+          last_paired_at?: string | null
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          token_hash: string
+          token_prefix: string
+          updated_at?: string
+          use_count?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          id?: string
+          integration_id?: string
+          last_paired_at?: string | null
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          token_hash?: string
+          token_prefix?: string
+          updated_at?: string
+          use_count?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_pairing_tokens_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_pairing_tokens_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1094,9 +1135,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: ["admin", "user"],

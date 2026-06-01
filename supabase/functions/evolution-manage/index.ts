@@ -40,6 +40,19 @@ function buildPairingUrl(token: string): string {
   return `${base}/conectar/${token}`;
 }
 
+// Lifetime do link de pareamento. Default 72h / 5 usos é o equilíbrio escolhido
+// entre fricção (cliente que demora pra parear) e janela de exposição caso o
+// link vaze. Sobrescrevível via env para flexibilidade operacional.
+const PAIRING_TOKEN_LIFETIME_HOURS = Number(Deno.env.get("PAIRING_TOKEN_LIFETIME_HOURS") || "72");
+const PAIRING_TOKEN_MAX_USES = Number(Deno.env.get("PAIRING_TOKEN_MAX_USES") || "5");
+
+function buildExpiresAt(): string {
+  const hours = Number.isFinite(PAIRING_TOKEN_LIFETIME_HOURS) && PAIRING_TOKEN_LIFETIME_HOURS > 0
+    ? PAIRING_TOKEN_LIFETIME_HOURS
+    : 72;
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -357,14 +370,19 @@ serve(async (req) => {
 
         const { data: existing } = await supabase
           .from("integration_pairing_tokens")
-          .select("id, token_prefix, last_paired_at, use_count, created_at")
+          .select("id, token_prefix, last_paired_at, use_count, max_uses, expires_at, created_at")
           .eq("integration_id", integration.id)
           .is("revoked_at", null)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (existing) {
+        const existingValid = existing && (
+          (!existing.expires_at || new Date(existing.expires_at).getTime() > Date.now()) &&
+          (!existing.max_uses || (existing.use_count || 0) < existing.max_uses)
+        );
+
+        if (existingValid) {
           return new Response(
             JSON.stringify({
               success: true,
@@ -374,12 +392,23 @@ serve(async (req) => {
                 last_paired_at: existing.last_paired_at,
                 use_count: existing.use_count,
                 created_at: existing.created_at,
+                expires_at: existing.expires_at,
+                max_uses: existing.max_uses,
                 url: null,
                 is_existing: true,
               },
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
+        }
+
+        // Se há token revogável (expirado/esgotado), revoga antes de criar novo
+        // para manter idx_ipt_integration_active enxuto e evitar lookup ambíguo.
+        if (existing) {
+          await supabase
+            .from("integration_pairing_tokens")
+            .update({ revoked_at: new Date().toISOString() })
+            .eq("id", existing.id);
         }
 
         const { plaintext, hash, prefix } = await generatePairingToken();
@@ -391,8 +420,10 @@ serve(async (req) => {
             created_by_user_id: user.id,
             token_hash: hash,
             token_prefix: prefix,
+            expires_at: buildExpiresAt(),
+            max_uses: PAIRING_TOKEN_MAX_USES > 0 ? PAIRING_TOKEN_MAX_USES : null,
           })
-          .select("id, token_prefix, created_at")
+          .select("id, token_prefix, created_at, expires_at, max_uses")
           .single();
         if (insertErr) throw new Error(`Failed to create pairing token: ${insertErr.message}`);
 
@@ -413,6 +444,8 @@ serve(async (req) => {
               token_id: inserted.id,
               token_prefix: inserted.token_prefix,
               created_at: inserted.created_at,
+              expires_at: inserted.expires_at,
+              max_uses: inserted.max_uses,
               last_paired_at: null,
               use_count: 0,
               url: buildPairingUrl(plaintext),
@@ -444,8 +477,10 @@ serve(async (req) => {
             created_by_user_id: user.id,
             token_hash: hash,
             token_prefix: prefix,
+            expires_at: buildExpiresAt(),
+            max_uses: PAIRING_TOKEN_MAX_USES > 0 ? PAIRING_TOKEN_MAX_USES : null,
           })
-          .select("id, token_prefix, created_at")
+          .select("id, token_prefix, created_at, expires_at, max_uses")
           .single();
         if (insertErr) throw new Error(`Failed to rotate pairing token: ${insertErr.message}`);
 
@@ -466,6 +501,8 @@ serve(async (req) => {
               token_id: inserted.id,
               token_prefix: inserted.token_prefix,
               created_at: inserted.created_at,
+              expires_at: inserted.expires_at,
+              max_uses: inserted.max_uses,
               last_paired_at: null,
               use_count: 0,
               url: buildPairingUrl(plaintext),

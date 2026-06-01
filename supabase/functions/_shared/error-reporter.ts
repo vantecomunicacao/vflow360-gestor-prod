@@ -3,7 +3,9 @@
 // Translates known errors into friendly Portuguese messages with action hints and severity.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 
-const WEBHOOK_URL = "https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable";
+const WEBHOOK_URL =
+  Deno.env.get("ERROR_WEBHOOK_URL") ||
+  "https://n8n-webhook.boliqf.easypanel.host/webhook/erro-lovable";
 const PROJECT = "VFlowGHL";
 
 type Severity = "error" | "warning" | "info";

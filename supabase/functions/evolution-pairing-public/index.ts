@@ -115,7 +115,7 @@ serve(async (req) => {
 
     const { data: row } = await supabase
       .from("integration_pairing_tokens")
-      .select("id, integration_id, workspace_id, revoked_at, use_count, last_paired_at, last_seen_at")
+      .select("id, integration_id, workspace_id, revoked_at, use_count, max_uses, expires_at, last_paired_at, last_seen_at")
       .eq("token_hash", tokenHash)
       .maybeSingle();
 
@@ -123,10 +123,25 @@ serve(async (req) => {
       return ok({ ok: false, reason: "invalid_or_expired" }, cors);
     }
 
+    // expires_at e max_uses são opcionais (tokens antigos têm NULL e seguem
+    // sem expiração, como antes). Para tokens novos, ambos são populados pelo
+    // evolution-manage no momento da criação.
+    if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) {
+      return ok({ ok: false, reason: "invalid_or_expired" }, cors);
+    }
+
     // Telemetria: incrementa use_count só em nova sessão (gap > 5 min);
     // last_seen_at é atualizado a cada poll. Não bloqueia se falhar.
     const userAgent = (req.headers.get("user-agent") || "").slice(0, 200);
     const newSession = isNewSession(row.last_seen_at);
+
+    // Bloqueia abertura de NOVA sessão se o limite de usos foi atingido.
+    // Sessão em andamento (polls dentro de SESSION_WINDOW_MS) continua, para
+    // não derrubar o cliente no meio do scan do QR.
+    if (newSession && row.max_uses && (row.use_count || 0) >= row.max_uses) {
+      return ok({ ok: false, reason: "invalid_or_expired" }, cors);
+    }
+
     const telemetryUpdate: Record<string, unknown> = { last_seen_at: new Date().toISOString() };
     if (newSession) telemetryUpdate.use_count = (row.use_count || 0) + 1;
     supabase

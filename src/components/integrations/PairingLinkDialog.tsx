@@ -24,6 +24,8 @@ interface PairingLink {
   token_id: string;
   token_prefix: string;
   created_at: string;
+  expires_at: string | null;
+  max_uses: number | null;
   last_paired_at: string | null;
   use_count: number;
   url: string | null;
@@ -37,6 +39,21 @@ const formatDateTime = (iso: string | null) => {
   } catch {
     return null;
   }
+};
+
+const formatRemaining = (iso: string | null): string | null => {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(ms) || ms <= 0) return "Expirado";
+  const hours = Math.floor(ms / (60 * 60 * 1000));
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const rest = hours % 24;
+    return rest > 0 ? `${days}d ${rest}h` : `${days}d`;
+  }
+  if (hours > 0) return `${hours}h`;
+  const minutes = Math.max(1, Math.floor(ms / (60 * 1000)));
+  return `${minutes}min`;
 };
 
 export const PairingLinkDialog = ({ open, onOpenChange, integration }: Props) => {
@@ -212,22 +229,33 @@ export const PairingLinkDialog = ({ open, onOpenChange, integration }: Props) =>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-muted rounded-lg p-3">
                 <p className="text-muted-foreground">Acessos</p>
-                <p className="text-base font-semibold text-foreground">{link.use_count}</p>
+                <p className="text-base font-semibold text-foreground">
+                  {link.use_count}
+                  {link.max_uses ? (
+                    <span className="text-xs text-muted-foreground font-normal"> / {link.max_uses}</span>
+                  ) : null}
+                </p>
               </div>
               <div className="bg-muted rounded-lg p-3">
-                <p className="text-muted-foreground">Último pareamento</p>
+                <p className="text-muted-foreground">Expira em</p>
                 <p className="text-sm font-medium text-foreground">
-                  {link.last_paired_at ? (
-                    <span className="flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-success" />
-                      {formatDateTime(link.last_paired_at)}
-                    </span>
+                  {link.expires_at ? (
+                    formatRemaining(link.expires_at)
                   ) : (
-                    <span className="text-muted-foreground">Ainda não usado</span>
+                    <span className="text-muted-foreground">Sem expiração</span>
                   )}
                 </p>
               </div>
             </div>
+            {link.last_paired_at && (
+              <div className="bg-muted rounded-lg p-3 text-xs">
+                <p className="text-muted-foreground">Último pareamento</p>
+                <p className="text-sm font-medium text-foreground flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-success" />
+                  {formatDateTime(link.last_paired_at)}
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <Button
