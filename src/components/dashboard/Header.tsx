@@ -134,14 +134,14 @@ function DateRangePicker({
       </PopoverTrigger>
       <PopoverContent style={{ width: "fit-content" }} className="p-0 rounded-xl" align="start">
         <div className="flex">
-          <div className="border-r border-border p-2 space-y-0.5 min-w-[140px]">
+          <div className="border-r border-border p-1.5 pr-3 space-y-0.5 w-[120px]">
             <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-2 py-1.5">Atalhos</p>
             {datePresets.map((p) => (
               <Button
                 key={p.label}
                 variant="ghost"
                 size="sm"
-                className="w-full justify-start text-xs h-7 rounded-md font-normal"
+                className="w-full justify-start text-xs h-7 px-2 rounded-md font-normal"
                 onClick={() => { const v = p.getValue(); setLocalRange(v); onDateRangeChange(v); setOpen(false); }}
               >
                 {p.label}
@@ -156,7 +156,7 @@ function DateRangePicker({
               onSelect={setLocalRange}
               numberOfMonths={2}
               locale={ptBR}
-              className="pointer-events-auto"
+              className="pointer-events-auto p-2"
             />
             <div className="flex justify-between items-center p-3 pt-0 border-t border-border/40 mt-2">
               <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setOpen(false)}>Cancelar</Button>

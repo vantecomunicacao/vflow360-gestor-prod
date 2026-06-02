@@ -248,19 +248,20 @@
     @apply text-[10px] font-semibold text-muted-foreground uppercase tracking-wider;
   }
 
-  /* Dashboard Section — card "elevado" do DS */
+  /* Dashboard Section — card "elevado" do DS
+     (raio e sombra unificados com .metric-card para padronização visual) */
   .dashboard-section {
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
-    border-radius: var(--raio-lg);
+    border-radius: var(--raio-md);
     padding: 1.25rem;
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-1);
   }
   @media (min-width: 640px) {
     .dashboard-section { padding: 1.5rem; }
   }
   @media (min-width: 1024px) {
-    .dashboard-section { padding: 1.75rem; border-radius: var(--raio-xl); }
+    .dashboard-section { padding: 1.75rem; }
   }
   .section-title {
     @apply text-[15px] font-bold text-foreground mb-5 flex items-center gap-2.5;
