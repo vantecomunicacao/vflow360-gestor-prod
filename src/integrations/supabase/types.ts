@@ -932,6 +932,7 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          ai_analysis_enabled: boolean
           created_at: string
           deleted_at: string | null
           id: string
@@ -940,6 +941,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_analysis_enabled?: boolean
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -948,6 +950,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_analysis_enabled?: boolean
           created_at?: string
           deleted_at?: string | null
           id?: string

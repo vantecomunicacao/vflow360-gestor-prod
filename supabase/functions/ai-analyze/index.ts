@@ -116,6 +116,26 @@ serve(async (req) => {
       }
     }
 
+    // 2a. Workspace-level gate: skip if admin has not enabled AI analysis for this workspace.
+    if (conversation?.workspace_id) {
+      const { data: workspaceRow } = await supabase
+        .from("workspaces")
+        .select("ai_analysis_enabled")
+        .eq("id", conversation.workspace_id)
+        .maybeSingle();
+
+      if (!workspaceRow?.ai_analysis_enabled) {
+        console.log(`Workspace AI disabled: skipping ${conversationId}, workspace_id=${conversation.workspace_id}`);
+        await supabase
+          .from("conversations")
+          .update({ analyze_after: null, analyze_started_at: null })
+          .eq("id", conversationId);
+        return new Response(JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason: "workspace_ai_disabled" } }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // 2b. Check if this contact is disabled for AI analysis (per-workspace)
     if (conversation?.contact_phone && conversation?.workspace_id) {
       const { data: disabledEntry } = await supabase

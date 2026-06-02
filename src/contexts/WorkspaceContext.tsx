@@ -8,6 +8,7 @@ interface Workspace {
   owner_id: string;
   created_at: string;
   deleted_at?: string | null;
+  ai_analysis_enabled: boolean;
 }
 
 interface WorkspaceContextType {
@@ -19,6 +20,7 @@ interface WorkspaceContextType {
   deleteWorkspace: (id: string) => Promise<void>;
   restoreWorkspace: (id: string) => Promise<void>;
   listTrashedWorkspaces: () => Promise<Workspace[]>;
+  setWorkspaceAiEnabled: (id: string, enabled: boolean) => Promise<void>;
   loading: boolean;
 }
 
@@ -26,11 +28,12 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
   workspaces: [],
   activeWorkspace: null,
   setActiveWorkspaceId: () => {},
-  createWorkspace: async () => ({ id: "", name: "", owner_id: "", created_at: "" }),
+  createWorkspace: async () => ({ id: "", name: "", owner_id: "", created_at: "", ai_analysis_enabled: false }),
   renameWorkspace: async () => {},
   deleteWorkspace: async () => {},
   restoreWorkspace: async () => {},
   listTrashedWorkspaces: async () => [],
+  setWorkspaceAiEnabled: async () => {},
   loading: true,
 });
 
@@ -159,6 +162,15 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     return (data || []) as Workspace[];
   }, []);
 
+  const setWorkspaceAiEnabled = useCallback(async (id: string, enabled: boolean) => {
+    const { error } = await supabase
+      .from("workspaces")
+      .update({ ai_analysis_enabled: enabled })
+      .eq("id", id);
+    if (error) throw error;
+    setWorkspaces(prev => prev.map(w => w.id === id ? { ...w, ai_analysis_enabled: enabled } : w));
+  }, []);
+
   const activeWorkspace = useMemo(
     () => workspaces.find(w => w.id === activeId) || null,
     [workspaces, activeId]
@@ -174,6 +186,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       deleteWorkspace,
       restoreWorkspace,
       listTrashedWorkspaces,
+      setWorkspaceAiEnabled,
       loading,
     }),
     [
@@ -186,6 +199,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       deleteWorkspace,
       restoreWorkspace,
       listTrashedWorkspaces,
+      setWorkspaceAiEnabled,
     ]
   );
 

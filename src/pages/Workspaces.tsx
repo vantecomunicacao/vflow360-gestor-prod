@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Building2, Plus, Pencil, Trash2, Check, X, Crown, RotateCcw } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, Check, X, Crown, RotateCcw, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ const Workspaces = () => {
     deleteWorkspace,
     restoreWorkspace,
     listTrashedWorkspaces,
+    setWorkspaceAiEnabled,
   } = useWorkspace();
   const { user } = useAuth();
   const { isAdmin } = useIsAdmin();
@@ -88,6 +90,20 @@ const Workspaces = () => {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [togglingAiId, setTogglingAiId] = useState<string | null>(null);
+
+  const handleToggleAi = async (id: string, current: boolean) => {
+    setTogglingAiId(id);
+    try {
+      await setWorkspaceAiEnabled(id, !current);
+      toast.success(!current ? "Análises de IA ativadas" : "Análises de IA desativadas");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar");
+    } finally {
+      setTogglingAiId(null);
+    }
+  };
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -178,81 +194,104 @@ const Workspaces = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="glass-card p-4 flex items-center gap-3"
+              className="glass-card p-4 space-y-3"
             >
-              <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                <Building2 className="w-5 h-5" />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                  <Building2 className="w-5 h-5" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {isEditing ? (
+                    <Input
+                      autoFocus
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit(ws.id);
+                        if (e.key === "Escape") cancelEdit();
+                      }}
+                      disabled={renaming}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-foreground truncate">{ws.name}</span>
+                      {isActive && <Badge variant="default" className="text-xs">Ativa</Badge>}
+                      {isOwner && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <Crown className="w-3 h-3" /> Proprietário
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {isEditing ? (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => saveEdit(ws.id)}
+                        disabled={renaming || !editName.trim()}
+                      >
+                        <Check className="w-4 h-4 text-primary" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={cancelEdit} disabled={renaming}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => startEdit(ws.id, ws.name)}
+                        disabled={!isOwner}
+                        title={isOwner ? "Renomear" : "Apenas o proprietário pode renomear"}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDeleteId(ws.id)}
+                        disabled={!isOwner || isOnly}
+                        title={
+                          !isOwner
+                            ? "Apenas o proprietário pode excluir"
+                            : isOnly
+                            ? "Não é possível excluir a única conta"
+                            : "Excluir"
+                        }
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
 
-              <div className="flex-1 min-w-0">
-                {isEditing ? (
-                  <Input
-                    autoFocus
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") saveEdit(ws.id);
-                      if (e.key === "Escape") cancelEdit();
-                    }}
-                    disabled={renaming}
-                  />
-                ) : (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-foreground truncate">{ws.name}</span>
-                    {isActive && <Badge variant="default" className="text-xs">Ativa</Badge>}
-                    {isOwner && (
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <Crown className="w-3 h-3" /> Proprietário
-                      </Badge>
-                    )}
+              {isAdmin && !isEditing && (
+                <div className="flex items-center justify-between pt-3 border-t border-border">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">Análises de IA</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {ws.ai_analysis_enabled
+                          ? "O co-piloto analisa conversas e gera sugestões."
+                          : "Conversas são recebidas, mas a IA não gera sugestões."}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1 shrink-0">
-                {isEditing ? (
-                  <>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => saveEdit(ws.id)}
-                      disabled={renaming || !editName.trim()}
-                    >
-                      <Check className="w-4 h-4 text-primary" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={cancelEdit} disabled={renaming}>
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => startEdit(ws.id, ws.name)}
-                      disabled={!isOwner}
-                      title={isOwner ? "Renomear" : "Apenas o proprietário pode renomear"}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setDeleteId(ws.id)}
-                      disabled={!isOwner || isOnly}
-                      title={
-                        !isOwner
-                          ? "Apenas o proprietário pode excluir"
-                          : isOnly
-                          ? "Não é possível excluir a única conta"
-                          : "Excluir"
-                      }
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </>
-                )}
-              </div>
+                  <Switch
+                    checked={ws.ai_analysis_enabled}
+                    disabled={togglingAiId === ws.id}
+                    onCheckedChange={() => handleToggleAi(ws.id, ws.ai_analysis_enabled)}
+                  />
+                </div>
+              )}
             </motion.div>
           );
         })}
