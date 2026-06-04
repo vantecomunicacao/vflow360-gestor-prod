@@ -232,6 +232,89 @@ export type Database = {
           },
         ]
       }
+      ghl_conversations: {
+        Row: {
+          analyze_after: string | null
+          analyze_started_at: string | null
+          assigned_ghl_user_id: string | null
+          channel_type: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          ghl_contact_id: string
+          ghl_conversation_id: string
+          ghl_date_added: string | null
+          ghl_date_updated: string | null
+          ghl_location_id: string
+          id: string
+          last_analyzed_at: string | null
+          last_message_at: string | null
+          last_message_body: string | null
+          last_message_direction: string | null
+          messages_synced_until: string | null
+          profile_photo_url: string | null
+          synced_at: string
+          unread_count: number
+          workspace_id: string
+        }
+        Insert: {
+          analyze_after?: string | null
+          analyze_started_at?: string | null
+          assigned_ghl_user_id?: string | null
+          channel_type?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          ghl_contact_id: string
+          ghl_conversation_id: string
+          ghl_date_added?: string | null
+          ghl_date_updated?: string | null
+          ghl_location_id: string
+          id?: string
+          last_analyzed_at?: string | null
+          last_message_at?: string | null
+          last_message_body?: string | null
+          last_message_direction?: string | null
+          messages_synced_until?: string | null
+          profile_photo_url?: string | null
+          synced_at?: string
+          unread_count?: number
+          workspace_id: string
+        }
+        Update: {
+          analyze_after?: string | null
+          analyze_started_at?: string | null
+          assigned_ghl_user_id?: string | null
+          channel_type?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          ghl_contact_id?: string
+          ghl_conversation_id?: string
+          ghl_date_added?: string | null
+          ghl_date_updated?: string | null
+          ghl_location_id?: string
+          id?: string
+          last_analyzed_at?: string | null
+          last_message_at?: string | null
+          last_message_body?: string | null
+          last_message_direction?: string | null
+          messages_synced_until?: string | null
+          profile_photo_url?: string | null
+          synced_at?: string
+          unread_count?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ghl_custom_fields: {
         Row: {
           created_at: string
@@ -382,6 +465,78 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_messages: {
+        Row: {
+          attachments_json: Json | null
+          body: string | null
+          date_added: string
+          direction: string
+          enrich_error: string | null
+          enriched_at: string | null
+          enriched_body: string | null
+          from_field: string | null
+          ghl_conversation_id: string
+          ghl_message_id: string
+          ghl_user_id: string | null
+          id: string
+          message_type: string | null
+          synced_at: string
+          to_field: string | null
+          workspace_id: string
+        }
+        Insert: {
+          attachments_json?: Json | null
+          body?: string | null
+          date_added: string
+          direction: string
+          enrich_error?: string | null
+          enriched_at?: string | null
+          enriched_body?: string | null
+          from_field?: string | null
+          ghl_conversation_id: string
+          ghl_message_id: string
+          ghl_user_id?: string | null
+          id?: string
+          message_type?: string | null
+          synced_at?: string
+          to_field?: string | null
+          workspace_id: string
+        }
+        Update: {
+          attachments_json?: Json | null
+          body?: string | null
+          date_added?: string
+          direction?: string
+          enrich_error?: string | null
+          enriched_at?: string | null
+          enriched_body?: string | null
+          from_field?: string | null
+          ghl_conversation_id?: string
+          ghl_message_id?: string
+          ghl_user_id?: string | null
+          id?: string
+          message_type?: string | null
+          synced_at?: string
+          to_field?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_messages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ghl_messages_workspace_id_ghl_conversation_id_fkey"
+            columns: ["workspace_id", "ghl_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ghl_conversations"
+            referencedColumns: ["workspace_id", "ghl_conversation_id"]
           },
         ]
       }
@@ -547,6 +702,41 @@ export type Database = {
           },
         ]
       }
+      ghl_sync_watermarks: {
+        Row: {
+          conversations_last_seen_at: string | null
+          last_run_at: string | null
+          last_run_count: number | null
+          last_run_error: string | null
+          last_run_status: string | null
+          workspace_id: string
+        }
+        Insert: {
+          conversations_last_seen_at?: string | null
+          last_run_at?: string | null
+          last_run_count?: number | null
+          last_run_error?: string | null
+          last_run_status?: string | null
+          workspace_id: string
+        }
+        Update: {
+          conversations_last_seen_at?: string | null
+          last_run_at?: string | null
+          last_run_count?: number | null
+          last_run_error?: string | null
+          last_run_status?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_sync_watermarks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ghl_users: {
         Row: {
           created_at: string
@@ -589,10 +779,12 @@ export type Database = {
         Row: {
           created_at: string
           created_by_user_id: string
+          expires_at: string | null
           id: string
           integration_id: string
           last_paired_at: string | null
           last_seen_at: string | null
+          max_uses: number | null
           revoked_at: string | null
           token_hash: string
           token_prefix: string
@@ -603,10 +795,12 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by_user_id: string
+          expires_at?: string | null
           id?: string
           integration_id: string
           last_paired_at?: string | null
           last_seen_at?: string | null
+          max_uses?: number | null
           revoked_at?: string | null
           token_hash: string
           token_prefix: string
@@ -617,10 +811,12 @@ export type Database = {
         Update: {
           created_at?: string
           created_by_user_id?: string
+          expires_at?: string | null
           id?: string
           integration_id?: string
           last_paired_at?: string | null
           last_seen_at?: string | null
+          max_uses?: number | null
           revoked_at?: string | null
           token_hash?: string
           token_prefix?: string
@@ -755,6 +951,7 @@ export type Database = {
           conversation_id: string | null
           created_at: string
           description: string | null
+          ghl_conversation_id: string | null
           id: string
           status: string
           title: string
@@ -769,6 +966,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           description?: string | null
+          ghl_conversation_id?: string | null
           id?: string
           status?: string
           title: string
@@ -783,6 +981,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           description?: string | null
+          ghl_conversation_id?: string | null
           id?: string
           status?: string
           title?: string
@@ -797,6 +996,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suggestions_ghl_conversation_id_fkey"
+            columns: ["ghl_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ghl_conversations"
             referencedColumns: ["id"]
           },
           {

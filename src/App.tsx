@@ -43,6 +43,7 @@ const DashboardSettings = lazy(() => import("./pages/settings/DashboardSettings"
 const Workspaces = lazy(() => import("./pages/Workspaces"));
 const Admin = lazy(() => import("./pages/Admin"));
 const SystemLogs = lazy(() => import("./pages/SystemLogs"));
+const Conversations2 = lazy(() => import("./pages/Conversations2"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const PairingPublic = lazy(() => import("./pages/PairingPublic"));
 
@@ -75,6 +76,7 @@ const App = () => (
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={lazyRoute(<Dashboard />, <DashboardSkeleton />)} />
                 <Route path="/conversations" element={lazyRoute(<Conversations />, <ConversationsSkeleton />)} />
+                <Route path="/conversations-v2" element={lazyRoute(<Conversations2 />, <ConversationsSkeleton />)} />
                 <Route
                   path="/suggestions"
                   element={<PermissionGuard require="viewSuggestions">{lazyRoute(<Suggestions />, <SuggestionsSkeleton />)}</PermissionGuard>}
