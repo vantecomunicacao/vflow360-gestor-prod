@@ -13,6 +13,15 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024; // 25 MB (limite do Whisper)
 
+// Modelos de enriquecimento (baratos por padrao, configuraveis por env):
+//   - audio: gpt-4o-mini-transcribe = $0.003/min (metade do whisper-1)
+//   - imagem: gpt-4o-mini = modelo de visao mais barato da OpenAI
+// Desacoplados do modelo de ANALISE do usuario (descricao de midia nao precisa
+// de modelo premium). Para tunar, setar os secrets GHL_ENRICH_AUDIO_MODEL /
+// GHL_ENRICH_IMAGE_MODEL nas edge functions.
+const ENRICH_AUDIO_MODEL = Deno.env.get("GHL_ENRICH_AUDIO_MODEL") || "gpt-4o-mini-transcribe";
+const ENRICH_IMAGE_MODEL = Deno.env.get("GHL_ENRICH_IMAGE_MODEL") || "gpt-4o-mini";
+
 // ============================================================
 // Helpers de download/conversao
 // ============================================================
@@ -66,14 +75,13 @@ async function describeImage(
   base64: string,
   mimetype: string,
   apiKey: string,
-  model = "gpt-4o-mini",
+  model = ENRICH_IMAGE_MODEL,
 ): Promise<string> {
-  const effective = model.includes("gpt-4") || model.includes("gpt-5") ? model : "gpt-4o-mini";
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: effective,
+      model,
       messages: [
         {
           role: "user",
@@ -115,7 +123,7 @@ async function transcribeAudio(
         : "mp3";
   const formData = new FormData();
   formData.append("file", new Blob([bytes], { type: contentType }), `audio.${ext}`);
-  formData.append("model", "whisper-1");
+  formData.append("model", ENRICH_AUDIO_MODEL);
   formData.append("language", "pt");
 
   const resp = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -124,10 +132,10 @@ async function transcribeAudio(
     body: formData,
     signal: AbortSignal.timeout(120_000),
   });
-  if (!resp.ok) throw new Error(`Whisper ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+  if (!resp.ok) throw new Error(`transcribe ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
   const data = await resp.json();
   const text = data.text?.trim();
-  if (!text) throw new Error("Whisper retornou vazio");
+  if (!text) throw new Error("transcribe retornou vazio");
   return `🎵 [Áudio]: ${text}`;
 }
 
@@ -178,7 +186,9 @@ export async function enrichPending(
     notBefore?: string | null;
   },
 ): Promise<EnrichResult> {
-  const { workspaceId, ghlConversationId, max, aiKey, aiModel, ownerId, supabaseUrl, serviceKey, notBefore } = opts;
+  // aiModel ainda aceito no tipo (callers passam), mas o enrich usa modelos
+  // proprios baratos (ENRICH_*_MODEL), nao o modelo de analise.
+  const { workspaceId, ghlConversationId, max, aiKey, ownerId, supabaseUrl, serviceKey, notBefore } = opts;
 
   let q = supabase
     .from("ghl_messages")
@@ -209,7 +219,9 @@ export async function enrichPending(
       try {
         if (kind === "image") {
           const { base64, mimetype } = await downloadAsBase64(url);
-          parts.push(await describeImage(base64, mimetype, aiKey, aiModel));
+          // Modelo de visao barato e fixo (ENRICH_IMAGE_MODEL), desacoplado do
+          // modelo de analise do usuario.
+          parts.push(await describeImage(base64, mimetype, aiKey));
         } else if (kind === "audio") {
           const { base64, mimetype } = await downloadAsBase64(url);
           parts.push(await transcribeAudio(base64, mimetype, aiKey));
