@@ -117,7 +117,7 @@ serve(async (req) => {
     // 1. Conversa (shim a partir de ghl_conversations)
     const { data: conversation } = await supabase
       .from("ghl_conversations")
-      .select("id, contact_name, contact_phone, analyze_after, analyze_started_at")
+      .select("id, contact_name, contact_phone, ghl_contact_id, ghl_location_id, analyze_after, analyze_started_at")
       .eq("workspace_id", workspaceId)
       .eq("ghl_conversation_id", ghlConversationId)
       .maybeSingle();
@@ -656,6 +656,10 @@ REGRAS OBRIGATÓRIAS:
             value: s.value || null,
             contact_name: conversation.contact_name || null,
             contact_phone: conversation.contact_phone || null,
+            // Contato canonico do GHL (multicanal) — execucao usa direto, sem
+            // depender de telefone. Essencial para Instagram/Facebook.
+            ghl_contact_id: conversation.ghl_contact_id || null,
+            ghl_location_id: conversation.ghl_location_id || null,
             ...(s.type === "agendar_lembrete" ? {
               task_title: s.task_title || s.value || "Entrar em contato",
               due_date: s.due_date || null,

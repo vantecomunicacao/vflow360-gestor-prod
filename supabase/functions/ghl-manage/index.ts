@@ -416,11 +416,17 @@ serve(async (req) => {
         }
 
         const actionData = suggestion.action_data as Record<string, any>;
+        // Conversas 2.0: o contato canonico do GHL ja vem na sugestao (multicanal:
+        // Instagram/Facebook/WhatsApp). Quando presente, usamos direto e pulamos a
+        // resolucao por telefone (legado 1.0/WhatsApp, que quebra sem telefone).
+        const directContactId = actionData?.ghl_contact_id as string | undefined;
         const contactPhone = actionData?.contact_phone;
-        if (!contactPhone) throw new Error("Sugestão sem telefone de contato associado.");
+        if (!directContactId && !contactPhone) {
+          throw new Error("Sugestão sem contato associado (sem ghl_contact_id nem telefone).");
+        }
 
         // 1. Search contact in GHL by phone (multiple BR formats) then by email
-        const cleanPhone = contactPhone.replace(/\D/g, "");
+        const cleanPhone = (contactPhone || "").replace(/\D/g, "");
         
         // Generate all possible phone format variations for BR numbers
         const phoneVariations: string[] = [];
@@ -450,18 +456,20 @@ serve(async (req) => {
         console.log(`Searching contact with phone variations: ${uniqueVariations.join(", ")}`);
 
         let contacts: any[] = [];
-        for (const variation of uniqueVariations) {
-          if (contacts.length > 0) break;
-          const result = await callGhl(`/contacts/?query=${encodeURIComponent(variation)}`) as any;
-          contacts = result?.contacts || [];
-        }
-
-        // Also try searching by email if available
         const contactEmail = actionData?.contact_email;
-        if (contacts.length === 0 && contactEmail) {
-          console.log(`Phone not found, trying email: ${contactEmail}`);
-          const emailResult = await callGhl(`/contacts/?query=${encodeURIComponent(contactEmail)}`) as any;
-          contacts = emailResult?.contacts || [];
+        // So busca por telefone/email quando NAO temos o contato canonico (1.0).
+        if (!directContactId) {
+          for (const variation of uniqueVariations) {
+            if (contacts.length > 0) break;
+            const result = await callGhl(`/contacts/?query=${encodeURIComponent(variation)}`) as any;
+            contacts = result?.contacts || [];
+          }
+          // Also try searching by email if available
+          if (contacts.length === 0 && contactEmail) {
+            console.log(`Phone not found, trying email: ${contactEmail}`);
+            const emailResult = await callGhl(`/contacts/?query=${encodeURIComponent(contactEmail)}`) as any;
+            contacts = emailResult?.contacts || [];
+          }
         }
 
         let contactCreated = false;
@@ -477,7 +485,17 @@ serve(async (req) => {
         const allowCreateContact = ghlConfig.allowCreateContact !== false; // default true
         const allowCreateOpportunity = ghlConfig.allowCreateOpportunity !== false; // default true
 
-        if (contacts.length === 0) {
+        if (directContactId) {
+          // Conversas 2.0: usa o contato do GHL direto (qualquer canal).
+          contactId = directContactId;
+          try {
+            const existing = await callGhl(`/contacts/${contactId}`, "GET", undefined, true) as any;
+            contact = existing?.contact || existing || { id: contactId };
+          } catch {
+            contact = { id: contactId };
+          }
+          console.log(`Using GHL contact from suggestion (2.0): ${contactId}`);
+        } else if (contacts.length === 0) {
           if (!allowCreateContact) {
             // Don't create - save alert and return
             console.log("Contact not found and creation disabled by user config");
