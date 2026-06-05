@@ -9,6 +9,7 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionGuard from "@/components/PermissionGuard";
+import GestorGuard from "@/components/GestorGuard";
 import AppLayout from "./components/AppLayout";
 import SettingsLayout from "./components/SettingsLayout";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -74,9 +75,9 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/conectar/:token" element={lazyRoute(<PairingPublic />, <GenericPageSkeleton />)} />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                <Route path="/dashboard" element={lazyRoute(<Dashboard />, <DashboardSkeleton />)} />
-                <Route path="/conversations" element={lazyRoute(<Conversations />, <ConversationsSkeleton />)} />
-                <Route path="/conversations-v2" element={lazyRoute(<Conversations2 />, <ConversationsSkeleton />)} />
+                <Route path="/dashboard" element={<GestorGuard>{lazyRoute(<Dashboard />, <DashboardSkeleton />)}</GestorGuard>} />
+                <Route path="/conversations" element={<GestorGuard>{lazyRoute(<Conversations />, <ConversationsSkeleton />)}</GestorGuard>} />
+                <Route path="/conversations-v2" element={<GestorGuard>{lazyRoute(<Conversations2 />, <ConversationsSkeleton />)}</GestorGuard>} />
                 <Route
                   path="/suggestions"
                   element={<PermissionGuard require="viewSuggestions">{lazyRoute(<Suggestions />, <SuggestionsSkeleton />)}</PermissionGuard>}
@@ -96,9 +97,9 @@ const App = () => (
                   <Route path="dashboard" element={lazyRoute(<DashboardSettings />, <GenericPageSkeleton />)} />
                 </Route>
                 <Route path="/workspaces" element={<Navigate to="/settings/workspace" replace />} />
-                <Route path="/admin" element={lazyRoute(<Admin />, <GenericPageSkeleton />)} />
-                <Route path="/admin/logs" element={lazyRoute(<SystemLogs />, <GenericPageSkeleton />)} />
-                <Route path="/docs" element={lazyRoute(<Documentation />, <GenericPageSkeleton />)} />
+                <Route path="/admin" element={<GestorGuard>{lazyRoute(<Admin />, <GenericPageSkeleton />)}</GestorGuard>} />
+                <Route path="/admin/logs" element={<GestorGuard>{lazyRoute(<SystemLogs />, <GenericPageSkeleton />)}</GestorGuard>} />
+                <Route path="/docs" element={<GestorGuard>{lazyRoute(<Documentation />, <GenericPageSkeleton />)}</GestorGuard>} />
               </Route>
               <Route path="*" element={<NotFound />} />
               </Routes>

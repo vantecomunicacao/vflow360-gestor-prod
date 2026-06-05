@@ -3,7 +3,7 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions, isSuggestionsOnly } from "@/contexts/PermissionsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
@@ -26,6 +26,8 @@ export function AppSidebar() {
   const { signOut } = useAuth();
   const { permissions } = usePermissions();
   const { isAdmin, viewSuggestions, viewIntegrations, viewSettings } = permissions;
+  // Vendedor (so sugestoes) nao ve os itens de gestor no menu.
+  const gestor = !isSuggestionsOnly(permissions);
 
   const handleSignOut = async () => {
     await signOut();
@@ -33,12 +35,12 @@ export function AppSidebar() {
   };
 
   const navItems: { title: string; url: string; icon: typeof LayoutDashboard; show: boolean; end?: boolean }[] = [
-    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, show: true },
-    { title: "Conversas", url: "/conversations", icon: MessageSquare, show: true },
-    { title: "Conversas 2.0", url: "/conversations-v2", icon: MessageSquare, show: true },
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, show: gestor },
+    { title: "Conversas", url: "/conversations", icon: MessageSquare, show: gestor },
+    { title: "Conversas 2.0", url: "/conversations-v2", icon: MessageSquare, show: gestor },
     { title: "Sugestões IA", url: "/suggestions", icon: Sparkles, show: viewSuggestions },
     { title: "Integrações", url: "/integrations", icon: Plug, show: viewIntegrations },
-    { title: "Documentação", url: "/docs", icon: BookOpen, show: true },
+    { title: "Documentação", url: "/docs", icon: BookOpen, show: gestor },
     { title: "Admin", url: "/admin", icon: ShieldCheck, show: isAdmin },
     { title: "Logs", url: "/admin/logs", icon: ScrollText, show: isAdmin },
   ].filter((i) => i.show);

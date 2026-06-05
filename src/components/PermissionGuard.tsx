@@ -1,5 +1,5 @@
 import { Navigate } from "react-router-dom";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions, landingPath } from "@/contexts/PermissionsContext";
 import { Loader2 } from "lucide-react";
 
 type PermKey = "viewSuggestions" | "viewIntegrations" | "viewSettings";
@@ -20,7 +20,7 @@ const PermissionGuard = ({
     );
   }
   if (!permissions[require]) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={landingPath(permissions)} replace />;
   }
   return <>{children}</>;
 };

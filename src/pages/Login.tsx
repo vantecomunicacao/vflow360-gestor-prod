@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,18 +8,23 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions, landingPath } from "@/contexts/PermissionsContext";
 import { Navigate } from "react-router-dom";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
+  const { permissions, loading: permsLoading } = usePermissions();
 
   if (authLoading) return null;
-  if (user) return <Navigate to="/dashboard" replace />;
+  // Logado: espera as permissoes e roteia conforme o perfil (vendedor -> Sugestoes).
+  if (user) {
+    if (permsLoading) return null;
+    return <Navigate to={landingPath(permissions)} replace />;
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +35,7 @@ const Login = () => {
       toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Login realizado com sucesso!" });
-      navigate("/dashboard");
+      // Redirect feito pelo guard acima quando user + permissoes carregam.
     }
   };
 

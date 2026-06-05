@@ -50,11 +50,12 @@ Deno.serve(async (req) => {
         const { data: list, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
         if (error) throw error;
         const ids = list.users.map((u) => u.id);
-        const [{ data: roles }, { data: profiles }, { data: members }, { data: perms }] = await Promise.all([
+        const [{ data: roles }, { data: profiles }, { data: members }, { data: perms }, { data: ghlLinks }] = await Promise.all([
           admin.from("user_roles").select("user_id, role").in("user_id", ids),
           admin.from("profiles").select("user_id, full_name").in("user_id", ids),
           admin.from("workspace_members").select("user_id, workspace_id, role, workspaces(name)").in("user_id", ids),
           admin.from("user_permissions").select("user_id, view_suggestions, view_integrations, view_settings").in("user_id", ids),
+          admin.from("user_ghl_links").select("user_id, workspace_id, ghl_user_id").in("user_id", ids),
         ]);
         return json({
           users: list.users.map((u) => {
@@ -76,6 +77,10 @@ Deno.serve(async (req) => {
                 view_integrations: !!p?.view_integrations,
                 view_settings: !!p?.view_settings,
               },
+              ghl_links: (ghlLinks?.filter((g) => g.user_id === u.id) || []).map((g) => ({
+                workspace_id: g.workspace_id,
+                ghl_user_id: g.ghl_user_id,
+              })),
             };
           }),
         });
@@ -87,9 +92,26 @@ Deno.serve(async (req) => {
         return json({ workspaces: data });
       }
 
+      case "list_ghl_users": {
+        // Vendedores do GHL de um workspace (para vincular ao criar vendedor).
+        const { workspace_id } = body;
+        if (!workspace_id) return json({ error: "workspace_id obrigatório" }, 400);
+        const { data, error } = await admin
+          .from("ghl_users")
+          .select("ghl_id, name, email")
+          .eq("workspace_id", workspace_id)
+          .order("name");
+        if (error) throw error;
+        return json({ ghl_users: data || [] });
+      }
+
       case "create_user": {
-        const { email, password, full_name, workspace_id, role = "user", permissions } = body;
+        const { email, password, full_name, workspace_id, role = "user", permissions, ghl_user_id } = body;
         if (!email || !password) return json({ error: "email e password obrigatórios" }, 400);
+        // Vendedor = usuario com ghl_user_id vinculado. Forca permissoes "so
+        // sugestoes" (ignora qualquer outra passada).
+        const isVendor = !!ghl_user_id;
+        if (isVendor && !workspace_id) return json({ error: "workspace_id obrigatório para vendedor" }, 400);
         const { data: created, error } = await admin.auth.admin.createUser({
           email,
           password,
@@ -98,7 +120,7 @@ Deno.serve(async (req) => {
         });
         if (error) throw error;
         const newId = created.user!.id;
-        if (role === "admin") {
+        if (role === "admin" && !isVendor) {
           await admin.from("user_roles").upsert({ user_id: newId, role: "admin" });
         }
         if (workspace_id) {
@@ -106,11 +128,35 @@ Deno.serve(async (req) => {
         }
         await admin.from("user_permissions").upsert({
           user_id: newId,
-          view_suggestions: !!permissions?.view_suggestions,
-          view_integrations: !!permissions?.view_integrations,
-          view_settings: !!permissions?.view_settings,
+          view_suggestions: isVendor ? true : !!permissions?.view_suggestions,
+          view_integrations: isVendor ? false : !!permissions?.view_integrations,
+          view_settings: isVendor ? false : !!permissions?.view_settings,
         });
+        if (isVendor) {
+          const { error: linkErr } = await admin.from("user_ghl_links").upsert(
+            { user_id: newId, workspace_id, ghl_user_id },
+            { onConflict: "user_id,workspace_id" },
+          );
+          if (linkErr) throw linkErr;
+        }
         return json({ ok: true, user_id: newId });
+      }
+
+      case "set_ghl_link": {
+        // Vincula/desvincula um usuario existente a um vendedor do GHL.
+        const { user_id, workspace_id, ghl_user_id } = body;
+        if (!user_id || !workspace_id) return json({ error: "user_id e workspace_id obrigatórios" }, 400);
+        if (ghl_user_id) {
+          const { error } = await admin.from("user_ghl_links").upsert(
+            { user_id, workspace_id, ghl_user_id },
+            { onConflict: "user_id,workspace_id" },
+          );
+          if (error) throw error;
+        } else {
+          await admin.from("user_ghl_links").delete()
+            .eq("user_id", user_id).eq("workspace_id", workspace_id);
+        }
+        return json({ ok: true });
       }
 
       case "set_permissions": {

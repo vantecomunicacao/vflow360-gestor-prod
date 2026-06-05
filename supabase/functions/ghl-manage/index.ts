@@ -105,11 +105,18 @@ serve(async (req) => {
       return await testResponse.json();
     };
 
-    // Helper to get stored GHL credentials
+    // Helper to get stored GHL credentials.
+    // Com workspace_id (2.0): resolve a integracao do WORKSPACE, sem filtrar por
+    // user_id — o vendedor nao tem integracao propria (a credencial e do gestor).
+    // Sem workspace_id (1.0): mantem a resolucao por user_id do chamador.
     const getGhlCredentials = async () => {
-      let q = supabase.from("integrations").select("config, status").eq("user_id", resolvedUserId!).eq("type", "ghl");
-      if (workspaceId) q = q.eq("workspace_id", workspaceId);
-      const { data: integration } = await q.single();
+      let q = supabase.from("integrations").select("config, status").eq("type", "ghl");
+      if (workspaceId) {
+        q = q.eq("workspace_id", workspaceId).eq("status", "connected");
+      } else {
+        q = q.eq("user_id", resolvedUserId!);
+      }
+      const { data: integration } = await q.limit(1).maybeSingle();
       if (!integration || integration.status !== "connected") {
         throw new Error("GHL not connected. Please add your credentials first.");
       }
@@ -401,18 +408,50 @@ serve(async (req) => {
         const suggestionId = payload.suggestionId as string;
         if (!suggestionId) throw new Error("suggestionId is required");
 
-        // Fetch the suggestion
+        // Fetch the suggestion (service role; autorizacao explicita abaixo —
+        // nao filtramos por user_id porque a sugestao 2.0 pertence ao owner do
+        // workspace, nao ao vendedor que a executa).
         const { data: suggestion, error: sugErr } = await supabase
           .from("suggestions")
           .select("*")
           .eq("id", suggestionId)
-          .eq("user_id", resolvedUserId!)
-          .single();
+          .maybeSingle();
         if (sugErr || !suggestion) throw new Error("Sugestão não encontrada");
 
         // Resolve workspace_id from suggestion if not provided in payload
         if (!workspaceId && suggestion.workspace_id) {
           workspaceId = suggestion.workspace_id;
+        }
+
+        // Autorizacao (defesa em profundidade alem da RLS): permite se for o dono
+        // (1.0), service role (auto-execute), admin, gestor (membro sem link) ou
+        // vendedor com link casando o assigned_ghl_user_id da conversa.
+        if (!isServiceRole && suggestion.user_id !== resolvedUserId) {
+          const sugWs = suggestion.workspace_id as string | null;
+          const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: resolvedUserId, _role: "admin" });
+          let allowed = !!isAdmin;
+          if (!allowed && sugWs) {
+            const { data: isMember } = await supabase.rpc("is_workspace_member", { _user_id: resolvedUserId, _workspace_id: sugWs });
+            if (isMember) {
+              const { data: link } = await supabase
+                .from("user_ghl_links")
+                .select("ghl_user_id")
+                .eq("user_id", resolvedUserId)
+                .eq("workspace_id", sugWs)
+                .maybeSingle();
+              if (!link) {
+                allowed = true; // gestor (membro sem link) age em tudo do workspace
+              } else if (suggestion.ghl_conversation_id) {
+                const { data: conv } = await supabase
+                  .from("ghl_conversations")
+                  .select("assigned_ghl_user_id")
+                  .eq("id", suggestion.ghl_conversation_id)
+                  .maybeSingle();
+                allowed = !!conv && conv.assigned_ghl_user_id === link.ghl_user_id;
+              }
+            }
+          }
+          if (!allowed) throw new Error("Forbidden: sem permissão para esta sugestão");
         }
 
         const actionData = suggestion.action_data as Record<string, any>;
@@ -477,10 +516,15 @@ serve(async (req) => {
         let contact: any;
         const creds = await getGhlCredentials();
 
-        // Check creation permissions from integration config
-        let cfgQ = supabase.from("integrations").select("config").eq("user_id", resolvedUserId!).eq("type", "ghl");
-        if (workspaceId) cfgQ = cfgQ.eq("workspace_id", workspaceId);
-        const { data: cfgData } = await cfgQ.single();
+        // Check creation permissions from integration config (mesma regra de
+        // resolucao do getGhlCredentials: por workspace no 2.0, por user no 1.0).
+        let cfgQ = supabase.from("integrations").select("config").eq("type", "ghl");
+        if (workspaceId) {
+          cfgQ = cfgQ.eq("workspace_id", workspaceId).eq("status", "connected");
+        } else {
+          cfgQ = cfgQ.eq("user_id", resolvedUserId!);
+        }
+        const { data: cfgData } = await cfgQ.limit(1).maybeSingle();
         const ghlConfig = (cfgData?.config || {}) as Record<string, any>;
         const allowCreateContact = ghlConfig.allowCreateContact !== false; // default true
         const allowCreateOpportunity = ghlConfig.allowCreateOpportunity !== false; // default true

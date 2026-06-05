@@ -28,6 +28,16 @@ const PermissionsContext = createContext<PermissionsContextType>({
 
 export const usePermissions = () => useContext(PermissionsContext);
 
+// Usuario "so sugestoes" (vendedor): nao-admin, ve sugestoes e nada mais.
+export function isSuggestionsOnly(p: Permissions): boolean {
+  return !p.isAdmin && p.viewSuggestions && !p.viewIntegrations && !p.viewSettings;
+}
+
+// Rota de destino conforme o perfil: vendedor -> Sugestoes; demais -> Dashboard.
+export function landingPath(p: Permissions): string {
+  return isSuggestionsOnly(p) ? "/suggestions" : "/dashboard";
+}
+
 export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [permissions, setPermissions] = useState<Permissions>(DEFAULT);
