@@ -200,6 +200,10 @@ serve(async (req) => {
     // a LISTA (conversas entram "frias"). O auto-heat so vale para ticks
     // incrementais: conversas que realmente mudaram desde o ultimo watermark.
     const isInitial = fullBackfill || !wm?.conversations_last_seen_at;
+    // touchedIds: conversas com QUALQUER atividade nova (inbound ou outbound) ->
+    // sincroniza mensagens, para o espelho local ficar completo (tempo de
+    // resposta correto). touchedInboundIds: subconjunto inbound -> dispara analise.
+    const touchedIds = new Set<string>();
     const touchedInboundIds = new Set<string>();
 
     // Paginate from newest backwards until watermark or safety cap
@@ -245,9 +249,11 @@ serve(async (req) => {
       if (upErr) throw new Error(`Upsert falhou: ${upErr.message}`);
       totalSynced += rows.length;
 
-      // Coleta conversas com inbound novo para o auto-heat (so em incremental).
+      // Coleta conversas tocadas neste tick (so em incremental). Sincronizamos
+      // mensagens de TODAS (inbound ou outbound); a analise so dispara nas inbound.
       if (!isInitial) {
         for (const c of batch) {
+          touchedIds.add(c.id);
           if ((c.lastMessageDirection || "").toLowerCase() === "inbound") {
             touchedInboundIds.add(c.id);
           }
@@ -290,31 +296,30 @@ serve(async (req) => {
       .is("enrich_cutoff_at", null);
 
     // ============================================================
-    // Pipeline automatico: "esquenta" conversas com inbound novo.
-    // Detecta via lista (last_message_direction='inbound' e last_message_at >
-    // messages_synced_until), puxa as mensagens (janela de contexto), enriquece
-    // a midia nova e seta o debounce de analise. Tudo INLINE (sem edge->edge).
-    // Falhas aqui nao derrubam o sync da lista, ja persistido acima.
+    // Pipeline automatico: sincroniza mensagens das conversas tocadas (qualquer
+    // direcao -> espelho local completo p/ tempo de resposta), enriquece midia
+    // nova e, SO para inbound, agenda a analise (debounce). Tudo INLINE (sem
+    // edge->edge). Falhas aqui nao derrubam o sync da lista, ja persistido acima.
     // ============================================================
     let heated = 0;
     let enrichedCount = 0;
     try {
-      const candidates = touchedInboundIds.size === 0 ? [] : (await supabase
+      const candidates = touchedIds.size === 0 ? [] : (await supabase
         .from("ghl_conversations")
         .select("ghl_conversation_id, last_message_at, messages_synced_until, analyze_started_at")
         .eq("workspace_id", workspaceId)
-        .in("ghl_conversation_id", [...touchedInboundIds])
+        .in("ghl_conversation_id", [...touchedIds])
         .not("last_message_at", "is", null)
         .order("last_message_at", { ascending: false })
         .limit(CONV_SYNC_CAP)).data;
 
-      const newInbound = (candidates || []).filter((c) => {
+      const toSync = (candidates || []).filter((c) => {
         const lm = c.last_message_at ? new Date(c.last_message_at).getTime() : 0;
         const synced = c.messages_synced_until ? new Date(c.messages_synced_until).getTime() : 0;
         return lm > synced;
       });
 
-      for (const c of newInbound) {
+      for (const c of toSync) {
         try {
           await syncConversationMessages(supabase, {
             workspaceId,
@@ -323,20 +328,23 @@ serve(async (req) => {
             maxMessages: HEAT_CONTEXT_MESSAGES,
           });
 
-          // Debounce de analise (espelha o modelo 1.0: espera o lead parar,
-          // com teto para nao adiar pra sempre numa rajada).
-          const nowMs = Date.now();
-          const startedMs = c.analyze_started_at ? new Date(c.analyze_started_at).getTime() : 0;
-          const ceilingReached = startedMs && (nowMs - startedMs >= CEILING_MS);
+          // Marca como sincronizado ate a ultima msg da lista -> nao re-sincroniza
+          // no proximo tick (so volta se chegar mensagem mais nova).
           const update: Record<string, unknown> = {
-            // Marca como sincronizado ate a ultima msg da lista -> nao re-esquenta
-            // no proximo tick (so volta se chegar inbound mais novo).
             messages_synced_until: c.last_message_at,
-            analyze_after: ceilingReached
-              ? new Date(nowMs).toISOString()
-              : new Date(nowMs + DEBOUNCE_MS).toISOString(),
           };
-          if (!startedMs) update.analyze_started_at = new Date(nowMs).toISOString();
+
+          // Analise (debounce) SO para inbound do lead — vendedor (outbound) nao
+          // dispara sugestao. Espelha o modelo 1.0 (espera o lead parar, com teto).
+          if (touchedInboundIds.has(c.ghl_conversation_id)) {
+            const nowMs = Date.now();
+            const startedMs = c.analyze_started_at ? new Date(c.analyze_started_at).getTime() : 0;
+            const ceilingReached = startedMs && (nowMs - startedMs >= CEILING_MS);
+            update.analyze_after = ceilingReached
+              ? new Date(nowMs).toISOString()
+              : new Date(nowMs + DEBOUNCE_MS).toISOString();
+            if (!startedMs) update.analyze_started_at = new Date(nowMs).toISOString();
+          }
 
           await supabase
             .from("ghl_conversations")
@@ -345,7 +353,7 @@ serve(async (req) => {
             .eq("ghl_conversation_id", c.ghl_conversation_id);
           heated++;
         } catch (convErr) {
-          console.warn(`heat falhou conv ${c.ghl_conversation_id}:`, (convErr as Error).message);
+          console.warn(`sync falhou conv ${c.ghl_conversation_id}:`, (convErr as Error).message);
         }
       }
 
