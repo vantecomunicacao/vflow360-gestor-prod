@@ -821,7 +821,7 @@ serve(async (req) => {
       oppsForResponse = opps.filter((o) => o.stage_id && mappedStageIds.has(o.stage_id));
     }
 
-    // Normaliza telefones (mantém apenas dígitos) para casar com conversations
+    // Normaliza telefones (mantém apenas dígitos) para casar com ghl_conversations
     const normalizePhone = (p: string | null | undefined) => (p || "").replace(/\D+/g, "");
     const phoneSet = new Set<string>();
     const allowedSellerIds = new Set<string>();
@@ -831,30 +831,31 @@ serve(async (req) => {
       if (o.assigned_to) allowedSellerIds.add(o.assigned_to);
     }
 
-    // Pagina TODAS as conversas do workspace e filtra por:
+    // Conversas 2.0 (ghl_conversations): filtra por:
     //  - phone match com oportunidades do escopo
-    //  - quando há filtro de vendedor: ghl_user_id == aquele vendedor
-    //  - quando NÃO há filtro de vendedor: ghl_user_id em qualquer vendedor com opp no escopo
-    //    (simétrico ao caso individual — equivalente a somar as conversas vendedor a vendedor)
+    //  - quando há filtro de vendedor: assigned_ghl_user_id == aquele vendedor
+    //  - quando NÃO há filtro de vendedor: assigned_ghl_user_id em qualquer vendedor
+    //    com opp no escopo (simétrico ao caso individual)
+    // convIds guarda o ghl_conversation_id (texto) usado como FK em ghl_messages.
     const convIds: string[] = [];
     const seenConvIds = new Set<string>();
-    const convToSeller = new Map<string, string>(); // convId -> sellerId
+    const convToSeller = new Map<string, string>(); // ghl_conversation_id -> sellerId
     if (phoneSet.size > 0 || filterUserId || allowedSellerIds.size > 0) {
       const PAGE = 1000;
       let from = 0;
       while (true) {
         const { data: convsRows, error: convErr } = await supabase
-          .from("conversations")
-          .select("id,contact_phone,ghl_user_id")
+          .from("ghl_conversations")
+          .select("ghl_conversation_id,contact_phone,assigned_ghl_user_id")
           .eq("workspace_id", workspaceId)
           .range(from, from + PAGE - 1);
-        if (convErr) { console.error("convs page error", convErr); break; }
+        if (convErr) { console.error("ghl_conversations page error", convErr); break; }
         const rows = convsRows || [];
         for (const c of rows) {
-          const id = (c as any).id as string;
+          const id = (c as any).ghl_conversation_id as string;
           if (seenConvIds.has(id)) continue;
           const phone = normalizePhone((c as any).contact_phone);
-          const convSeller = (c as any).ghl_user_id as string | null;
+          const convSeller = (c as any).assigned_ghl_user_id as string | null;
           const phoneMatch = phoneSet.has(phone);
           const sellerMatch = filterUserId
             ? convSeller === filterUserId
@@ -862,7 +863,7 @@ serve(async (req) => {
           if (phoneMatch || sellerMatch) {
             convIds.push(id);
             seenConvIds.add(id);
-            // prefer explicit conversation linkage, fall back to phone -> assigned_to
+            // prefere o vendedor atribuído na conversa, com fallback phone -> assigned_to
             const sid = convSeller || phoneToSeller.get(phone) || null;
             if (sid) convToSeller.set(id, sid);
           }
@@ -884,7 +885,7 @@ serve(async (req) => {
       // Pagina mensagens em lotes de conversation IDs e por páginas, sem cortar dados.
       const ID_CHUNK = 200;
       const MSG_PAGE = 1000;
-      const msgsAll: Array<{ conversation_id: string; direction: string; created_at: string }> = [];
+      const msgsAll: Array<{ ghl_conversation_id: string; direction: string; date_added: string }> = [];
       const startIso = startDate || new Date(0).toISOString();
       const endIso = endDate || new Date().toISOString();
 
@@ -893,14 +894,15 @@ serve(async (req) => {
         let mFrom = 0;
         while (true) {
           const { data: msgsRows, error: msgErr } = await supabase
-            .from("messages")
-            .select("conversation_id,direction,created_at")
-            .in("conversation_id", chunk)
-            .gte("created_at", startIso)
-            .lte("created_at", endIso)
-            .order("created_at", { ascending: true })
+            .from("ghl_messages")
+            .select("ghl_conversation_id,direction,date_added")
+            .eq("workspace_id", workspaceId)
+            .in("ghl_conversation_id", chunk)
+            .gte("date_added", startIso)
+            .lte("date_added", endIso)
+            .order("date_added", { ascending: true })
             .range(mFrom, mFrom + MSG_PAGE - 1);
-          if (msgErr) { console.error("msgs page error", msgErr); break; }
+          if (msgErr) { console.error("ghl_messages page error", msgErr); break; }
           const rows = (msgsRows || []) as any[];
           for (const m of rows) msgsAll.push(m);
           if (rows.length < MSG_PAGE) break;
@@ -914,9 +916,9 @@ serve(async (req) => {
 
       const byConv = new Map<string, Array<{ dir: string; t: number }>>();
       for (const m of (msgsRows || [])) {
-        const arr = byConv.get((m as any).conversation_id) || [];
-        arr.push({ dir: (m as any).direction, t: new Date((m as any).created_at).getTime() });
-        byConv.set((m as any).conversation_id, arr);
+        const arr = byConv.get((m as any).ghl_conversation_id) || [];
+        arr.push({ dir: (m as any).direction, t: new Date((m as any).date_added).getTime() });
+        byConv.set((m as any).ghl_conversation_id, arr);
       }
 
       for (const [convId, msgs] of byConv) {
