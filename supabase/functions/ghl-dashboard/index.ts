@@ -926,7 +926,11 @@ serve(async (req) => {
         let convHadResponse = false;
         let convHadInbound = false;
         const sid = convToSeller.get(convId);
-        const acc = sid ? (sellerResponse.get(sid) || { totalMinutes: 0, count: 0 }) : null;
+        // Tempo de resposta conta SO conversas com vendedor responsavel
+        // (atribuido na conversa ou dono da oportunidade). Conversa orfa nao
+        // entra na media global, na contagem nem na taxa de resposta.
+        if (!sid) continue;
+        const acc = sellerResponse.get(sid) || { totalMinutes: 0, count: 0 };
         for (const m of msgs) {
           if (m.dir === "inbound") {
             if (!convHadInbound) {

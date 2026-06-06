@@ -75,6 +75,14 @@ export function isActivityMessage(messageType?: string | null): boolean {
   return !!messageType && messageType.toUpperCase().startsWith("TYPE_ACTIVITY");
 }
 
+// Email nao e canal conversacional aqui: na pratica sao disparos de
+// marketing/nurture (todos outbound, sem dono), que poluem o contexto da IA e
+// contam como "resposta do vendedor" no tempo de resposta. Excluimos o canal
+// inteiro (TYPE_EMAIL, TYPE_CUSTOM_EMAIL, TYPE_CAMPAIGN_EMAIL, ...).
+export function isEmailChannel(messageType?: string | null): boolean {
+  return !!messageType && messageType.toUpperCase().includes("EMAIL");
+}
+
 // Mensagens de CONTROLE da automacao (Evolution/Stevo) vazam para o historico
 // como TYPE_WHATSAPP outbound, mas nao sao fala humana: avisos de sistema e
 // comandos. Poluem o contexto da IA e, por serem outbound, contam como
@@ -138,7 +146,11 @@ export async function syncConversationMessages(
       const ms = m.dateAdded ? new Date(m.dateAdded).getTime() : 0;
       if (ms > maxDateAddedMs) maxDateAddedMs = ms;
       const messageType = m.messageType || (typeof m.type === "number" ? `TYPE_${m.type}` : null);
-      if (isActivityMessage(messageType) || isSystemNoiseMessage(m.body)) continue;
+      if (
+        isActivityMessage(messageType) ||
+        isEmailChannel(messageType) ||
+        isSystemNoiseMessage(m.body)
+      ) continue;
       rows.push({
         workspace_id: workspaceId,
         ghl_conversation_id: ghlConversationId,
