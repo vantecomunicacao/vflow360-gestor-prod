@@ -66,6 +66,15 @@ export async function ghlFetchMessages(
   };
 }
 
+// Itens de atividade do GHL ("Opportunity created", "Appointment booked",
+// "Contact created", etc.) chegam no MESMO endpoint das mensagens, com
+// messageType comecando em TYPE_ACTIVITY. Nao sao falas reais: poluem o
+// historico que a IA le e, como vem marcados outbound, sao contados como
+// "resposta do vendedor" no tempo medio de resposta. Filtramos no sync.
+export function isActivityMessage(messageType?: string | null): boolean {
+  return !!messageType && messageType.toUpperCase().startsWith("TYPE_ACTIVITY");
+}
+
 export interface SyncMessagesResult {
   synced: number;
   pages: number;
@@ -88,7 +97,8 @@ export async function syncConversationMessages(
   const maxMessages = Math.min(Math.max(1, opts.maxMessages ?? 100), 500);
 
   let cursor: string | undefined = undefined;
-  let totalSynced = 0;
+  let totalSynced = 0; // itens lidos da API (mensagens + atividades) — controla cap/paginacao
+  let realSynced = 0; // falas reais gravadas (sem atividades)
   let pages = 0;
   let maxDateAddedMs = 0;
 
@@ -103,37 +113,46 @@ export async function syncConversationMessages(
     pages++;
     if (!messages.length) break;
 
-    const rows = messages.map((m) => {
+    // maxDateAdded avanca sobre TODOS os itens vistos (inclusive atividades),
+    // para o watermark refletir ate onde a API ja foi lida e nao re-paginar.
+    // Mas so gravamos falas reais (atividades sao puladas — ver isActivityMessage).
+    const rows: Record<string, unknown>[] = [];
+    for (const m of messages) {
       const ms = m.dateAdded ? new Date(m.dateAdded).getTime() : 0;
       if (ms > maxDateAddedMs) maxDateAddedMs = ms;
-      return {
+      const messageType = m.messageType || (typeof m.type === "number" ? `TYPE_${m.type}` : null);
+      if (isActivityMessage(messageType)) continue;
+      rows.push({
         workspace_id: workspaceId,
         ghl_conversation_id: ghlConversationId,
         ghl_message_id: m.id,
         direction: m.direction || "unknown",
         body: m.body || null,
-        message_type: m.messageType || (typeof m.type === "number" ? `TYPE_${m.type}` : null),
+        message_type: messageType,
         from_field: m.from || null,
         to_field: m.to || null,
         attachments_json: m.attachments && m.attachments.length ? m.attachments : null,
         ghl_user_id: m.userId || null,
         date_added: m.dateAdded,
         synced_at: new Date().toISOString(),
-      };
-    });
+      });
+    }
 
-    const { error: upErr } = await supabase
-      .from("ghl_messages")
-      .upsert(rows, { onConflict: "workspace_id,ghl_message_id" });
-    if (upErr) throw new Error(`Upsert ghl_messages falhou: ${upErr.message}`);
-    totalSynced += rows.length;
+    if (rows.length) {
+      const { error: upErr } = await supabase
+        .from("ghl_messages")
+        .upsert(rows, { onConflict: "workspace_id,ghl_message_id" });
+      if (upErr) throw new Error(`Upsert ghl_messages falhou: ${upErr.message}`);
+    }
+    totalSynced += messages.length; // conta itens lidos (para cap/paginacao)
+    realSynced += rows.length;
 
     if (!nextPage || !lastMessageId) break;
     cursor = lastMessageId;
   }
 
   return {
-    synced: totalSynced,
+    synced: realSynced,
     pages,
     maxDateAdded: maxDateAddedMs ? new Date(maxDateAddedMs).toISOString() : null,
   };

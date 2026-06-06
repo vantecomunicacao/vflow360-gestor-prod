@@ -254,7 +254,10 @@ serve(async (req) => {
       if (!isInitial) {
         for (const c of batch) {
           touchedIds.add(c.id);
-          if ((c.lastMessageDirection || "").toLowerCase() === "inbound") {
+          // Atividade do GHL (TYPE_ACTIVITY*) NAO e fala do lead: nao pode
+          // disparar analise mesmo que venha marcada como inbound.
+          const isActivity = (c.lastMessageType || "").toUpperCase().startsWith("TYPE_ACTIVITY");
+          if (!isActivity && (c.lastMessageDirection || "").toLowerCase() === "inbound") {
             touchedInboundIds.add(c.id);
           }
         }
