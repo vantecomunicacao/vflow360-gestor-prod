@@ -75,6 +75,23 @@ export function isActivityMessage(messageType?: string | null): boolean {
   return !!messageType && messageType.toUpperCase().startsWith("TYPE_ACTIVITY");
 }
 
+// Mensagens de CONTROLE da automacao (Evolution/Stevo) vazam para o historico
+// como TYPE_WHATSAPP outbound, mas nao sao fala humana: avisos de sistema e
+// comandos. Poluem o contexto da IA e, por serem outbound, contam como
+// "resposta do vendedor" no tempo medio de resposta. Filtramos por padrao do
+// corpo. Padroes ancorados no inicio (fala real nao comeca com "#cmd|").
+const SYSTEM_NOISE_PATTERNS: RegExp[] = [
+  /^Number Active:/i, // aviso "Number Active: <num> / Instance: <inst>"
+  /^Envio de mensagem ativa/i, // aviso de disparo ativo
+  /^#[a-zA-Z_]+\|/, // comandos: #sw|3, #template|chile_inicio, ...
+];
+
+export function isSystemNoiseMessage(body?: string | null): boolean {
+  if (!body) return false;
+  const t = body.trimStart();
+  return SYSTEM_NOISE_PATTERNS.some((re) => re.test(t));
+}
+
 export interface SyncMessagesResult {
   synced: number;
   pages: number;
@@ -121,7 +138,7 @@ export async function syncConversationMessages(
       const ms = m.dateAdded ? new Date(m.dateAdded).getTime() : 0;
       if (ms > maxDateAddedMs) maxDateAddedMs = ms;
       const messageType = m.messageType || (typeof m.type === "number" ? `TYPE_${m.type}` : null);
-      if (isActivityMessage(messageType)) continue;
+      if (isActivityMessage(messageType) || isSystemNoiseMessage(m.body)) continue;
       rows.push({
         workspace_id: workspaceId,
         ghl_conversation_id: ghlConversationId,
