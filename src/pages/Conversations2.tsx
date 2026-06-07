@@ -162,10 +162,13 @@ export default function Conversations2() {
           "id, ghl_conversation_id, contact_name, contact_phone, contact_email, profile_photo_url, channel_type, last_message_at, last_message_body, last_message_direction, unread_count, assigned_ghl_user_id",
         )
         .eq("workspace_id", workspaceId)
-        // Email nao e canal conversacional (disparo de marketing). As conversas
-        // com historico real tem o channel_type corrigido p/ o canal real, entao
-        // este filtro so esconde as de email puro (sem mensagem real).
-        .not("channel_type", "ilike", "%email%")
+        // Esconde conversa de EMAIL PURO (disparo de marketing, sem fala real).
+        // Regra durável: esconde só se channel_type for email E nao tiver
+        // mensagem real (has_messages=false, mantido por trigger). Conversa com
+        // histórico real cujo último item virou email continua aparecendo.
+        // (O cron pode reverter channel_type p/ email; por isso nao filtramos só
+        // por canal — ver has_messages.)
+        .or("channel_type.not.ilike.*email*,has_messages.is.true")
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .range(offset, offset + LIST_PAGE_SIZE - 1);
       if (error) throw error;
