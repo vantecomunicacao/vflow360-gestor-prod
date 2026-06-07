@@ -53,6 +53,16 @@ function parseMonetaryValue(raw: unknown): number {
   return parseFloat(s);
 }
 
+// Valida due_date de agendar_lembrete: devolve a string original se for uma
+// data ISO valida e no futuro; caso contrario null (a execucao aplica o
+// default de 24h). Preserva o offset -03:00 que o executor espera.
+function sanitizeFutureDate(raw: unknown): string | null {
+  if (!raw || typeof raw !== "string") return null;
+  const t = Date.parse(raw);
+  if (Number.isNaN(t) || t <= Date.now()) return null;
+  return raw;
+}
+
 function resolveAiModel(
   providerConfig: { provider?: string; api_key?: string; model?: string } | null,
 ): { useOpenAI: boolean; model: string; providerLabel: string } {
@@ -389,9 +399,9 @@ REGRAS SOBRE SUGESTÕES ANTERIORES:
 
     const stageNames = selectedStages.map((s: any) => s.name);
     const stagesDescription = selectedStages.length > 0
-      ? `\n\nEtapas do funil disponíveis (use EXATAMENTE estes nomes, APENAS estas etapas podem ser sugeridas):\n${selectedStages
-          .map((s: any) => `- "${s.name}" (pipeline: "${s.pipelineName}", ID: ${s.pipelineId})${s.description ? `: ${s.description}` : ""}`)
-          .join("\n")}\n\nATENÇÃO: Cada etapa pertence a um pipeline específico. Use a etapa correta para o contexto da conversa. Pipelines de "vendas" são para conversas comerciais. Pipelines de "organização interna" são para conversas internas.`
+      ? `\n\nEtapas do funil disponíveis (APENAS estas podem ser sugeridas):\n${selectedStages
+          .map((s: any) => `- "${s.name}" — stage_id: ${s.id} (funil: "${s.pipelineName}")${s.description ? `: ${s.description}` : ""}`)
+          .join("\n")}\n\nATENÇÃO: Cada etapa pertence a um pipeline específico. Para mover_funil, retorne o campo "stage_id" com o ID EXATO da etapa destino (isso desambigua etapas de mesmo nome em funis diferentes) e use o nome da etapa no campo "value". Pipelines de "vendas" são para conversas comerciais; de "organização interna", para conversas internas.`
       : "";
 
     const actionTypesDescription = `\n\nTipos de ação que você pode sugerir:
@@ -412,6 +422,29 @@ ${filteredActionTypes.includes("ganho_perdido") ? (() => {
 
     const validFieldKeys = new Set(selectedFields.map((f: any) => f.fieldKey));
     const validStageNames = new Set(stageNames);
+
+    // Mapas para desambiguar etapa por stage_id e validar opcoes de campo.
+    const stageIds: string[] = selectedStages.map((s: any) => s.id);
+    const stageById = new Map<string, any>(selectedStages.map((s: any) => [s.id, s]));
+    const stagesByName = new Map<string, any[]>();
+    for (const s of selectedStages) {
+      const k = (s.name || "").toLowerCase();
+      const arr = stagesByName.get(k);
+      if (arr) arr.push(s);
+      else stagesByName.set(k, [s]);
+    }
+    // fieldKey -> conjunto de opcoes validas (so campos com opcoes definidas).
+    const fieldOptionsByKey = new Map<string, Set<string>>();
+    for (const f of selectedFields) {
+      if (Array.isArray(f.options) && f.options.length > 0) {
+        const vals = new Set<string>();
+        for (const opt of f.options) {
+          const v = typeof opt === "string" ? opt : opt?.value;
+          if (v) vals.add(String(v));
+        }
+        if (vals.size > 0) fieldOptionsByKey.set(f.fieldKey, vals);
+      }
+    }
 
     const nowBrazil = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" });
     const systemPrompt = `Você é um assistente de CRM inteligente. Analise a conversa de WhatsApp abaixo e gere sugestões de ações para o CRM (Go High Level).
@@ -481,6 +514,7 @@ REGRAS OBRIGATÓRIAS:
                       title: { type: "string", description: "Título curto da sugestão (ex: 'Mover para Qualificado')" },
                       description: { type: "string", description: "Justificativa detalhada com trecho da conversa" },
                       field: { type: "string", description: "Para mover_funil: nome EXATO da etapa destino. Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null." },
+                      stage_id: { type: "string", description: "Apenas para mover_funil: o stage_id EXATO da etapa destino (das listadas). Use para desambiguar etapas de mesmo nome em funis diferentes.", ...(stageIds.length > 0 ? { enum: stageIds } : {}) },
                       value: {
                         type: "string",
                         description: stageNames.length > 0
@@ -574,11 +608,26 @@ REGRAS OBRIGATÓRIAS:
     // 9a. Filtra campos/etapas nao configurados
     suggestions = suggestions.filter((s) => {
       if (s.type === "mover_funil") {
-        const stageValue = s.value || s.field;
-        if (!stageValue || !validStageNames.has(stageValue)) return false;
+        // Resolve a etapa canonica: 1o por stage_id (desambigua); senao por nome
+        // EXATO, mas apenas se o nome nao for ambiguo entre os funis configurados.
+        let stage = s.stage_id ? stageById.get(s.stage_id) : null;
+        if (!stage) {
+          const byName = stagesByName.get((s.value || s.field || "").toLowerCase());
+          if (byName && byName.length === 1) stage = byName[0];
+        }
+        if (!stage) {
+          console.log(`Filtered mover_funil: etapa nao resolvida (stage_id=${s.stage_id}, value=${s.value})`);
+          return false;
+        }
+        s.__stage = stage;
       }
       if (s.type === "campo_personalizado") {
         if (!s.field || !validFieldKeys.has(s.field)) return false;
+        const opts = fieldOptionsByKey.get(s.field);
+        if (opts && !opts.has(String(s.value ?? ""))) {
+          console.log(`Filtered campo_personalizado: valor "${s.value}" fora das opcoes de ${s.field}`);
+          return false;
+        }
       }
       if (s.type === "valor_negociacao") {
         const num = parseMonetaryValue(s.value);
@@ -673,16 +722,23 @@ REGRAS OBRIGATÓRIAS:
           status: autoApprove ? "approved" : "pending",
           action_data: {
             field: s.field || null,
-            value: s.value || null,
+            // Para mover_funil grava o nome canonico da etapa resolvida.
+            value: s.type === "mover_funil" && s.__stage ? s.__stage.name : (s.value || null),
             contact_name: conversation.contact_name || null,
             contact_phone: conversation.contact_phone || null,
             // Contato canonico do GHL (multicanal) — execucao usa direto, sem
             // depender de telefone. Essencial para Instagram/Facebook.
             ghl_contact_id: conversation.ghl_contact_id || null,
             ghl_location_id: conversation.ghl_location_id || null,
+            // Para auto-execucao: o cron postgres->edge so pega sugestoes com esta flag.
+            ...(autoApprove ? { auto_execute_pending: true } : {}),
+            ...(s.type === "mover_funil" && s.__stage ? {
+              stageId: s.__stage.id,
+              pipelineId: s.__stage.pipelineId,
+            } : {}),
             ...(s.type === "agendar_lembrete" ? {
               task_title: s.task_title || s.value || "Entrar em contato",
-              due_date: s.due_date || null,
+              due_date: sanitizeFutureDate(s.due_date),
               task_description: s.description || null,
             } : {}),
             ...(s.type === "ganho_perdido" && s.lost_reason_id ? {

@@ -705,9 +705,14 @@ serve(async (req) => {
             const allowedPipelineIds = new Set(configSelectedStages.map(s => s.pipelineId));
             const allowedStageIds = new Set(configSelectedStages.map(s => s.id));
             
-            // First try to find among selected stages directly (best match)
+            // Preferir o stageId canonico gravado pela analise (desambigua etapas
+            // de mesmo nome em funis diferentes). Fallback: casar por nome.
+            const directStageId = actionData?.stageId as string | undefined;
             const searchName = targetStageName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            let matchedConfigStage = configSelectedStages.find(s => {
+            let matchedConfigStage = directStageId
+              ? configSelectedStages.find(s => s.id === directStageId)
+              : undefined;
+            if (!matchedConfigStage) matchedConfigStage = configSelectedStages.find(s => {
               const sn = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
               return sn === searchName;
             });
