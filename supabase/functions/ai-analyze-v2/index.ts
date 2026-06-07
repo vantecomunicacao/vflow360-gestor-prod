@@ -141,7 +141,7 @@ serve(async (req) => {
     // 1. Conversa (shim a partir de ghl_conversations)
     const { data: conversation } = await supabase
       .from("ghl_conversations")
-      .select("id, contact_name, contact_phone, ghl_contact_id, ghl_location_id, analyze_after, analyze_started_at")
+      .select("id, contact_name, contact_phone, ghl_contact_id, ghl_location_id, analyze_after, analyze_started_at, last_analyzed_at")
       .eq("workspace_id", workspaceId)
       .eq("ghl_conversation_id", ghlConversationId)
       .maybeSingle();
@@ -266,6 +266,19 @@ serve(async (req) => {
       });
     }
 
+    // 2a. Gate de idempotencia: se nada chegou desde a ultima analise, NAO chama
+    // o LLM nem gera nada (reanalisar manualmente vira no-op). messagesDesc[0] e a
+    // mensagem mais recente (query ordenada desc). Compara timestamp da mensagem
+    // com last_analyzed_at; mensagem ja vista => date_added <= last_analyzed_at.
+    const newestMsgAt = messagesDesc?.[0]?.date_added as string | null | undefined;
+    if (conversation.last_analyzed_at && newestMsgAt &&
+        new Date(newestMsgAt).getTime() <= new Date(conversation.last_analyzed_at).getTime()) {
+      console.log(`Idempotente: nenhuma mensagem nova desde last_analyzed_at em ${ghlConversationId}`);
+      return new Response(JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason: "no_new_messages" } }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // 3. Integracao GHL do workspace (config: campos/etapas/prompt/credenciais)
     const { data: ghlIntegration } = await supabase
       .from("integrations")
@@ -355,7 +368,7 @@ serve(async (req) => {
       .select("type, title, description, status, action_data, created_at")
       .eq("ghl_conversation_id", ghlConvUuid)
       .order("created_at", { ascending: false })
-      .limit(5);
+      .limit(30);
 
     let previousContext = "";
     if (previousSuggestions && previousSuggestions.length > 0) {
