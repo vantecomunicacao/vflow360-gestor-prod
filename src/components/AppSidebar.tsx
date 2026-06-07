@@ -37,7 +37,6 @@ export function AppSidebar() {
   const navItems: { title: string; url: string; icon: typeof LayoutDashboard; show: boolean; end?: boolean }[] = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, show: gestor },
     { title: "Conversas", url: "/conversations", icon: MessageSquare, show: gestor },
-    { title: "Conversas 2.0", url: "/conversations-v2", icon: MessageSquare, show: gestor },
     { title: "Sugestões IA", url: "/suggestions", icon: Sparkles, show: viewSuggestions },
     { title: "Integrações", url: "/integrations", icon: Plug, show: viewIntegrations },
     { title: "Documentação", url: "/docs", icon: BookOpen, show: gestor },

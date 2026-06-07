@@ -1,7 +1,8 @@
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AnimatePresence } from "framer-motion";
 import {
+  Calendar,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -23,7 +24,6 @@ import {
 import { SuggestionCard } from "./SuggestionCard";
 import {
   ACTION_TYPE_LABELS,
-  typeColors,
   type ContactGroup,
   type ExecutionResult,
   type LostReason,
@@ -100,7 +100,18 @@ export function ContactGroupCard({
                 />
               </div>
               <div className="text-left">
-                <p className="text-sm font-semibold text-foreground">{group.contactName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground">{group.contactName}</p>
+                  {group.createdAt && (
+                    <span
+                      className="flex items-center gap-1 text-xs text-muted-foreground"
+                      title={format(new Date(group.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    >
+                      <Calendar className="w-3 h-3" />
+                      {format(new Date(group.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+                    </span>
+                  )}
+                </div>
                 {group.contactPhone && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Phone className="w-3 h-3" />
@@ -115,7 +126,7 @@ export function ContactGroupCard({
                   {group.suggestions.length} sugestão{group.suggestions.length !== 1 ? "ões" : ""}
                 </span>
                 {group.pendingCount > 0 && (
-                  <Badge variant="default" className="text-xs">
+                  <Badge variant="outline" className="text-xs font-medium border-primary/30 text-primary">
                     {group.pendingCount} pendente{group.pendingCount !== 1 ? "s" : ""}
                   </Badge>
                 )}
@@ -123,24 +134,21 @@ export function ContactGroupCard({
               {group.contactPhone && (
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className={`h-7 px-2 ${
-                    isContactDisabled
-                      ? "text-muted-foreground hover:text-foreground"
-                      : "text-primary hover:text-primary"
+                  size="icon"
+                  className={`h-8 w-8 ${
+                    isContactDisabled ? "text-muted-foreground" : "text-foreground"
                   }`}
                   onClick={(e) => onToggleContactAI(group.contactPhone, e)}
                   title={isContactDisabled ? "IA desativada para este contato" : "IA ativa para este contato"}
                 >
-                  <Power className="w-3.5 h-3.5 mr-1" />
-                  <span className="text-xs">{isContactDisabled ? "IA off" : "IA on"}</span>
+                  <Power className="w-4 h-4" />
                 </Button>
               )}
               {group.pendingCount > 0 && (
                 <Button
-                  variant="ghost"
+                  variant="default"
                   size="sm"
-                  className="text-primary hover:text-primary hover:bg-primary/10 h-7 px-2"
+                  className="h-8 px-3"
                   disabled={approvingThisGroup || rejectingThisGroup || !!executingId}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -149,21 +157,21 @@ export function ContactGroupCard({
                 >
                   {approvingThisGroup ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                       {approveProgress ? `${approveProgress.current}/${approveProgress.total}` : "..."}
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Aceitar todas
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Aceitar todas
                     </>
                   )}
                 </Button>
               )}
               {group.pendingCount > 0 && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
+                  className="h-8 px-3 text-muted-foreground hover:text-destructive"
                   disabled={rejectingThisGroup || approvingThisGroup}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -174,7 +182,7 @@ export function ContactGroupCard({
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <>
-                      <XCircle className="w-3.5 h-3.5 mr-1" /> Rejeitar todas
+                      <XCircle className="w-3.5 h-3.5 mr-1.5" /> Rejeitar todas
                     </>
                   )}
                 </Button>
@@ -210,9 +218,7 @@ export function ContactGroupCard({
                 {group.actionSummary.map(({ type, count }) => (
                   <span
                     key={type}
-                    className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] leading-none font-medium ${
-                      typeColors[type] || "bg-muted text-muted-foreground border-border"
-                    }`}
+                    className="inline-flex items-center whitespace-nowrap rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] leading-none font-medium text-muted-foreground"
                   >
                     {count}× {ACTION_TYPE_LABELS[type]?.split(" ")[0] || type}
                   </span>

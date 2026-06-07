@@ -36,6 +36,28 @@ import {
   type SuggestionStatus,
 } from "@/components/suggestions/types";
 
+// Converte o channel_type do GHL (ex: "TYPE_WHATSAPP") num rótulo amigável.
+function formatChannelType(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const key = raw.toUpperCase().replace(/^TYPE_/, "");
+  const labels: Record<string, string> = {
+    WHATSAPP: "WhatsApp",
+    SMS: "SMS",
+    EMAIL: "E-mail",
+    CUSTOM_EMAIL: "E-mail",
+    IG: "Instagram",
+    INSTAGRAM: "Instagram",
+    FB: "Facebook",
+    FACEBOOK: "Facebook",
+    GMB: "Google",
+    PHONE: "Telefone",
+    CALL: "Telefone",
+    LIVE_CHAT: "Chat",
+    WEBCHAT: "Chat",
+  };
+  return labels[key] || key.charAt(0) + key.slice(1).toLowerCase().replace(/_/g, " ");
+}
+
 const Suggestions = () => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [filter, setFilter] = useState<SuggestionStatus | "all">("all");
@@ -299,6 +321,7 @@ const Suggestions = () => {
           suggestions: [],
           pendingCount: 0,
           integrationLabel: null,
+          createdAt: null,
           lastApprovedAt: null,
           lastAssignedTo: null,
           actionSummary: [],
@@ -311,8 +334,8 @@ const Suggestions = () => {
     }
 
     for (const group of groups.values()) {
-      const withLabel = group.suggestions.find(s => s.conversations?.integration_label);
-      if (withLabel) group.integrationLabel = withLabel.conversations!.integration_label;
+      const withLabel = group.suggestions.find(s => s.ghl_conversations?.channel_type);
+      if (withLabel) group.integrationLabel = formatChannelType(withLabel.ghl_conversations!.channel_type);
 
       const approved = group.suggestions
         .filter(s => s.status === "approved")
@@ -321,6 +344,11 @@ const Suggestions = () => {
         group.lastApprovedAt = approved[0].action_data?.executed_at || approved[0].created_at;
         group.lastAssignedTo = approved[0].action_data?.ghl_assigned_to || null;
       }
+
+      group.createdAt = group.suggestions.reduce<string | null>(
+        (latest, s) => (!latest || s.created_at > latest ? s.created_at : latest),
+        null,
+      );
 
       const typeCounts = new Map<string, number>();
       for (const s of group.suggestions) {

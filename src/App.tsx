@@ -35,7 +35,6 @@ import NotFound from "./pages/NotFound";
 
 // Lazy: rotas pesadas (recharts, listas, integrações, etc.)
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Conversations = lazy(() => import("./pages/Conversations"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const AccountSettings = lazy(() => import("./pages/settings/AccountSettings"));
@@ -46,7 +45,6 @@ const Admin = lazy(() => import("./pages/Admin"));
 const SystemLogs = lazy(() => import("./pages/SystemLogs"));
 const Conversations2 = lazy(() => import("./pages/Conversations2"));
 const Documentation = lazy(() => import("./pages/Documentation"));
-const PairingPublic = lazy(() => import("./pages/PairingPublic"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,11 +71,9 @@ const App = () => (
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/conectar/:token" element={lazyRoute(<PairingPublic />, <GenericPageSkeleton />)} />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<GestorGuard>{lazyRoute(<Dashboard />, <DashboardSkeleton />)}</GestorGuard>} />
-                <Route path="/conversations" element={<GestorGuard>{lazyRoute(<Conversations />, <ConversationsSkeleton />)}</GestorGuard>} />
-                <Route path="/conversations-v2" element={<GestorGuard>{lazyRoute(<Conversations2 />, <ConversationsSkeleton />)}</GestorGuard>} />
+                <Route path="/conversations" element={<GestorGuard>{lazyRoute(<Conversations2 />, <ConversationsSkeleton />)}</GestorGuard>} />
                 <Route
                   path="/suggestions"
                   element={<PermissionGuard require="viewSuggestions">{lazyRoute(<Suggestions />, <SuggestionsSkeleton />)}</PermissionGuard>}

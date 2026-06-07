@@ -32,7 +32,7 @@ export interface Suggestion {
   created_at: string;
   conversation_id: string | null;
   ai_provider: string | null;
-  conversations?: { integration_label: string | null } | null;
+  ghl_conversations?: { channel_type: string | null } | null;
 }
 
 export interface ContactGroup {
@@ -42,6 +42,7 @@ export interface ContactGroup {
   suggestions: Suggestion[];
   pendingCount: number;
   integrationLabel: string | null;
+  createdAt: string | null;
   lastApprovedAt: string | null;
   lastAssignedTo: string | null;
   actionSummary: { type: string; count: number }[];

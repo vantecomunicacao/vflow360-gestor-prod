@@ -22,23 +22,6 @@ export interface GhlPipelineStage {
   description: string;
 }
 
-export type WhatsAppStatus = "not_created" | "disconnected" | "connecting" | "connected";
-export type WhatsAppProvider = "uazap" | "stevo" | "stevo_oficial" | "evolution";
-
-export interface WhatsAppInstance {
-  id: string;
-  instanceName: string;
-  label: string;
-  status: WhatsAppStatus;
-  provider: WhatsAppProvider;
-  qrCode?: string | null;
-  loading?: boolean;
-  webhookUrl?: string;
-  lastWebhookAt?: string | null;
-  accessToken?: string;
-  ghlUserId?: string | null;
-}
-
 export interface GhlUserOption {
   ghl_id: string;
   name: string;

@@ -1,25 +1,9 @@
 project_id = "xcrfbpyhyznyufijrdry"
 
-[functions.analyze-scheduler]
-verify_jwt = false
-# schedule = "* * * * *"  # comentado p/ rodar localmente (CLI local não aceita esta chave)
-
 [functions.ghl-sync]
 verify_jwt = false
 
-[functions.stevo-webhook]
-verify_jwt = false
-
-[functions.stevo-oficial-webhook]
-verify_jwt = false
-
-[functions.evolution-webhook]
-verify_jwt = false
-
 [functions.log-event]
-verify_jwt = false
-
-[functions.evolution-pairing-public]
 verify_jwt = false
 
 [functions.pdf-extract]
