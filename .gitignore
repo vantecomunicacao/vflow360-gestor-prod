@@ -22,6 +22,12 @@ dist-ssr
 supabase/.branches/
 supabase/.temp/
 
+# Playwright E2E artifacts
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

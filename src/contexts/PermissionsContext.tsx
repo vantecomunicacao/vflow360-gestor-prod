@@ -39,12 +39,19 @@ export function landingPath(p: Permissions): string {
 }
 
 export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [permissions, setPermissions] = useState<Permissions>(DEFAULT);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    // Enquanto a sessao ainda esta sendo restaurada (reload), mantemos loading=true
+    // para os guards nao avaliarem permissoes DEFAULT no intervalo user=null->presente
+    // (senao um F5 em rota protegida chutaria o usuario para /dashboard).
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
     if (!user) {
       setPermissions(DEFAULT);
       setLoading(false);
@@ -69,7 +76,7 @@ export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user, authLoading]);
 
   const value = useMemo(() => ({ permissions, loading }), [permissions, loading]);
 
