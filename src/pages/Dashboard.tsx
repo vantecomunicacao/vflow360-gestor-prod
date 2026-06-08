@@ -252,8 +252,8 @@ export default function Dashboard() {
       </AnimatedSection>
 
 
-      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-5 gap-5 lg:gap-6" delay={0.05}>
-        <div className="lg:col-span-3">
+      <AnimatedSection className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6" delay={0.05}>
+        <div className="lg:col-span-1">
           <FunnelVisualization
             funnelStages={data.funnelStages}
             conversionRates={data.conversionRates}
@@ -269,7 +269,7 @@ export default function Dashboard() {
             }
           />
         </div>
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-1 lg:relative">
           <AIInsights />
         </div>
       </AnimatedSection>
