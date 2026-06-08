@@ -36,7 +36,7 @@ export function AIInsights() {
   const periodText = periodLabel(period.start, period.end);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 sm:p-6 h-full lg:absolute lg:inset-0 flex flex-col">
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6 h-full flex flex-col">
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-2 rounded-lg bg-accent/10 shrink-0">
@@ -77,7 +77,7 @@ export function AIInsights() {
         </div>
       ) : (
         <>
-          <ul className="flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
+          <ul className="flex-1 min-h-0 max-h-[560px] space-y-3 overflow-y-auto pr-1">
             {insights.map((ins) => {
               const Icon = KIND_ICON[ins.kind] ?? Sparkles;
               return (
