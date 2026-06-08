@@ -38,6 +38,7 @@ const Workspaces = () => {
     renameWorkspace,
     deleteWorkspace,
     restoreWorkspace,
+    purgeWorkspace,
     listTrashedWorkspaces,
     setWorkspaceAiEnabled,
   } = useWorkspace();
@@ -47,6 +48,9 @@ const Workspaces = () => {
   type TrashedWorkspace = { id: string; name: string; owner_id: string; created_at: string; deleted_at?: string | null };
   const [trashed, setTrashed] = useState<TrashedWorkspace[]>([]);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<TrashedWorkspace | null>(null);
+  const [purgeConfirmText, setPurgeConfirmText] = useState("");
+  const [purging, setPurging] = useState(false);
 
   const RETENTION_DAYS = 30;
   const daysLeft = (deletedAt?: string | null) => {
@@ -77,6 +81,22 @@ const Workspaces = () => {
       toast.error(err instanceof Error ? err.message : "Erro ao restaurar");
     } finally {
       setRestoringId(null);
+    }
+  };
+
+  const handlePurge = async () => {
+    if (!purgeTarget) return;
+    setPurging(true);
+    try {
+      await purgeWorkspace(purgeTarget.id);
+      toast.success("Conta excluída definitivamente");
+      setPurgeTarget(null);
+      setPurgeConfirmText("");
+      await refreshTrash();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+    } finally {
+      setPurging(false);
     }
   };
 
@@ -348,6 +368,17 @@ const Workspaces = () => {
                   <RotateCcw className="w-4 h-4 mr-2" />
                   {restoringId === ws.id ? "Restaurando..." : "Restaurar"}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => { setPurgeTarget(ws); setPurgeConfirmText(""); }}
+                  disabled={!isOwner}
+                  title={isOwner ? "Excluir definitivamente" : "Apenas o proprietário pode excluir"}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir de vez
+                </Button>
               </div>
             );
           })}
@@ -409,6 +440,46 @@ const Workspaces = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? "Movendo..." : "Mover para a lixeira"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Purge (hard delete) confirmation */}
+      <AlertDialog
+        open={!!purgeTarget}
+        onOpenChange={(open) => { if (!open) { setPurgeTarget(null); setPurgeConfirmText(""); } }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">
+              Excluir "{purgeTarget?.name}" definitivamente?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é <strong>irreversível</strong>. Todos os dados desta conta
+              (conversas, mensagens, sugestões, integrações e configurações) serão
+              <strong> apagados permanentemente</strong> e não poderão ser restaurados.
+              <br /><br />
+              Para confirmar, digite o nome da conta: <strong>{purgeTarget?.name}</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={purgeConfirmText}
+            onChange={(e) => setPurgeConfirmText(e.target.value)}
+            placeholder={purgeTarget?.name}
+            autoFocus
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={purging}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handlePurge();
+              }}
+              disabled={purging || purgeConfirmText.trim() !== (purgeTarget?.name ?? "")}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {purging ? "Excluindo..." : "Excluir definitivamente"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

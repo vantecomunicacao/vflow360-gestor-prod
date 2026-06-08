@@ -19,6 +19,7 @@ interface WorkspaceContextType {
   renameWorkspace: (id: string, name: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
   restoreWorkspace: (id: string) => Promise<void>;
+  purgeWorkspace: (id: string) => Promise<void>;
   listTrashedWorkspaces: () => Promise<Workspace[]>;
   setWorkspaceAiEnabled: (id: string, enabled: boolean) => Promise<void>;
   loading: boolean;
@@ -32,6 +33,7 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
   renameWorkspace: async () => {},
   deleteWorkspace: async () => {},
   restoreWorkspace: async () => {},
+  purgeWorkspace: async () => {},
   listTrashedWorkspaces: async () => [],
   setWorkspaceAiEnabled: async () => {},
   loading: true,
@@ -152,6 +154,14 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     );
   }, []);
 
+  const purgeWorkspace = useCallback(async (id: string) => {
+    // Hard delete: remove definitivamente. FKs ON DELETE CASCADE limpam todos os
+    // dados relacionados (integracoes, conversas, mensagens, sugestoes, etc.).
+    // RLS so permite ao dono (auth.uid() = owner_id).
+    const { error } = await supabase.from("workspaces").delete().eq("id", id);
+    if (error) throw error;
+  }, []);
+
   const listTrashedWorkspaces = useCallback(async (): Promise<Workspace[]> => {
     const { data, error } = await supabase
       .from("workspaces")
@@ -185,6 +195,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       renameWorkspace,
       deleteWorkspace,
       restoreWorkspace,
+      purgeWorkspace,
       listTrashedWorkspaces,
       setWorkspaceAiEnabled,
       loading,
@@ -198,6 +209,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       renameWorkspace,
       deleteWorkspace,
       restoreWorkspace,
+      purgeWorkspace,
       listTrashedWorkspaces,
       setWorkspaceAiEnabled,
     ]
