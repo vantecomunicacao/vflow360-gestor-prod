@@ -90,9 +90,9 @@ export const AiPipelineFilter = () => {
           <Filter className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h3 className="font-semibold text-foreground">Funis analisados pela IA</h3>
+          <h3 className="font-semibold text-foreground">Funis onde a IA sugere ações</h3>
           <p className="text-sm text-muted-foreground">
-            A IA só gerará sugestões para conversas cujo lead esteja em um dos funis selecionados.
+            A IA só gerará sugestões (mover funil, nota, campo…) para conversas cujo lead esteja em um dos funis selecionados.
           </p>
         </div>
       </div>

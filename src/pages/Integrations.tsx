@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { GhlSection } from "@/components/integrations/GhlSection";
 import { AiPipelineFilter } from "@/components/integrations/AiPipelineFilter";
+import { AiAnalystConfig } from "@/components/integrations/AiAnalystConfig";
 import { callEdge } from "@/lib/edgeClient";
 import { GHL_STANDARD_FIELDS } from "@/lib/ghl-standard-fields";
 import { FieldOption, GhlCustomField, GhlPipelineStage } from "@/components/integrations/types";
@@ -299,6 +300,7 @@ const Integrations = () => {
       </motion.div>
 
       {ghlConnected && <AiPipelineFilter />}
+      {ghlConnected && <AiAnalystConfig />}
     </div>
   );
 };
