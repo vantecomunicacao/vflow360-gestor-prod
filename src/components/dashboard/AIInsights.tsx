@@ -57,7 +57,7 @@ export function AIInsights() {
           </div>
         </div>
       ) : (
-        <ul className="flex-1 space-y-3 overflow-y-auto pr-1">
+        <ul className="flex-1 min-h-0 max-h-[480px] lg:max-h-[420px] space-y-3 overflow-y-auto pr-1">
           {insights.map((ins) => {
             const Icon = KIND_ICON[ins.kind] ?? Sparkles;
             return (
