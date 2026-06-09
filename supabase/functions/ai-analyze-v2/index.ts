@@ -18,6 +18,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { reportEdgeError } from "../_shared/error-reporter.ts";
 
+// Versao do prompt/guardrails desta function. Gravada em suggestions.prompt_version
+// para rastreabilidade (AI_DECISIONS #2). Bump SEMPRE que o system prompt OU os
+// guardrails pos-LLM (normalizacao, dedup, contradicao) mudarem.
+const PROMPT_VERSION = "suggest-v2-crm-actions-2026-06-07";
+
 // ====== Helpers (identicos ao ai-analyze 1.0) ======
 const VALID_SUGGESTION_TYPES = [
   "mover_funil",
@@ -760,6 +765,7 @@ REGRAS OBRIGATÓRIAS:
             } : {}),
           },
           ai_provider: buildAiProviderString(providerConfig || null, resolved),
+          prompt_version: PROMPT_VERSION,
         })
         .select()
         .single();
