@@ -1,8 +1,6 @@
-import { CalendarDays, RefreshCw, Filter, Users, GitBranch, ChevronDown, Layers, X, SlidersHorizontal, Megaphone, Target } from "lucide-react";
+import { CalendarDays, Filter, Users, GitBranch, ChevronDown, Layers, X, Megaphone, Target } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { usePermissions } from "@/contexts/PermissionsContext";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -215,7 +213,6 @@ export function Header({
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { permissions } = usePermissions();
   const hasAdditionalRange = !!additionalDateRange?.from;
   const activeFilterCount = [selectedPipelineId, selectedStageId, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
@@ -362,41 +359,6 @@ export function Header({
               onClick={clearAll}
             >
               <X className="w-3.5 h-3.5" /> Limpar
-            </Button>
-          )}
-        </div>
-
-        {/* Status + ação */}
-        <div className="flex items-center gap-2 ml-auto shrink-0">
-          {cachedAt && !isLoading && (
-            <span className="hidden md:inline text-[11px] text-muted-foreground">
-              Atualizado {format(new Date(cachedAt), "HH:mm", { locale: ptBR })}
-            </span>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 gap-1.5 text-xs"
-            onClick={() => onRefresh(true)}
-            disabled={isLoading}
-            title="Forçar atualização"
-            aria-label="Atualizar dados do dashboard"
-          >
-            <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} aria-hidden="true" />
-            <span className="hidden sm:inline">Atualizar</span>
-          </Button>
-          {permissions.viewSettings && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 gap-1.5 text-xs"
-              asChild
-              title="Personalizar dashboard"
-            >
-              <Link to="/settings/dashboard" aria-label="Personalizar dashboard">
-                <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="hidden sm:inline">Personalizar</span>
-              </Link>
             </Button>
           )}
         </div>

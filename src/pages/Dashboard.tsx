@@ -1,7 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
-import { subDays, startOfDay, endOfDay, differenceInDays } from "date-fns";
+import { subDays, startOfDay, endOfDay, differenceInDays, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
-import { Users, TrendingUp, Target, Banknote, Receipt, HandCoins } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Users, TrendingUp, Target, Banknote, Receipt, HandCoins, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useGhlData, DashboardFilters } from "@/hooks/useGhlData";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +44,7 @@ const filtersStorageKey = (workspaceId: string) => `dashboard:filters:${workspac
 
 export default function Dashboard() {
   const { activeWorkspace } = useWorkspace();
+  const { permissions } = usePermissions();
   const [hydrated, setHydrated] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 6),
@@ -237,9 +243,46 @@ export default function Dashboard() {
         additionalDateLabel={data.additionalDateFieldName || null}
       />
 
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">{activeWorkspace.name} · oportunidades VFlow360</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">{activeWorkspace.name} · oportunidades VFlow360</p>
+        </div>
+
+        {/* Status + ação */}
+        <div className="flex items-center gap-2 shrink-0">
+          {cachedAt && !isLoading && (
+            <span className="hidden md:inline text-[11px] text-muted-foreground">
+              Atualizado {format(new Date(cachedAt), "HH:mm", { locale: ptBR })}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 gap-1.5 text-xs"
+            onClick={() => refetch(true)}
+            disabled={isLoading}
+            title="Forçar atualização"
+            aria-label="Atualizar dados do dashboard"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} aria-hidden="true" />
+            <span>Atualizar</span>
+          </Button>
+          {permissions.viewSettings && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 gap-1.5 text-xs"
+              asChild
+              title="Personalizar dashboard"
+            >
+              <Link to="/settings/dashboard" aria-label="Personalizar dashboard">
+                <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Personalizar</span>
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <AnimatedSection className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5">

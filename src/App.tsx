@@ -43,6 +43,7 @@ const DashboardSettings = lazy(() => import("./pages/settings/DashboardSettings"
 const Workspaces = lazy(() => import("./pages/Workspaces"));
 const Admin = lazy(() => import("./pages/Admin"));
 const SystemLogs = lazy(() => import("./pages/SystemLogs"));
+const SystemHub = lazy(() => import("./pages/SystemHub"));
 const Conversations2 = lazy(() => import("./pages/Conversations2"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 
@@ -95,6 +96,7 @@ const App = () => (
                 <Route path="/workspaces" element={<Navigate to="/settings/workspace" replace />} />
                 <Route path="/admin" element={<GestorGuard>{lazyRoute(<Admin />, <GenericPageSkeleton />)}</GestorGuard>} />
                 <Route path="/admin/logs" element={<GestorGuard>{lazyRoute(<SystemLogs />, <GenericPageSkeleton />)}</GestorGuard>} />
+                <Route path="/admin/system" element={<GestorGuard>{lazyRoute(<SystemHub />, <GenericPageSkeleton />)}</GestorGuard>} />
                 <Route path="/docs" element={<GestorGuard>{lazyRoute(<Documentation />, <GenericPageSkeleton />)}</GestorGuard>} />
               </Route>
               <Route path="*" element={<NotFound />} />
