@@ -84,7 +84,20 @@ export default function Admin() {
       "admin-users",
       { body: { action, ...payload } },
     );
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Em erros 4xx/5xx o supabase-js só expõe uma mensagem genérica
+      // ("non-2xx status code") e deixa o motivo real no corpo da resposta
+      // (error.context). Tentamos ler o `error` que a edge function devolve.
+      let detail = "";
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.json === "function") {
+        try {
+          const body = await ctx.clone().json();
+          detail = body?.error || "";
+        } catch (_) { /* corpo não é JSON */ }
+      }
+      throw new Error(detail || error.message);
+    }
     if (data && (data as { error?: string }).error) throw new Error((data as { error?: string }).error!);
     return data as T;
   };
