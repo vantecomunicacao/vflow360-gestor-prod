@@ -212,9 +212,20 @@ function MultiFilterSelect({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // Rascunho local: edita várias etapas com o menu aberto e só aplica ao fechar.
+  const [draft, setDraft] = useState<string[]>(values);
   const hasSelection = values.length > 0;
   const toggle = (id: string) => {
-    onChange(values.includes(id) ? values.filter((v) => v !== id) : [...values, id]);
+    setDraft((d) => (d.includes(id) ? d.filter((v) => v !== id) : [...d, id]));
+  };
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setDraft(values); // sincroniza ao abrir
+    } else {
+      const changed = draft.length !== values.length || draft.some((v) => !values.includes(v));
+      if (changed) onChange(draft); // aplica (e atualiza dashboard) só ao fechar
+    }
+    setOpen(next);
   };
   const label = !hasSelection
     ? placeholder
@@ -223,7 +234,7 @@ function MultiFilterSelect({
       : `${values.length} etapas`;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -245,11 +256,11 @@ function MultiFilterSelect({
       <PopoverContent className="p-1 rounded-lg w-[220px]" align="start">
         <div className="flex items-center justify-between px-2 py-1.5">
           <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{placeholder}</span>
-          {hasSelection && (
+          {draft.length > 0 && (
             <button
               type="button"
               className="text-[10px] text-muted-foreground hover:text-foreground"
-              onClick={() => onChange([])}
+              onClick={() => setDraft([])}
             >
               Limpar
             </button>
@@ -257,7 +268,7 @@ function MultiFilterSelect({
         </div>
         <div className="max-h-[260px] overflow-y-auto">
           {options.map((o) => {
-            const checked = values.includes(o.id);
+            const checked = draft.includes(o.id);
             return (
               <button
                 type="button"
