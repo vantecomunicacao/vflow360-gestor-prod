@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils";
 
 interface SellerPerformanceProps {
   sellers: Seller[];
-  selectedSellerId?: string | null;
-  onSellerClick?: (id: string | null) => void;
+  selectedSellerIds?: string[];
+  onSellerToggle?: (id: string) => void;
+  onClearSellers?: () => void;
 }
 
 function formatResponseTime(minutes: number | null | undefined): string {
@@ -25,7 +26,7 @@ function formatResponseTime(minutes: number | null | undefined): string {
   return `${days.toFixed(1)} dias`;
 }
 
-export function SellerPerformance({ sellers, selectedSellerId, onSellerClick }: SellerPerformanceProps) {
+export function SellerPerformance({ sellers, selectedSellerIds = [], onSellerToggle, onClearSellers }: SellerPerformanceProps) {
   const [query, setQuery] = useState("");
   const sortedSellers = useMemo(
     () => [...sellers].sort((a, b) => b.vendaGanha - a.vendaGanha),
@@ -36,10 +37,10 @@ export function SellerPerformance({ sellers, selectedSellerId, onSellerClick }: 
     if (!q) return sortedSellers;
     return sortedSellers.filter((s) => s.name.toLowerCase().includes(q));
   }, [sortedSellers, query]);
-  const interactive = !!onSellerClick;
+  const interactive = !!onSellerToggle;
   const handleRowClick = (id: string | undefined) => {
     if (!interactive || !id) return;
-    onSellerClick!(selectedSellerId === id ? null : id);
+    onSellerToggle!(id);
   };
 
   const getRankBadge = (i: number) => {
@@ -86,10 +87,10 @@ export function SellerPerformance({ sellers, selectedSellerId, onSellerClick }: 
               />
             </div>
           )}
-          {interactive && selectedSellerId && (
+          {interactive && selectedSellerIds.length > 0 && (
             <button
               type="button"
-              onClick={() => onSellerClick?.(null)}
+              onClick={() => onClearSellers?.()}
               className="text-xs font-medium text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
             >
               Limpar filtro de vendedor
@@ -117,7 +118,7 @@ export function SellerPerformance({ sellers, selectedSellerId, onSellerClick }: 
               const realIndex = sortedSellers.indexOf(s);
               const rate = s.contatoInicial > 0 ? ((s.vendaGanha / s.contatoInicial) * 100).toFixed(1) : "0.0";
               const respLabel = formatResponseTime(s.avgResponseMinutes);
-              const isSelected = !!selectedSellerId && s.id === selectedSellerId;
+              const isSelected = !!s.id && selectedSellerIds.includes(s.id);
               const canClick = interactive && !!s.id;
               return (
                 <tr

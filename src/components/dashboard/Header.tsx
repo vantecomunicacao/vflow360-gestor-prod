@@ -22,14 +22,14 @@ interface HeaderProps {
   users: User[];
   selectedPipelineId: string | null;
   selectedStageIds?: string[];
-  selectedSellerId: string | null;
+  selectedSellerIds?: string[];
   utmMediumValues?: string[];
   utmCampaignValues?: string[];
   selectedUtmMedium?: string | null;
   selectedUtmCampaign?: string | null;
   onPipelineChange: (id: string | null) => void;
   onStageIdsChange?: (ids: string[]) => void;
-  onSellerChange: (id: string | null) => void;
+  onSellerIdsChange?: (ids: string[]) => void;
   onUtmMediumChange?: (v: string | null) => void;
   onUtmCampaignChange?: (v: string | null) => void;
   cachedAt?: string | null;
@@ -202,11 +202,12 @@ function FilterSelect({
 }
 
 function MultiFilterSelect({
-  values, onChange, placeholder, icon: Icon, options, className,
+  values, onChange, placeholder, pluralLabel, icon: Icon, options, className,
 }: {
   values: string[];
   onChange: (v: string[]) => void;
   placeholder: string;
+  pluralLabel: string;
   icon: typeof Users;
   options: { id: string; name: string }[];
   className?: string;
@@ -231,7 +232,7 @@ function MultiFilterSelect({
     ? placeholder
     : values.length === 1
       ? (options.find((o) => o.id === values[0])?.name ?? placeholder)
-      : `${values.length} etapas`;
+      : `${values.length} ${pluralLabel}`;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -295,17 +296,17 @@ function MultiFilterSelect({
 export function Header({
   dateRange, onDateRangeChange, onRefresh, isLoading,
   pipelines, users,
-  selectedPipelineId, selectedStageIds = [], selectedSellerId,
+  selectedPipelineId, selectedStageIds = [], selectedSellerIds = [],
   utmMediumValues = [], utmCampaignValues = [],
   selectedUtmMedium = null, selectedUtmCampaign = null,
-  onPipelineChange, onStageIdsChange, onSellerChange,
+  onPipelineChange, onStageIdsChange, onSellerIdsChange,
   onUtmMediumChange, onUtmCampaignChange,
   cachedAt,
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const hasAdditionalRange = !!additionalDateRange?.from;
-  const activeFilterCount = [selectedPipelineId, selectedStageIds.length > 0, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange].filter(Boolean).length;
+  const activeFilterCount = [selectedPipelineId, selectedStageIds.length > 0, selectedSellerIds.length > 0, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const stages = selectedPipeline?.stages || [];
@@ -313,7 +314,7 @@ export function Header({
   const clearAll = () => {
     onPipelineChange(null);
     onStageIdsChange?.([]);
-    onSellerChange(null);
+    onSellerIdsChange?.([]);
     onUtmMediumChange?.(null);
     onUtmCampaignChange?.(null);
     onAdditionalDateRangeChange?.(undefined);
@@ -352,21 +353,25 @@ export function Header({
             values={selectedStageIds}
             onChange={onStageIdsChange}
             placeholder="Etapa"
+            pluralLabel="etapas"
             icon={Layers}
             options={stages.map((s) => ({ id: s.id, name: s.name }))}
           />
         </Field>
       )}
 
-      <Field label="Vendedor">
-        <FilterSelect
-          value={selectedSellerId}
-          onChange={onSellerChange}
-          placeholder="Vendedor"
-          icon={Users}
-          options={users.map((u) => ({ id: u.id, name: u.name }))}
-        />
-      </Field>
+      {onSellerIdsChange && (
+        <Field label="Vendedor">
+          <MultiFilterSelect
+            values={selectedSellerIds}
+            onChange={onSellerIdsChange}
+            placeholder="Vendedor"
+            pluralLabel="vendedores"
+            icon={Users}
+            options={users.map((u) => ({ id: u.id, name: u.name }))}
+          />
+        </Field>
+      )}
 
       {onUtmMediumChange && utmMediumValues.length > 0 && (
         <Field label="Tipo de origem">

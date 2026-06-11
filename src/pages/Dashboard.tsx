@@ -36,7 +36,8 @@ type SavedFilters = {
   pipelineId?: string | null;
   stageId?: string | null; // legado (seleção única)
   stageIds?: string[];
-  sellerId?: string | null;
+  sellerId?: string | null; // legado (seleção única)
+  sellerIds?: string[];
   utmMedium?: string | null;
   utmCampaign?: string | null;
 };
@@ -54,7 +55,7 @@ export default function Dashboard() {
   const [additionalDateRange, setAdditionalDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const [selectedStageIds, setSelectedStageIds] = useState<string[]>([]);
-  const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
+  const [selectedSellerIds, setSelectedSellerIds] = useState<string[]>([]);
   const [selectedUtmMedium, setSelectedUtmMedium] = useState<string | null>(null);
   const [selectedUtmCampaign, setSelectedUtmCampaign] = useState<string | null>(null);
 
@@ -83,7 +84,7 @@ export default function Dashboard() {
           );
           setSelectedPipelineId(saved.pipelineId ?? null);
           setSelectedStageIds(saved.stageIds ?? (saved.stageId ? [saved.stageId] : []));
-          setSelectedSellerId(saved.sellerId ?? null);
+          setSelectedSellerIds(saved.sellerIds ?? (saved.sellerId ? [saved.sellerId] : []));
           setSelectedUtmMedium(saved.utmMedium ?? null);
           setSelectedUtmCampaign(saved.utmCampaign ?? null);
           restored = true;
@@ -96,7 +97,7 @@ export default function Dashboard() {
         // Reset padrão
         setDateRange({ from: subDays(new Date(), 6), to: new Date() });
         setAdditionalDateRange(undefined);
-        setSelectedSellerId(null);
+        setSelectedSellerIds([]);
         setSelectedUtmMedium(null);
         setSelectedUtmCampaign(null);
         setSelectedStageIds([]);
@@ -129,7 +130,7 @@ export default function Dashboard() {
       addTo: additionalDateRange?.to ? additionalDateRange.to.toISOString() : undefined,
       pipelineId: selectedPipelineId,
       stageIds: selectedStageIds,
-      sellerId: selectedSellerId,
+      sellerIds: selectedSellerIds,
       utmMedium: selectedUtmMedium,
       utmCampaign: selectedUtmCampaign,
     };
@@ -138,7 +139,7 @@ export default function Dashboard() {
     } catch {
       // ignora quota cheia
     }
-  }, [hydrated, activeWorkspace?.id, dateRange, additionalDateRange, selectedPipelineId, selectedStageIds, selectedSellerId, selectedUtmMedium, selectedUtmCampaign]);
+  }, [hydrated, activeWorkspace?.id, dateRange, additionalDateRange, selectedPipelineId, selectedStageIds, selectedSellerIds, selectedUtmMedium, selectedUtmCampaign]);
 
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 6)), [dateRange?.from]);
@@ -159,13 +160,13 @@ export default function Dashboard() {
     startDate, endDate,
     pipelineId: selectedPipelineId,
     stageIds: selectedStageIds,
-    sellerId: selectedSellerId,
+    sellerIds: selectedSellerIds,
     utmMedium: selectedUtmMedium,
     utmCampaign: selectedUtmCampaign,
     workspaceId: activeWorkspace?.id || null,
     additionalStartDate,
     additionalEndDate,
-  }), [startDate, endDate, selectedPipelineId, selectedStageIds, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
+  }), [startDate, endDate, selectedPipelineId, selectedStageIds, selectedSellerIds, selectedUtmMedium, selectedUtmCampaign, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
 
   const periodDays = useMemo(() => differenceInDays(endDate, startDate) + 1, [startDate, endDate]);
   const prevFilters: DashboardFilters = useMemo(() => ({
@@ -228,14 +229,14 @@ export default function Dashboard() {
         users={data.users}
         selectedPipelineId={selectedPipelineId}
         selectedStageIds={selectedStageIds}
-        selectedSellerId={selectedSellerId}
+        selectedSellerIds={selectedSellerIds}
         utmMediumValues={data.utmMediumValues || []}
         utmCampaignValues={data.utmCampaignValues || []}
         selectedUtmMedium={selectedUtmMedium}
         selectedUtmCampaign={selectedUtmCampaign}
         onPipelineChange={(id) => { setSelectedPipelineId(id); setSelectedStageIds([]); }}
         onStageIdsChange={setSelectedStageIds}
-        onSellerChange={setSelectedSellerId}
+        onSellerIdsChange={setSelectedSellerIds}
         onUtmMediumChange={setSelectedUtmMedium}
         onUtmCampaignChange={setSelectedUtmCampaign}
         cachedAt={cachedAt}
@@ -350,8 +351,9 @@ export default function Dashboard() {
       <AnimatedSection delay={0.05}>
         <SellerPerformance
           sellers={data.sellers}
-          selectedSellerId={selectedSellerId}
-          onSellerClick={setSelectedSellerId}
+          selectedSellerIds={selectedSellerIds}
+          onSellerToggle={(id) => setSelectedSellerIds((prev) => prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id])}
+          onClearSellers={() => setSelectedSellerIds([])}
         />
       </AnimatedSection>
 

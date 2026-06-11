@@ -181,7 +181,9 @@ serve(async (req) => {
     const filterStageIds: string[] = Array.isArray(payload.stageIds)
       ? payload.stageIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
       : (payload.stageId ? [payload.stageId] : []);
-    const filterUserId: string | null = payload.sellerId || null;
+    const filterUserIds: string[] = Array.isArray(payload.sellerIds)
+      ? payload.sellerIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
+      : (payload.sellerId ? [payload.sellerId] : []);
     const filterOrigin: string | null = payload.sourceOrigin || null;
     const filterUtmMedium: string | null = payload.utmMedium || null;
     const filterUtmCampaign: string | null = payload.utmCampaign || null;
@@ -346,7 +348,8 @@ serve(async (req) => {
       if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
       if (filterStageIds.length === 1) q = q.eq("stage_id", filterStageIds[0]);
       else if (filterStageIds.length > 1) q = q.in("stage_id", filterStageIds);
-      if (filterUserId) q = q.eq("assigned_to", filterUserId);
+      if (filterUserIds.length === 1) q = q.eq("assigned_to", filterUserIds[0]);
+      else if (filterUserIds.length > 1) q = q.in("assigned_to", filterUserIds);
       return q;
     };
 
@@ -843,7 +846,7 @@ serve(async (req) => {
     const convIds: string[] = [];
     const seenConvIds = new Set<string>();
     const convToSeller = new Map<string, string>(); // ghl_conversation_id -> sellerId
-    if (phoneSet.size > 0 || filterUserId || allowedSellerIds.size > 0) {
+    if (phoneSet.size > 0 || filterUserIds.length > 0 || allowedSellerIds.size > 0) {
       const PAGE = 1000;
       let from = 0;
       while (true) {
@@ -860,8 +863,8 @@ serve(async (req) => {
           const phone = normalizePhone((c as any).contact_phone);
           const convSeller = (c as any).assigned_ghl_user_id as string | null;
           const phoneMatch = phoneSet.has(phone);
-          const sellerMatch = filterUserId
-            ? convSeller === filterUserId
+          const sellerMatch = filterUserIds.length > 0
+            ? (!!convSeller && filterUserIds.includes(convSeller))
             : !!convSeller && allowedSellerIds.has(convSeller);
           if (phoneMatch || sellerMatch) {
             convIds.push(id);
