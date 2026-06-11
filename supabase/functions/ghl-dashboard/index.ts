@@ -178,7 +178,9 @@ serve(async (req) => {
     const startDate: string | null = payload.startDate || null;
     const endDate: string | null = payload.endDate || null;
     const filterPipelineId: string | null = payload.pipelineId || null;
-    const filterStageId: string | null = payload.stageId || null;
+    const filterStageIds: string[] = Array.isArray(payload.stageIds)
+      ? payload.stageIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
+      : (payload.stageId ? [payload.stageId] : []);
     const filterUserId: string | null = payload.sellerId || null;
     const filterOrigin: string | null = payload.sourceOrigin || null;
     const filterUtmMedium: string | null = payload.utmMedium || null;
@@ -342,7 +344,8 @@ serve(async (req) => {
         .eq("workspace_id", workspaceId)
         .limit(10000);
       if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
-      if (filterStageId) q = q.eq("stage_id", filterStageId);
+      if (filterStageIds.length === 1) q = q.eq("stage_id", filterStageIds[0]);
+      else if (filterStageIds.length > 1) q = q.in("stage_id", filterStageIds);
       if (filterUserId) q = q.eq("assigned_to", filterUserId);
       return q;
     };

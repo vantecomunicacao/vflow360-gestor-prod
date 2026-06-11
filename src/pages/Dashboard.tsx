@@ -34,7 +34,8 @@ type SavedFilters = {
   addFrom?: string;
   addTo?: string;
   pipelineId?: string | null;
-  stageId?: string | null;
+  stageId?: string | null; // legado (seleção única)
+  stageIds?: string[];
   sellerId?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
@@ -52,7 +53,7 @@ export default function Dashboard() {
   });
   const [additionalDateRange, setAdditionalDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
-  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const [selectedStageIds, setSelectedStageIds] = useState<string[]>([]);
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
   const [selectedUtmMedium, setSelectedUtmMedium] = useState<string | null>(null);
   const [selectedUtmCampaign, setSelectedUtmCampaign] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export default function Dashboard() {
               : undefined
           );
           setSelectedPipelineId(saved.pipelineId ?? null);
-          setSelectedStageId(saved.stageId ?? null);
+          setSelectedStageIds(saved.stageIds ?? (saved.stageId ? [saved.stageId] : []));
           setSelectedSellerId(saved.sellerId ?? null);
           setSelectedUtmMedium(saved.utmMedium ?? null);
           setSelectedUtmCampaign(saved.utmCampaign ?? null);
@@ -98,7 +99,7 @@ export default function Dashboard() {
         setSelectedSellerId(null);
         setSelectedUtmMedium(null);
         setSelectedUtmCampaign(null);
-        setSelectedStageId(null);
+        setSelectedStageIds([]);
         setSelectedPipelineId(null);
 
         // Aplicar pipeline padrão do workspace
@@ -127,7 +128,7 @@ export default function Dashboard() {
       addFrom: additionalDateRange?.from ? additionalDateRange.from.toISOString() : undefined,
       addTo: additionalDateRange?.to ? additionalDateRange.to.toISOString() : undefined,
       pipelineId: selectedPipelineId,
-      stageId: selectedStageId,
+      stageIds: selectedStageIds,
       sellerId: selectedSellerId,
       utmMedium: selectedUtmMedium,
       utmCampaign: selectedUtmCampaign,
@@ -137,7 +138,7 @@ export default function Dashboard() {
     } catch {
       // ignora quota cheia
     }
-  }, [hydrated, activeWorkspace?.id, dateRange, additionalDateRange, selectedPipelineId, selectedStageId, selectedSellerId, selectedUtmMedium, selectedUtmCampaign]);
+  }, [hydrated, activeWorkspace?.id, dateRange, additionalDateRange, selectedPipelineId, selectedStageIds, selectedSellerId, selectedUtmMedium, selectedUtmCampaign]);
 
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 6)), [dateRange?.from]);
@@ -157,14 +158,14 @@ export default function Dashboard() {
   const filters: DashboardFilters = useMemo(() => ({
     startDate, endDate,
     pipelineId: selectedPipelineId,
-    stageId: selectedStageId,
+    stageIds: selectedStageIds,
     sellerId: selectedSellerId,
     utmMedium: selectedUtmMedium,
     utmCampaign: selectedUtmCampaign,
     workspaceId: activeWorkspace?.id || null,
     additionalStartDate,
     additionalEndDate,
-  }), [startDate, endDate, selectedPipelineId, selectedStageId, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
+  }), [startDate, endDate, selectedPipelineId, selectedStageIds, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
 
   const periodDays = useMemo(() => differenceInDays(endDate, startDate) + 1, [startDate, endDate]);
   const prevFilters: DashboardFilters = useMemo(() => ({
@@ -226,14 +227,14 @@ export default function Dashboard() {
         pipelines={data.pipelines}
         users={data.users}
         selectedPipelineId={selectedPipelineId}
-        selectedStageId={selectedStageId}
+        selectedStageIds={selectedStageIds}
         selectedSellerId={selectedSellerId}
         utmMediumValues={data.utmMediumValues || []}
         utmCampaignValues={data.utmCampaignValues || []}
         selectedUtmMedium={selectedUtmMedium}
         selectedUtmCampaign={selectedUtmCampaign}
-        onPipelineChange={(id) => { setSelectedPipelineId(id); setSelectedStageId(null); }}
-        onStageChange={setSelectedStageId}
+        onPipelineChange={(id) => { setSelectedPipelineId(id); setSelectedStageIds([]); }}
+        onStageIdsChange={setSelectedStageIds}
         onSellerChange={setSelectedSellerId}
         onUtmMediumChange={setSelectedUtmMedium}
         onUtmCampaignChange={setSelectedUtmCampaign}

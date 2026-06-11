@@ -1,4 +1,4 @@
-import { CalendarDays, Filter, Users, GitBranch, ChevronDown, Layers, X, Megaphone, Target } from "lucide-react";
+import { CalendarDays, Filter, Users, GitBranch, ChevronDown, Layers, X, Megaphone, Target, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -21,14 +21,14 @@ interface HeaderProps {
   pipelines: Pipeline[];
   users: User[];
   selectedPipelineId: string | null;
-  selectedStageId?: string | null;
+  selectedStageIds?: string[];
   selectedSellerId: string | null;
   utmMediumValues?: string[];
   utmCampaignValues?: string[];
   selectedUtmMedium?: string | null;
   selectedUtmCampaign?: string | null;
   onPipelineChange: (id: string | null) => void;
-  onStageChange?: (id: string | null) => void;
+  onStageIdsChange?: (ids: string[]) => void;
   onSellerChange: (id: string | null) => void;
   onUtmMediumChange?: (v: string | null) => void;
   onUtmCampaignChange?: (v: string | null) => void;
@@ -201,27 +201,107 @@ function FilterSelect({
   );
 }
 
+function MultiFilterSelect({
+  values, onChange, placeholder, icon: Icon, options, className,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  placeholder: string;
+  icon: typeof Users;
+  options: { id: string; name: string }[];
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasSelection = values.length > 0;
+  const toggle = (id: string) => {
+    onChange(values.includes(id) ? values.filter((v) => v !== id) : [...values, id]);
+  };
+  const label = !hasSelection
+    ? placeholder
+    : values.length === 1
+      ? (options.find((o) => o.id === values[0])?.name ?? placeholder)
+      : `${values.length} etapas`;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "h-8 text-xs font-medium border-border/60 hover:bg-accent/50 gap-2 px-3 w-auto min-w-[130px] max-w-[200px] justify-between",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
+            hasSelection && "border-primary/40 bg-primary/5 text-foreground",
+            className
+          )}
+        >
+          <span className="flex items-center gap-2 truncate">
+            <Icon className={cn("w-3.5 h-3.5 shrink-0", hasSelection ? "text-primary-ink" : "text-muted-foreground")} />
+            <span className={cn("truncate", !hasSelection && "text-muted-foreground")}>{label}</span>
+          </span>
+          <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-1 rounded-lg w-[220px]" align="start">
+        <div className="flex items-center justify-between px-2 py-1.5">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{placeholder}</span>
+          {hasSelection && (
+            <button
+              type="button"
+              className="text-[10px] text-muted-foreground hover:text-foreground"
+              onClick={() => onChange([])}
+            >
+              Limpar
+            </button>
+          )}
+        </div>
+        <div className="max-h-[260px] overflow-y-auto">
+          {options.map((o) => {
+            const checked = values.includes(o.id);
+            return (
+              <button
+                type="button"
+                key={o.id}
+                onClick={() => toggle(o.id)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-accent/60 text-left"
+              >
+                <span className={cn(
+                  "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                  checked ? "bg-primary border-primary text-primary-foreground" : "border-border"
+                )}>
+                  {checked && <Check className="w-3 h-3" />}
+                </span>
+                <span className="truncate">{o.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function Header({
   dateRange, onDateRangeChange, onRefresh, isLoading,
   pipelines, users,
-  selectedPipelineId, selectedStageId, selectedSellerId,
+  selectedPipelineId, selectedStageIds = [], selectedSellerId,
   utmMediumValues = [], utmCampaignValues = [],
   selectedUtmMedium = null, selectedUtmCampaign = null,
-  onPipelineChange, onStageChange, onSellerChange,
+  onPipelineChange, onStageIdsChange, onSellerChange,
   onUtmMediumChange, onUtmCampaignChange,
   cachedAt,
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const hasAdditionalRange = !!additionalDateRange?.from;
-  const activeFilterCount = [selectedPipelineId, selectedStageId, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange].filter(Boolean).length;
+  const activeFilterCount = [selectedPipelineId, selectedStageIds.length > 0, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const stages = selectedPipeline?.stages || [];
 
   const clearAll = () => {
     onPipelineChange(null);
-    onStageChange?.(null);
+    onStageIdsChange?.([]);
     onSellerChange(null);
     onUtmMediumChange?.(null);
     onUtmCampaignChange?.(null);
@@ -255,11 +335,11 @@ export function Header({
         />
       </Field>
 
-      {selectedPipelineId && stages.length > 0 && onStageChange && (
+      {selectedPipelineId && stages.length > 0 && onStageIdsChange && (
         <Field label="Etapa">
-          <FilterSelect
-            value={selectedStageId || null}
-            onChange={onStageChange}
+          <MultiFilterSelect
+            values={selectedStageIds}
+            onChange={onStageIdsChange}
             placeholder="Etapa"
             icon={Layers}
             options={stages.map((s) => ({ id: s.id, name: s.name }))}

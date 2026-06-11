@@ -109,7 +109,7 @@ export interface DashboardFilters {
   startDate: Date;
   endDate: Date;
   pipelineId: string | null;
-  stageId: string | null;
+  stageIds: string[];
   sellerId: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
@@ -145,7 +145,7 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
       filters.startDate.getTime(),
       filters.endDate.getTime(),
       filters.pipelineId,
-      filters.stageId,
+      [...filters.stageIds].sort().join(","),
       filters.sellerId,
       filters.utmMedium,
       filters.utmCampaign,
@@ -157,7 +157,7 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
       filters.startDate,
       filters.endDate,
       filters.pipelineId,
-      filters.stageId,
+      filters.stageIds,
       filters.sellerId,
       filters.utmMedium,
       filters.utmCampaign,
@@ -175,7 +175,7 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
           startDate: filters.startDate.toISOString(),
           endDate: filters.endDate.toISOString(),
           pipelineId: filters.pipelineId,
-          stageId: filters.stageId,
+          stageIds: filters.stageIds,
           sellerId: filters.sellerId,
           utmMedium: filters.utmMedium,
           utmCampaign: filters.utmCampaign,
