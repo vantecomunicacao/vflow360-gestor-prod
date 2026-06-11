@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions, landingPath } from "@/contexts/PermissionsContext";
 import { Navigate } from "react-router-dom";
+import { useForceLightTheme } from "@/hooks/useForceLightTheme";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -18,6 +19,9 @@ const Login = () => {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const { permissions, loading: permsLoading } = usePermissions();
+
+  // Telas de auth são sempre modo claro, sem opção de alternar.
+  useForceLightTheme();
 
   if (authLoading) return null;
   // Logado: espera as permissoes e roteia conforme o perfil (vendedor -> Sugestoes).

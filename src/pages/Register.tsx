@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useForceLightTheme } from "@/hooks/useForceLightTheme";
 
 const Register = () => {
   const [name, setName] = useState("");
@@ -17,6 +18,8 @@ const Register = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
+
+  useForceLightTheme();
 
   if (authLoading) return null;
   if (user) return <Navigate to="/dashboard" replace />;

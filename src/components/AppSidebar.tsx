@@ -5,6 +5,7 @@ import { WorkspaceSelector } from "@/components/WorkspaceSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { usePermissions, isSuggestionsOnly } from "@/contexts/PermissionsContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +25,7 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { displayName, email, initial } = useProfile();
   const { permissions } = usePermissions();
   const { isAdmin, viewSuggestions, viewIntegrations, viewSettings } = permissions;
   // Vendedor (so sugestoes) nao ve os itens de gestor no menu.
@@ -96,6 +98,27 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-3 gap-2">
+        {/* Usuário logado */}
+        <div
+          className={
+            collapsed
+              ? "flex justify-center"
+              : "flex items-center gap-3 px-2 py-2 rounded-md bg-sidebar-accent/40"
+          }
+          title={collapsed ? displayName : undefined}
+        >
+          <div className="w-8 h-8 rounded-full gradient-primary text-white flex items-center justify-center text-sm font-semibold shrink-0">
+            {initial}
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{displayName}</p>
+              {email && email !== displayName && (
+                <p className="text-xs text-sidebar-foreground/60 truncate">{email}</p>
+              )}
+            </div>
+          )}
+        </div>
         <div className={collapsed ? "flex justify-center" : "px-1"}>
           <ThemeToggle placement="inline" />
         </div>

@@ -59,7 +59,7 @@ export function ThemeToggle({ placement = "floating", className }: ThemeTogglePr
       className={cn(
         "flex items-center justify-center rounded-full text-muted-foreground transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         placement === "floating" &&
-          "fixed bottom-4 left-4 z-[60] h-9 w-9 border border-border/60 bg-background/70 opacity-50 shadow-sm backdrop-blur-sm hover:bg-accent hover:text-accent-foreground hover:opacity-100 focus-visible:ring-offset-2 focus-visible:ring-offset-background [html[data-app]_&]:hidden",
+          "fixed bottom-4 left-4 z-[60] h-9 w-9 border border-border/60 bg-background/70 opacity-50 shadow-sm backdrop-blur-sm hover:bg-accent hover:text-accent-foreground hover:opacity-100 focus-visible:ring-offset-2 focus-visible:ring-offset-background [html[data-app]_&]:hidden [html[data-auth-light]_&]:hidden",
         placement === "inline" &&
           "h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         className,

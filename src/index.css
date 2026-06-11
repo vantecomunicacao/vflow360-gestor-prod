@@ -18,9 +18,9 @@
     --laranja-200: 14 100% 81%;
     --laranja-300: 14 100% 72%;
     --laranja-400: 11 99% 62%;
-    --laranja-500: 4 98% 54%;    /* #FD2516 — início do gradiente */
+    --laranja-500: 4 100% 64%;   /* #FF5347 — início do gradiente */
     --laranja-600: 19 98% 53%;
-    --laranja-700: 33 98% 51%;   /* #FD8E06 — fim do gradiente, marca */
+    --laranja-700: 33 98% 50%;   /* #FD8A02 — fim do gradiente, marca */
     --laranja-800: 33 95% 39%;   /* #C56F05 — texto sobre fundo claro */
     --laranja-900: 32 95% 27%;
 
@@ -105,8 +105,8 @@
     --chart-5: 142 76% 36%;      /* sucesso-base */
 
     /* Gradientes do DS */
-    --gradient-primary: linear-gradient(90deg, #FD2516 0%, #FD8E06 100%);
-    --gradient-primary-135: linear-gradient(135deg, #FD2516 0%, #FD8E06 100%);
+    --gradient-primary: linear-gradient(90deg, #FF5347 0%, #FD8A02 100%);
+    --gradient-primary-135: linear-gradient(135deg, #FF5347 0%, #FD8A02 100%);
     --gradient-card: linear-gradient(180deg, hsl(var(--neutro-0)), hsl(var(--neutro-50)));
 
     /* Sombras (DS Vante) */
@@ -187,8 +187,8 @@
     --chart-4: 221 83% 62%;
     --chart-5: 142 65% 50%;
 
-    --gradient-primary: linear-gradient(90deg, #FD2516 0%, #FD8E06 100%);
-    --gradient-primary-135: linear-gradient(135deg, #FD2516 0%, #FD8E06 100%);
+    --gradient-primary: linear-gradient(90deg, #FF5347 0%, #FD8A02 100%);
+    --gradient-primary-135: linear-gradient(135deg, #FF5347 0%, #FD8A02 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 9%), hsl(0 0% 7%));
 
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
