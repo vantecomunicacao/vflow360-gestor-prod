@@ -325,6 +325,44 @@ serve(async (req) => {
       else console.log(`loss reasons fallback from opps: ${fallbackRows.length}`);
     }
 
+    // === 6b. Contacts (paginação) ===
+    // Os custom fields do contato (incl. UTMs) NÃO vêm em /opportunities/search,
+    // então sincronizamos os contatos à parte. /contacts/?locationId já devolve
+    // os customFields paginados (meta.nextPageUrl), igual às oportunidades.
+    let totalContacts = 0;
+    let contactsNextUrl: string | null = null;
+    let contactsPage = 0;
+    const contactsMaxPages = 100; // safety: 10000 contatos
+    do {
+      contactsPage++;
+      const curl = contactsNextUrl
+        ? contactsNextUrl
+        : `/contacts/?locationId=${locationId}&limit=100`;
+      const cresp: any = await ghlFetch(curl, creds);
+      const contacts: any[] = cresp?.contacts || [];
+      if (contacts.length) {
+        const crows = contacts.map((c: any) => ({
+          workspace_id: workspaceId,
+          ghl_id: c.id,
+          name: c.contactName || c.name || [c.firstName, c.lastName].filter(Boolean).join(" ") || null,
+          phone: c.phone || null,
+          email: c.email || null,
+          source: c.source || null,
+          custom_fields: c.customFields || [],
+          attribution_source: c.attributions || c.attributionSource || c.lastAttributionSource || null,
+          ghl_created_at: c.dateAdded || null,
+          ghl_updated_at: c.dateUpdated || null,
+          updated_at: new Date().toISOString(),
+        }));
+        const { error: cErr } = await supabase.from("ghl_contacts")
+          .upsert(crows, { onConflict: "workspace_id,ghl_id" });
+        if (cErr) throw cErr;
+        totalContacts += crows.length;
+      }
+      contactsNextUrl = cresp?.meta?.nextPageUrl || null;
+    } while (contactsNextUrl && contactsPage < contactsMaxPages);
+    console.log(`contacts synced: ${totalContacts}`);
+
     // === 7. (removido) ===
     // O endpoint individual /opportunities/lost-reason/{id} não existe na API GHL v2.
     // Os motivos vêm pela listagem (passo 4) e pelo fallback dos próprios opportunities (passo 6).
@@ -360,7 +398,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       }, { onConflict: "workspace_id" });
     }
-    await reportEdgeError("edge:ghl-sync", error);
+    await reportEdgeError("edge:ghl-sync", err);
     return new Response(JSON.stringify({ ok: false, error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
