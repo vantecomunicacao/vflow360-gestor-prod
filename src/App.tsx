@@ -37,6 +37,7 @@ import NotFound from "./pages/NotFound";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Assistant = lazy(() => import("./pages/Assistant"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
+const CoolingLeads = lazy(() => import("./pages/CoolingLeads"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const AccountSettings = lazy(() => import("./pages/settings/AccountSettings"));
 const AiSettings = lazy(() => import("./pages/settings/AiSettings"));
@@ -80,6 +81,10 @@ const App = () => (
                 <Route
                   path="/suggestions"
                   element={<PermissionGuard require="viewSuggestions">{lazyRoute(<Suggestions />, <SuggestionsSkeleton />)}</PermissionGuard>}
+                />
+                <Route
+                  path="/cooling-leads"
+                  element={<PermissionGuard require="viewSuggestions">{lazyRoute(<CoolingLeads />, <GenericPageSkeleton />)}</PermissionGuard>}
                 />
                 <Route
                   path="/integrations"

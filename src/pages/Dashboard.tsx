@@ -22,6 +22,7 @@ import { ResponseTimeCard } from "@/components/dashboard/ResponseTimeCard";
 import { CustomFieldCharts } from "@/components/dashboard/CustomFieldCharts";
 import { LossReasons } from "@/components/dashboard/LossReasons";
 import { DailyLeads } from "@/components/dashboard/DailyLeads";
+import { CoolingLeadsCard } from "@/components/dashboard/CoolingLeadsCard";
 import { AIInsights } from "@/components/dashboard/AIInsights";
 import { DashboardSkeleton } from "@/components/skeletons/RouteSkeletons";
 import { ErrorState } from "@/components/dashboard/ErrorState";
@@ -355,6 +356,10 @@ export default function Dashboard() {
           onSellerToggle={(id) => setSelectedSellerIds((prev) => prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id])}
           onClearSellers={() => setSelectedSellerIds([])}
         />
+      </AnimatedSection>
+
+      <AnimatedSection delay={0.05}>
+        <CoolingLeadsCard data={data.coolingLeads} />
       </AnimatedSection>
 
       <AnimatedSection delay={0.05}>
