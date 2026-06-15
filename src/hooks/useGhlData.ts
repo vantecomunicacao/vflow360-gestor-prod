@@ -46,6 +46,15 @@ export interface CustomFieldDistribution {
   filledCount: number;
   distribution: { name: string; count: number; percentage: number }[];
 }
+export interface CoolingLead { name: string; seller: string | null; days: number; }
+export interface CoolingLeads {
+  warning: number;  // 7–9 dias parado
+  alert: number;    // 10–13 dias parado
+  critical: number; // 14+ dias parado
+  total: number;
+  thresholds: { warning: number; alert: number; critical: number };
+  leads?: { warning: CoolingLead[]; alert: CoolingLead[]; critical: CoolingLead[] };
+}
 export interface ResponseTime {
   averageMinutes: number;
   responseCount: number;
@@ -103,15 +112,16 @@ export interface DashboardData {
   additionalDateFieldId?: string | null;
   additionalDateFieldName?: string | null;
   responseTime?: ResponseTime | null;
+  coolingLeads?: CoolingLeads | null;
 }
 
 export interface DashboardFilters {
   startDate: Date;
   endDate: Date;
   pipelineId: string | null;
-  stageId: string | null;
-  sellerId: string | null;
-  utmMedium: string | null;
+  stageId: string[];
+  sellerId: string[];
+  utmMedium: string[];
   utmCampaign: string | null;
   workspaceId: string | null;
   additionalStartDate?: Date | null;
@@ -145,9 +155,9 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
       filters.startDate.getTime(),
       filters.endDate.getTime(),
       filters.pipelineId,
-      filters.stageId,
-      filters.sellerId,
-      filters.utmMedium,
+      filters.stageId.join(","),
+      filters.sellerId.join(","),
+      filters.utmMedium.join(","),
       filters.utmCampaign,
       filters.additionalStartDate?.getTime() ?? null,
       filters.additionalEndDate?.getTime() ?? null,

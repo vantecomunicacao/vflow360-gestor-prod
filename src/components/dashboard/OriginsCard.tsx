@@ -14,6 +14,8 @@ interface OriginsCardProps {
   distribution: LeadOrigin[];
   fillRate: number;
   configured: boolean;
+  /** Mapa nome→cor compartilhado para manter a mesma origem na mesma cor entre cards. */
+  colorMap?: Record<string, string>;
 }
 
 const COPY: Record<Mode, {
@@ -28,7 +30,7 @@ const COPY: Record<Mode, {
   leads: {
     icon: Compass,
     title: "Origem dos leads",
-    tooltip: "Distribuição das oportunidades por UTM Source + Campaign. Mostra as 6 maiores origens; o restante é agrupado em 'Outras'.",
+    tooltip: "Origem por UTM Source + Campaign (ou o que houver). Sem UTM, usa a fonte do lead; sem nada, 'Não identificado'. Mostra as 6 maiores; o restante vira 'Outras'.",
     unitLabel: "leads",
     emptyData: "Nenhum lead no período.",
     notConfiguredText: "Mapeie o UTM Source nas configurações para visualizar a origem dos leads.",
@@ -37,7 +39,7 @@ const COPY: Record<Mode, {
   wins: {
     icon: Trophy,
     title: "Origem das vendas",
-    tooltip: "Distribuição das vendas ganhas por UTM Source + Campaign. Mostra as 6 maiores origens; o restante é agrupado em 'Outras'.",
+    tooltip: "Origem das vendas ganhas por UTM Source + Campaign (ou o que houver). Sem UTM, usa a fonte do lead; sem nada, 'Não identificado'. Mostra as 6 maiores; o restante vira 'Outras'.",
     unitLabel: "vendas",
     emptyData: "Nenhuma venda ganha no período.",
     notConfiguredText: "Configure o campo UTM Source nas configurações para visualizar de onde vêm suas vendas.",
@@ -45,9 +47,10 @@ const COPY: Record<Mode, {
   },
 };
 
-export function OriginsCard({ mode, distribution, fillRate, configured }: OriginsCardProps) {
+export function OriginsCard({ mode, distribution, fillRate, configured, colorMap }: OriginsCardProps) {
   const copy = COPY[mode];
   const Icon = copy.icon;
+  const colorFor = (name: string, i: number) => colorMap?.[name] ?? getPieColor(name, i);
 
   const grouped = useMemo(() => groupTopN(distribution, 6), [distribution]);
   const chartData = grouped.map((o) => ({ name: o.name, value: o.count }));
@@ -128,7 +131,7 @@ export function OriginsCard({ mode, distribution, fillRate, configured }: Origin
                   strokeWidth={0}
                 >
                   {chartData.map((d, i) => (
-                    <Cell key={i} fill={getPieColor(d.name, i)} />
+                    <Cell key={i} fill={colorFor(d.name, i)} />
                   ))}
                 </Pie>
                 <Tooltip
@@ -149,7 +152,7 @@ export function OriginsCard({ mode, distribution, fillRate, configured }: Origin
             {grouped.map((o, i) => (
               <div key={o.name} className="flex items-center justify-between px-2 py-1.5 bg-secondary/40 rounded-[var(--raio-md)]">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getPieColor(o.name, i) }} />
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorFor(o.name, i) }} />
                   <span className="text-xs font-semibold truncate" title={o.name}>{o.name}</span>
                 </div>
                 <span className="text-xs font-bold text-foreground tabular-nums ml-2 shrink-0">

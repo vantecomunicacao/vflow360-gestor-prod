@@ -1,4 +1,4 @@
-import { LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen, ShieldCheck, ScrollText, Gauge } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Sparkles, Plug, Settings, LogOut, BookOpen, ShieldCheck, ScrollText, Gauge, Snowflake } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
@@ -38,6 +38,7 @@ export function AppSidebar() {
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, show: gestor },
     { title: "Conversas", url: "/conversations", icon: MessageSquare, show: gestor },
     { title: "Sugestões IA", url: "/suggestions", icon: Sparkles, show: viewSuggestions },
+    { title: "Leads esfriando", url: "/cooling-leads", icon: Snowflake, show: viewSuggestions },
     { title: "Integrações", url: "/integrations", icon: Plug, show: viewIntegrations },
     { title: "Documentação", url: "/docs", icon: BookOpen, show: gestor },
     { title: "Admin", url: "/admin", icon: ShieldCheck, show: isAdmin },

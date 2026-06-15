@@ -16,12 +16,15 @@ import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization"
 import { SellerPerformance } from "@/components/dashboard/SellerPerformance";
 import { TimePerStage } from "@/components/dashboard/TimePerStage";
 import { OriginsCard } from "@/components/dashboard/OriginsCard";
+import { groupTopN } from "@/lib/group-top-n";
+import { buildPieColorMap } from "@/lib/pie-palette";
 import { FunnelCycles } from "@/components/dashboard/FunnelCycles";
 import { DataQuality } from "@/components/dashboard/DataQuality";
 import { ResponseTimeCard } from "@/components/dashboard/ResponseTimeCard";
 import { CustomFieldCharts } from "@/components/dashboard/CustomFieldCharts";
 import { LossReasons } from "@/components/dashboard/LossReasons";
 import { DailyLeads } from "@/components/dashboard/DailyLeads";
+import { CoolingLeadsCard } from "@/components/dashboard/CoolingLeadsCard";
 import { AIInsights } from "@/components/dashboard/AIInsights";
 import { DashboardSkeleton } from "@/components/skeletons/RouteSkeletons";
 import { ErrorState } from "@/components/dashboard/ErrorState";
@@ -34,9 +37,9 @@ type SavedFilters = {
   addFrom?: string;
   addTo?: string;
   pipelineId?: string | null;
-  stageId?: string | null;
-  sellerId?: string | null;
-  utmMedium?: string | null;
+  stageId?: string[] | null;
+  sellerId?: string[] | null;
+  utmMedium?: string[] | null;
   utmCampaign?: string | null;
 };
 
@@ -52,9 +55,9 @@ export default function Dashboard() {
   });
   const [additionalDateRange, setAdditionalDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
-  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
-  const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
-  const [selectedUtmMedium, setSelectedUtmMedium] = useState<string | null>(null);
+  const [selectedStageId, setSelectedStageId] = useState<string[]>([]);
+  const [selectedSellerId, setSelectedSellerId] = useState<string[]>([]);
+  const [selectedUtmMedium, setSelectedUtmMedium] = useState<string[]>([]);
   const [selectedUtmCampaign, setSelectedUtmCampaign] = useState<string | null>(null);
 
   // Hidratar filtros salvos por workspace (ou aplicar pipeline padrão)
@@ -81,9 +84,9 @@ export default function Dashboard() {
               : undefined
           );
           setSelectedPipelineId(saved.pipelineId ?? null);
-          setSelectedStageId(saved.stageId ?? null);
-          setSelectedSellerId(saved.sellerId ?? null);
-          setSelectedUtmMedium(saved.utmMedium ?? null);
+          setSelectedStageId(Array.isArray(saved.stageId) ? saved.stageId : []);
+          setSelectedSellerId(Array.isArray(saved.sellerId) ? saved.sellerId : []);
+          setSelectedUtmMedium(Array.isArray(saved.utmMedium) ? saved.utmMedium : []);
           setSelectedUtmCampaign(saved.utmCampaign ?? null);
           restored = true;
         }
@@ -95,10 +98,10 @@ export default function Dashboard() {
         // Reset padrão
         setDateRange({ from: subDays(new Date(), 6), to: new Date() });
         setAdditionalDateRange(undefined);
-        setSelectedSellerId(null);
-        setSelectedUtmMedium(null);
+        setSelectedSellerId([]);
+        setSelectedUtmMedium([]);
         setSelectedUtmCampaign(null);
-        setSelectedStageId(null);
+        setSelectedStageId([]);
         setSelectedPipelineId(null);
 
         // Aplicar pipeline padrão do workspace
@@ -178,6 +181,18 @@ export default function Dashboard() {
   const { data, isLoading, error, refetch, cachedAt } = useGhlData(filters);
   const { data: prevData } = useGhlData(prevFilters, { enabled: !!data });
 
+  // Mapa de cores compartilhado entre Origem dos leads e Origem das vendas, para
+  // que a mesma origem apareça na mesma cor nos dois gráficos. Usa o mesmo
+  // groupTopN dos cards para que os nomes e o "Outras" batam. Declarado antes dos
+  // early returns para respeitar as regras de hooks.
+  const originColorMap = useMemo(
+    () => buildPieColorMap(
+      groupTopN(data?.leadsOriginDistribution || [], 6),
+      groupTopN(data?.wonOriginDistribution || [], 6),
+    ),
+    [data?.leadsOriginDistribution, data?.wonOriginDistribution],
+  );
+
   if (!activeWorkspace) {
     return <ErrorState error="Selecione uma conta para visualizar o dashboard." onRetry={() => window.location.reload()} />;
   }
@@ -232,7 +247,7 @@ export default function Dashboard() {
         utmCampaignValues={data.utmCampaignValues || []}
         selectedUtmMedium={selectedUtmMedium}
         selectedUtmCampaign={selectedUtmCampaign}
-        onPipelineChange={(id) => { setSelectedPipelineId(id); setSelectedStageId(null); }}
+        onPipelineChange={(id) => { setSelectedPipelineId(id); setSelectedStageId([]); }}
         onStageChange={setSelectedStageId}
         onSellerChange={setSelectedSellerId}
         onUtmMediumChange={setSelectedUtmMedium}
@@ -294,7 +309,6 @@ export default function Dashboard() {
         <MetricCard title="Ticket Médio" value={formatBRL(ticketAvg)} icon={Receipt} variant="default" tooltip="Receita ganha dividida pela quantidade de vendas ganhas no período." trend={ticketTrend} />
       </AnimatedSection>
 
-
       <AnimatedSection className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6" delay={0.05}>
         <div className="lg:col-span-2">
           <FunnelVisualization
@@ -323,12 +337,14 @@ export default function Dashboard() {
           distribution={data.leadsOriginDistribution || []}
           fillRate={data.leadsOriginFillRate || 0}
           configured={data.utmConfigured?.source || false}
+          colorMap={originColorMap}
         />
         <OriginsCard
           mode="wins"
           distribution={data.wonOriginDistribution || []}
           fillRate={data.wonOriginFillRate || 0}
           configured={data.utmConfigured?.source || false}
+          colorMap={originColorMap}
         />
         <LossReasons lossReasons={data.lossReasons || []} totalLost={data.lostLeads || 0} />
       </AnimatedSection>
@@ -349,9 +365,13 @@ export default function Dashboard() {
       <AnimatedSection delay={0.05}>
         <SellerPerformance
           sellers={data.sellers}
-          selectedSellerId={selectedSellerId}
-          onSellerClick={setSelectedSellerId}
+          selectedSellerId={selectedSellerId.length === 1 ? selectedSellerId[0] : null}
+          onSellerClick={(id) => setSelectedSellerId(id ? [id] : [])}
         />
+      </AnimatedSection>
+
+      <AnimatedSection delay={0.05}>
+        <CoolingLeadsCard data={data.coolingLeads} />
       </AnimatedSection>
 
       <AnimatedSection delay={0.05}>

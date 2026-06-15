@@ -19,3 +19,25 @@ export function getPieColor(name: string, index: number): string {
   if (name === OUTRAS_LABEL) return OUTRAS_COLOR;
   return PIE_COLORS[index % PIE_COLORS.length];
 }
+
+/**
+ * Constrói um mapa nome→cor estável a partir de uma ou mais distribuições, para
+ * que a MESMA origem receba a MESMA cor em gráficos diferentes (ex: origem dos
+ * leads e origem das vendas). A ordem de prioridade segue a ordem em que os
+ * nomes aparecem nas distribuições passadas. Labels especiais (Outras / Não
+ * identificado) mantêm suas cores fixas e não consomem a paleta.
+ */
+export function buildPieColorMap(...distributions: { name: string }[][]): Record<string, string> {
+  const map: Record<string, string> = {};
+  let paletteIndex = 0;
+  for (const dist of distributions) {
+    for (const { name } of dist) {
+      if (name in map) continue;
+      if (FALLBACK_LABELS.has(name)) { map[name] = FALLBACK_COLOR; continue; }
+      if (name === OUTRAS_LABEL) { map[name] = OUTRAS_COLOR; continue; }
+      map[name] = PIE_COLORS[paletteIndex % PIE_COLORS.length];
+      paletteIndex++;
+    }
+  }
+  return map;
+}

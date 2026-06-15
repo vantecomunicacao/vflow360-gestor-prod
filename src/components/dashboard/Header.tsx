@@ -1,10 +1,11 @@
-import { CalendarDays, Filter, Users, GitBranch, ChevronDown, Layers, X, Megaphone, Target } from "lucide-react";
+import { CalendarDays, Filter, Users, GitBranch, ChevronDown, Layers, X, Megaphone } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
@@ -21,16 +22,16 @@ interface HeaderProps {
   pipelines: Pipeline[];
   users: User[];
   selectedPipelineId: string | null;
-  selectedStageId?: string | null;
-  selectedSellerId: string | null;
+  selectedStageId?: string[];
+  selectedSellerId: string[];
   utmMediumValues?: string[];
   utmCampaignValues?: string[];
-  selectedUtmMedium?: string | null;
+  selectedUtmMedium?: string[];
   selectedUtmCampaign?: string | null;
   onPipelineChange: (id: string | null) => void;
-  onStageChange?: (id: string | null) => void;
-  onSellerChange: (id: string | null) => void;
-  onUtmMediumChange?: (v: string | null) => void;
+  onStageChange?: (id: string[]) => void;
+  onSellerChange: (id: string[]) => void;
+  onUtmMediumChange?: (v: string[]) => void;
   onUtmCampaignChange?: (v: string | null) => void;
   cachedAt?: string | null;
   additionalDateRange?: DateRange | undefined;
@@ -201,12 +202,100 @@ function FilterSelect({
   );
 }
 
+function MultiFilterSelect({
+  value, onChange, placeholder, icon: Icon, options, className,
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  placeholder: string;
+  icon: typeof Users;
+  options: { id: string; name: string }[];
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  // Rascunho local enquanto o popover está aberto. Só commita (dispara o reload do
+  // dashboard) ao fechar/clicar fora, pra não recarregar a cada clique.
+  const [draft, setDraft] = useState<string[]>(value);
+  const current = open ? draft : value;
+  const hasSelection = current.length > 0;
+  const toggle = (id: string) => {
+    setDraft((prev) => prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]);
+  };
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setDraft(value);
+    } else {
+      const changed = draft.length !== value.length || draft.some((v) => !value.includes(v));
+      if (changed) onChange(draft);
+    }
+    setOpen(next);
+  };
+  const label = !hasSelection
+    ? placeholder
+    : current.length === 1
+      ? (options.find((o) => o.id === current[0])?.name ?? current[0])
+      : `${current.length} selecionados`;
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "flex items-center h-8 text-xs font-medium rounded-md border border-border/60 hover:bg-accent/50 gap-2 px-3 w-auto min-w-[130px] max-w-[200px]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
+            hasSelection && "border-primary/40 bg-primary/5 text-foreground",
+            className
+          )}
+        >
+          <Icon className={cn("w-3.5 h-3.5 shrink-0", hasSelection ? "text-primary-ink" : "text-muted-foreground")} />
+          <span className={cn("truncate", !hasSelection && "text-muted-foreground")}>{label}</span>
+          <ChevronDown className="w-3.5 h-3.5 shrink-0 ml-auto text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-1.5 rounded-lg" align="start">
+        {options.length === 0 ? (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">Sem valores</div>
+        ) : (
+          <div className="flex flex-col gap-0.5 max-h-64 overflow-y-auto">
+            {hasSelection && (
+              <button
+                type="button"
+                onClick={() => setDraft([])}
+                className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-accent text-muted-foreground"
+              >
+                <X className="w-3.5 h-3.5" /> Limpar seleção
+              </button>
+            )}
+            {options.map((o) => {
+              const checked = current.includes(o.id);
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => toggle(o.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-accent text-left",
+                    checked && "font-medium"
+                  )}
+                >
+                  <Checkbox checked={checked} className="pointer-events-none" />
+                  <span className="truncate">{o.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function Header({
   dateRange, onDateRangeChange, onRefresh, isLoading,
   pipelines, users,
-  selectedPipelineId, selectedStageId, selectedSellerId,
+  selectedPipelineId, selectedStageId = [], selectedSellerId = [],
   utmMediumValues = [], utmCampaignValues = [],
-  selectedUtmMedium = null, selectedUtmCampaign = null,
+  selectedUtmMedium = [], selectedUtmCampaign = null,
   onPipelineChange, onStageChange, onSellerChange,
   onUtmMediumChange, onUtmCampaignChange,
   cachedAt,
@@ -214,16 +303,16 @@ export function Header({
 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const hasAdditionalRange = !!additionalDateRange?.from;
-  const activeFilterCount = [selectedPipelineId, selectedStageId, selectedSellerId, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange].filter(Boolean).length;
+  const activeFilterCount = [selectedPipelineId, selectedStageId.length > 0, selectedSellerId.length > 0, selectedUtmMedium.length > 0, hasAdditionalRange].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const stages = selectedPipeline?.stages || [];
 
   const clearAll = () => {
     onPipelineChange(null);
-    onStageChange?.(null);
-    onSellerChange(null);
-    onUtmMediumChange?.(null);
+    onStageChange?.([]);
+    onSellerChange([]);
+    onUtmMediumChange?.([]);
     onUtmCampaignChange?.(null);
     onAdditionalDateRangeChange?.(undefined);
   };
@@ -257,8 +346,8 @@ export function Header({
 
       {selectedPipelineId && stages.length > 0 && onStageChange && (
         <Field label="Etapa">
-          <FilterSelect
-            value={selectedStageId || null}
+          <MultiFilterSelect
+            value={selectedStageId}
             onChange={onStageChange}
             placeholder="Etapa"
             icon={Layers}
@@ -268,7 +357,7 @@ export function Header({
       )}
 
       <Field label="Vendedor">
-        <FilterSelect
+        <MultiFilterSelect
           value={selectedSellerId}
           onChange={onSellerChange}
           placeholder="Vendedor"
@@ -278,8 +367,8 @@ export function Header({
       </Field>
 
       {onUtmMediumChange && utmMediumValues.length > 0 && (
-        <Field label="Tipo de origem">
-          <FilterSelect
+        <Field label="Tipo de mídia">
+          <MultiFilterSelect
             value={selectedUtmMedium}
             onChange={onUtmMediumChange}
             placeholder="Tipo"
@@ -289,17 +378,6 @@ export function Header({
         </Field>
       )}
 
-      {onUtmCampaignChange && utmCampaignValues.length > 0 && (
-        <Field label="Campanha">
-          <FilterSelect
-            value={selectedUtmCampaign}
-            onChange={onUtmCampaignChange}
-            placeholder="Campanha"
-            icon={Target}
-            options={utmCampaignValues.map((v) => ({ id: v, name: v }))}
-          />
-        </Field>
-      )}
 
       {showAdditional && (
         <>
