@@ -178,16 +178,14 @@ serve(async (req) => {
     const startDate: string | null = payload.startDate || null;
     const endDate: string | null = payload.endDate || null;
     const filterPipelineId: string | null = payload.pipelineId || null;
-    // Etapa e vendedor aceitam seleção múltipla (array). Mantém compat com string legada.
-    const toStrArray = (v: unknown): string[] =>
-      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x) : (typeof v === "string" && v ? [v] : []);
-    const filterStageIds: string[] = toStrArray(payload.stageId);
-    const filterUserIds: string[] = toStrArray(payload.sellerId);
+    const filterStageIds: string[] = Array.isArray(payload.stageIds)
+      ? payload.stageIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
+      : (payload.stageId ? [payload.stageId] : []);
+    const filterUserIds: string[] = Array.isArray(payload.sellerIds)
+      ? payload.sellerIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
+      : (payload.sellerId ? [payload.sellerId] : []);
     const filterOrigin: string | null = payload.sourceOrigin || null;
-    // Tipo de mídia aceita seleção múltipla (array). Mantém compat com string legada.
-    const filterUtmMediums: string[] = Array.isArray(payload.utmMedium)
-      ? payload.utmMedium.filter((v: unknown) => typeof v === "string" && v)
-      : (payload.utmMedium ? [payload.utmMedium] : []);
+    const filterUtmMedium: string | null = payload.utmMedium || null;
     const filterUtmCampaign: string | null = payload.utmCampaign || null;
     const additionalStartDate: string | null = payload.additionalStartDate || null;
     const additionalEndDate: string | null = payload.additionalEndDate || null;
@@ -199,38 +197,13 @@ serve(async (req) => {
       { data: customFieldsRows },
       { data: lossReasonsRows },
       { data: settingsRow },
-      { data: contactsRows },
     ] = await Promise.all([
       supabase.from("ghl_pipelines").select("ghl_id,name,stages").eq("workspace_id", workspaceId),
       supabase.from("ghl_users").select("ghl_id,name").eq("workspace_id", workspaceId),
       supabase.from("ghl_custom_fields").select("ghl_id,name,field_key,model").eq("workspace_id", workspaceId),
       supabase.from("ghl_loss_reasons").select("ghl_id,name").eq("workspace_id", workspaceId),
       supabase.from("ghl_dashboard_settings").select("*").eq("workspace_id", workspaceId).maybeSingle(),
-      // Página 0 dos contatos; o restante é paginado abaixo (PostgREST limita a 1000/req).
-      supabase.from("ghl_contacts").select("ghl_id,custom_fields,source,attribution_source").eq("workspace_id", workspaceId).range(0, 999),
     ]);
-
-    // Mapa de contato por ghl_id, para buscar UTMs do contato (fallback de origem).
-    // Pagina explicitamente: o PostgREST corta em 1000 linhas por request, então
-    // sem isso workspaces com >1000 contatos perdiam parte do fallback de origem.
-    const contactMap = new Map<string, { custom_fields: any; source: string | null; attribution_source: any }>();
-    const addContacts = (rows: any[] | null) => {
-      for (const c of (rows || []) as Array<{ ghl_id: string; custom_fields: any; source: string | null; attribution_source: any }>) {
-        contactMap.set(c.ghl_id, { custom_fields: c.custom_fields, source: c.source, attribution_source: c.attribution_source });
-      }
-    };
-    addContacts(contactsRows);
-    let lastCount = contactsRows?.length || 0;
-    let contactsPage = 1;
-    while (lastCount === 1000) {
-      const from = contactsPage * 1000;
-      const { data: more } = await supabase
-        .from("ghl_contacts").select("ghl_id,custom_fields,source,attribution_source")
-        .eq("workspace_id", workspaceId).range(from, from + 999);
-      addContacts(more);
-      lastCount = more?.length || 0;
-      contactsPage++;
-    }
 
     const allPipelines = (pipelinesRows || []) as Array<{ ghl_id: string; name: string; stages: any }>;
     const usersList = (usersRows || []) as Array<{ ghl_id: string; name: string }>;
@@ -365,7 +338,7 @@ serve(async (req) => {
     //   - Query B (apenas se filtro adicional ativo): leads cujo campo de data customizado
     //     (ex: data de venda) caia no período adicional, independente de quando criados.
     // Dedup por ghl_id ao mesclar A e B.
-    const SELECT_COLS = "ghl_id,name,pipeline_id,stage_id,status,monetary_value,source,assigned_to,lost_reason_id,custom_fields,ghl_created_at,last_status_change_at,contact_phone,contact_id";
+    const SELECT_COLS = "ghl_id,name,pipeline_id,stage_id,status,monetary_value,source,assigned_to,lost_reason_id,custom_fields,ghl_created_at,last_status_change_at,contact_phone";
     const baseQuery = () => {
       let q = supabase
         .from("ghl_opportunities")
@@ -471,56 +444,11 @@ serve(async (req) => {
       return cfValueToString(v);
     };
 
-    // IDs dos campos UTM no modelo CONTATO (diferentes dos da oportunidade).
-    // Usados como fallback de origem quando a oportunidade não tem UTM.
-    const contactFieldIdsByName = (name: string): string[] =>
-      customFieldDefs
-        .filter(d => (d.model || "").toLowerCase() === "contact" && (d.name || "").toLowerCase() === name)
-        .map(d => d.ghl_id);
-    const contactSourceIds = contactFieldIdsByName("utm_source");
-    const contactCampaignIds = contactFieldIdsByName("utm_campaign");
-
-    // Lê um UTM do CONTATO vinculado à oportunidade (custom_fields no formato {id,value}).
-    const getContactUtm = (o: any, fieldIds: string[]): string | null => {
-      if (!fieldIds.length || !o.contact_id) return null;
-      const c = contactMap.get(o.contact_id);
-      if (!c) return null;
-      return cfValueToString(extractCfValue(c.custom_fields, fieldIds));
-    };
-
-    // Fonte nativa do CONTATO (campo "source", ex: Facebook, meta-ads, GoogleAds).
-    const getContactSource = (o: any): string | null => {
-      if (!o.contact_id) return null;
-      const c = contactMap.get(o.contact_id);
-      const s = c?.source;
-      return s && s.trim() ? s.trim() : null;
-    };
-
-    // Atribuição do CONTATO (fonte que o GHL registra na criação do lead).
-    // Pode vir como array (listagem: [{utmSessionSource, medium, isFirst/isLast}])
-    // ou objeto (GET individual: {sessionSource, medium}). Pega o last-touch.
-    const getContactAttribution = (o: any): string | null => {
-      if (!o.contact_id) return null;
-      const a = contactMap.get(o.contact_id)?.attribution_source;
-      if (!a) return null;
-      let entry: any = a;
-      if (Array.isArray(a)) {
-        entry = a.find((x: any) => x?.isLast) || a.find((x: any) => x?.isFirst) || a[0];
-      }
-      if (!entry || typeof entry !== "object") return null;
-      const s = (entry.sessionSource || entry.utmSessionSource || "").toString().trim();
-      return s || null;
-    };
-
-    // Tipo de mídia (UTM Medium): valor literal ("pago", "organico", "email"...).
-    // Regra de negócio: oportunidade sem UTM Medium preenchido é considerada "organico".
-    const getMedium = (o: any): string => {
-      const v = utmMediumFieldId ? getUtm(o, utmMediumFieldId) : null;
-      return v && v.trim() ? v.trim() : "organico";
-    };
-
     if (filterOrigin) {
       opps = opps.filter(o => getOrigin(o) === filterOrigin);
+    }
+    if (filterUtmMedium && utmMediumFieldId) {
+      opps = opps.filter(o => getUtm(o, utmMediumFieldId) === filterUtmMedium);
     }
     if (filterUtmCampaign && utmCampaignFieldId) {
       opps = opps.filter(o => getUtm(o, utmCampaignFieldId) === filterUtmCampaign);
@@ -529,28 +457,6 @@ serve(async (req) => {
     // Quando não há filtro de pipeline, restringe aos pipelines ativos (default_pipeline_ids ou todos)
     if (!filterPipelineId && activePipelineIds.size > 0) {
       opps = opps.filter(o => !o.pipeline_id || activePipelineIds.has(o.pipeline_id));
-    }
-
-    // Lista de opções do filtro "Tipo de mídia" — calculada ANTES de aplicar o
-    // filtro de medium, para que selecionar "pago" não esconda "organico"/"email"
-    // do dropdown. Reflete todos os outros filtros ativos (período, pipeline, etc).
-    const mediumOptionValues = utmMediumFieldId
-      ? (() => {
-          const counts = new Map<string, number>();
-          for (const o of opps) {
-            const v = getMedium(o);
-            counts.set(v, (counts.get(v) || 0) + 1);
-          }
-          return Array.from(counts.entries())
-            .sort((a, b) => b[1] - a[1])
-            .map(([name]) => name);
-        })()
-      : [];
-
-    // Aplica o filtro de medium por último, já com a lista de opções preservada.
-    if (filterUtmMediums.length > 0 && utmMediumFieldId) {
-      const set = new Set(filterUtmMediums);
-      opps = opps.filter(o => set.has(getMedium(o)));
     }
 
     const totalLeads = opps.length;
@@ -680,31 +586,8 @@ serve(async (req) => {
       };
     };
 
-    // Tipo de mídia: distribuição/valores com vazio normalizado para "organico".
-    // Diferente das outras dimensões UTM, aqui não existe "não preenchido" — tudo
-    // vira pago/organico/email/etc, então o fill rate é sempre 100%.
-    const buildMediumDistribution = () => {
-      if (!utmMediumFieldId) {
-        return { distribution: [] as Array<{ name: string; count: number; percentage: number }>, fillRate: 0, values: [] as string[] };
-      }
-      const counts = new Map<string, number>();
-      for (const o of opps) {
-        const v = getMedium(o);
-        counts.set(v, (counts.get(v) || 0) + 1);
-      }
-      const total = opps.length;
-      const distribution = Array.from(counts.entries())
-        .map(([name, count]) => ({ name, count, percentage: safeRate(count, total) }))
-        .sort((a, b) => b.count - a.count);
-      return {
-        distribution,
-        fillRate: total > 0 ? 100 : 0,
-        values: distribution.map(d => d.name),
-      };
-    };
-
     const utmSource = buildUtmDistribution(utmSourceFieldId);
-    const utmMedium = buildMediumDistribution();
+    const utmMedium = buildUtmDistribution(utmMediumFieldId);
     const utmCampaign = buildUtmDistribution(utmCampaignFieldId);
 
     // Won leads por UTM Source — pra card "Origem das vendas"
@@ -735,23 +618,16 @@ serve(async (req) => {
     // Opps sem UTM Source viram fatia "Não identificado". Desempate por contagem
     // desc, depois alfabético.
     const buildSourceCampaignDistribution = (oppsList: any[]) => {
-      if (!utmSourceFieldId && !utmCampaignFieldId) {
+      if (!utmSourceFieldId) {
         return { distribution: [] as Array<{ name: string; count: number; percentage: number }>, fillRate: 0 };
       }
       const counts = new Map<string, number>();
       let filled = 0;
       for (const o of oppsList) {
-        // Hierarquia por campo: UTM da oportunidade; faltando, UTM do contato.
-        const source = getUtm(o, utmSourceFieldId) || getContactUtm(o, contactSourceIds);
-        const campaign = (utmCampaignFieldId ? getUtm(o, utmCampaignFieldId) : null) || getContactUtm(o, contactCampaignIds);
-        // Resultado: 1) source+campaign (ou individual); 2) fonte do contato
-        // (campo "source"); 3) fonte do lead da oportunidade; 4) "Não identificado".
-        let key: string | null = null;
-        if (source && campaign) key = `${source} · ${campaign}`;
-        else if (source) key = source;
-        else if (campaign) key = campaign;
-        else key = getContactSource(o) || getContactAttribution(o) || getOrigin(o);
-        if (!key) continue;
+        const source = getUtm(o, utmSourceFieldId);
+        if (!source) continue;
+        const campaign = utmCampaignFieldId ? getUtm(o, utmCampaignFieldId) : null;
+        const key = campaign ? `${source} · ${campaign}` : source;
         filled++;
         counts.set(key, (counts.get(key) || 0) + 1);
       }
@@ -970,7 +846,6 @@ serve(async (req) => {
     const convIds: string[] = [];
     const seenConvIds = new Set<string>();
     const convToSeller = new Map<string, string>(); // ghl_conversation_id -> sellerId
-    const filterUserSet = new Set(filterUserIds);
     if (phoneSet.size > 0 || filterUserIds.length > 0 || allowedSellerIds.size > 0) {
       const PAGE = 1000;
       let from = 0;
@@ -988,8 +863,8 @@ serve(async (req) => {
           const phone = normalizePhone((c as any).contact_phone);
           const convSeller = (c as any).assigned_ghl_user_id as string | null;
           const phoneMatch = phoneSet.has(phone);
-          const sellerMatch = filterUserSet.size > 0
-            ? !!convSeller && filterUserSet.has(convSeller)
+          const sellerMatch = filterUserIds.length > 0
+            ? (!!convSeller && filterUserIds.includes(convSeller))
             : !!convSeller && allowedSellerIds.has(convSeller);
           if (phoneMatch || sellerMatch) {
             convIds.push(id);
@@ -1135,8 +1010,6 @@ serve(async (req) => {
         if (o.stage_id && wonStageIds.has(o.stage_id)) return false;
         return true;
       };
-      // Candidatos: abertas paradas (por etapa/criação) há >= warning dias.
-      // Só esses precisam da checagem de mensagem (otimização).
       const candidates: Array<{ phone: string; baseMs: number; name: string; seller: string | null }> = [];
       for (const o of (openRows || [])) {
         if (!isOpen(o)) continue;
@@ -1153,8 +1026,6 @@ serve(async (req) => {
         });
       }
 
-      // Última mensagem por telefone dos candidatos (janela de 90 dias — além
-      // disso o lead já é 14+ pela etapa, então não muda a classificação).
       const candPhones = new Set(candidates.map((c) => c.phone).filter(Boolean));
       const lastMsgByPhone = new Map<string, number>();
       if (candPhones.size > 0) {
@@ -1216,11 +1087,10 @@ serve(async (req) => {
         }
       }
 
-      // Classifica pela atividade efetiva (max etapa/criação vs. última msg).
       for (const c of candidates) {
         const effMs = Math.max(c.baseMs, c.phone ? (lastMsgByPhone.get(c.phone) || 0) : 0);
         const days = (nowMs - effMs) / DAY;
-        if (days < COOLING_THRESHOLDS.warning) continue; // mensagem recente => não está esfriando
+        if (days < COOLING_THRESHOLDS.warning) continue;
         coolingLeads.total++;
         const bucket: keyof typeof coolingLeads.leads =
           days >= COOLING_THRESHOLDS.critical ? "critical"
@@ -1229,7 +1099,6 @@ serve(async (req) => {
         coolingLeads[bucket]++;
         coolingLeads.leads[bucket].push({ name: c.name, seller: c.seller, days: Math.floor(days) });
       }
-      // Ordena cada faixa pelos mais parados e limita a 100 por faixa no payload.
       for (const k of ["warning", "alert", "critical"] as const) {
         coolingLeads.leads[k].sort((a, b) => b.days - a.days);
         if (coolingLeads.leads[k].length > 100) coolingLeads.leads[k] = coolingLeads.leads[k].slice(0, 100);
@@ -1255,7 +1124,7 @@ serve(async (req) => {
       utmSourceValues: utmSource.values,
       utmMediumDistribution: utmMedium.distribution,
       utmMediumFillRate: utmMedium.fillRate,
-      utmMediumValues: mediumOptionValues,
+      utmMediumValues: utmMedium.values,
       utmCampaignDistribution: utmCampaign.distribution,
       utmCampaignFillRate: utmCampaign.fillRate,
       utmCampaignValues: utmCampaign.values,

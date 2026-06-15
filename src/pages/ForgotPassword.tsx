@@ -7,12 +7,15 @@ import { Bot, Mail, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useForceLightTheme } from "@/hooks/useForceLightTheme";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  useForceLightTheme();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
