@@ -985,7 +985,127 @@ serve(async (req) => {
       businessHoursEnd: businessEndStr,
     };
 
+    // ===== Leads esfriando (sem atividade há X dias) =====
+    // Olha TODAS as oportunidades ABERTAS (ignora o período do header),
+    // respeitando pipeline/etapa/vendedor. "Atividade" = o mais recente entre
+    // a última mudança de etapa (last_status_change_at, fallback ghl_created_at)
+    // e a última mensagem trocada. Faixas não-sobrepostas: 7–9 / 10–13 / 14+.
+    const COOLING_THRESHOLDS = { warning: 7, alert: 10, critical: 14 };
+    type CoolingLead = { name: string; seller: string | null; days: number };
+    const coolingLeads = {
+      warning: 0, alert: 0, critical: 0, total: 0,
+      thresholds: COOLING_THRESHOLDS,
+      leads: { warning: [] as CoolingLead[], alert: [] as CoolingLead[], critical: [] as CoolingLead[] },
+    };
+    try {
+      const sellerNameById = new Map<string, string>();
+      for (const u of usersList) sellerNameById.set(u.ghl_id, u.name);
+      const { data: openRows, error: openErr } = await baseQuery();
+      if (openErr) throw openErr;
+      const nowMs = Date.now();
+      const DAY = 86400000;
+      const isOpen = (o: any) => {
+        const st = (o.status || "").toLowerCase();
+        if (st === "lost" || st === "won") return false;
+        if (o.stage_id && wonStageIds.has(o.stage_id)) return false;
+        return true;
+      };
+      const candidates: Array<{ phone: string; baseMs: number; name: string; seller: string | null }> = [];
+      for (const o of (openRows || [])) {
+        if (!isOpen(o)) continue;
+        const baseStr = o.last_status_change_at || o.ghl_created_at;
+        if (!baseStr) continue;
+        const baseMs = new Date(baseStr).getTime();
+        if (isNaN(baseMs)) continue;
+        if ((nowMs - baseMs) / DAY < COOLING_THRESHOLDS.warning) continue;
+        candidates.push({
+          phone: normalizePhone(o.contact_phone),
+          baseMs,
+          name: o.name || `Oportunidade ${String(o.ghl_id).slice(0, 6)}`,
+          seller: o.assigned_to ? (sellerNameById.get(o.assigned_to) || null) : null,
+        });
+      }
 
+      const candPhones = new Set(candidates.map((c) => c.phone).filter(Boolean));
+      const lastMsgByPhone = new Map<string, number>();
+      if (candPhones.size > 0) {
+        const convIdToPhone = new Map<string, string>();
+        const coolConvIds: string[] = [];
+        const PAGE = 1000;
+        let from = 0;
+        while (true) {
+          const { data: convsRows, error: convErr } = await supabase
+            .from("ghl_conversations")
+            .select("ghl_conversation_id,contact_phone")
+            .eq("workspace_id", workspaceId)
+            .range(from, from + PAGE - 1);
+          if (convErr) { console.error("[cooling] ghl_conversations error", convErr); break; }
+          const rows = convsRows || [];
+          for (const c of rows) {
+            const phone = normalizePhone((c as any).contact_phone);
+            if (!candPhones.has(phone)) continue;
+            const id = (c as any).ghl_conversation_id as string;
+            if (convIdToPhone.has(id)) continue;
+            convIdToPhone.set(id, phone);
+            coolConvIds.push(id);
+          }
+          if (rows.length < PAGE) break;
+          from += PAGE;
+          if (from > 50000) break; // safety
+        }
+
+        if (coolConvIds.length > 0) {
+          const sinceIso = new Date(nowMs - 90 * DAY).toISOString();
+          const ID_CHUNK = 200;
+          const MSG_PAGE = 1000;
+          for (let i = 0; i < coolConvIds.length; i += ID_CHUNK) {
+            const chunk = coolConvIds.slice(i, i + ID_CHUNK);
+            let mFrom = 0;
+            while (true) {
+              const { data: msgsRows, error: msgErr } = await supabase
+                .from("ghl_messages")
+                .select("ghl_conversation_id,date_added")
+                .eq("workspace_id", workspaceId)
+                .in("ghl_conversation_id", chunk)
+                .gte("date_added", sinceIso)
+                .order("date_added", { ascending: false })
+                .range(mFrom, mFrom + MSG_PAGE - 1);
+              if (msgErr) { console.error("[cooling] ghl_messages error", msgErr); break; }
+              const rows = (msgsRows || []) as any[];
+              for (const m of rows) {
+                const phone = convIdToPhone.get(m.ghl_conversation_id);
+                if (!phone) continue;
+                const t = new Date(m.date_added).getTime();
+                if (isNaN(t)) continue;
+                if (t > (lastMsgByPhone.get(phone) || 0)) lastMsgByPhone.set(phone, t);
+              }
+              if (rows.length < MSG_PAGE) break;
+              mFrom += MSG_PAGE;
+              if (mFrom > 100000) break; // safety
+            }
+          }
+        }
+      }
+
+      for (const c of candidates) {
+        const effMs = Math.max(c.baseMs, c.phone ? (lastMsgByPhone.get(c.phone) || 0) : 0);
+        const days = (nowMs - effMs) / DAY;
+        if (days < COOLING_THRESHOLDS.warning) continue;
+        coolingLeads.total++;
+        const bucket: keyof typeof coolingLeads.leads =
+          days >= COOLING_THRESHOLDS.critical ? "critical"
+          : days >= COOLING_THRESHOLDS.alert ? "alert"
+          : "warning";
+        coolingLeads[bucket]++;
+        coolingLeads.leads[bucket].push({ name: c.name, seller: c.seller, days: Math.floor(days) });
+      }
+      for (const k of ["warning", "alert", "critical"] as const) {
+        coolingLeads.leads[k].sort((a, b) => b.days - a.days);
+        if (coolingLeads.leads[k].length > 100) coolingLeads.leads[k] = coolingLeads.leads[k].slice(0, 100);
+      }
+    } catch (e) {
+      console.error("[cooling] erro ao calcular leads esfriando", e);
+    }
 
     return new Response(JSON.stringify({
       totalLeads,
@@ -1041,6 +1161,7 @@ serve(async (req) => {
       additionalDateFieldId,
       additionalDateFieldName,
       responseTime,
+      coolingLeads,
       cachedAt: new Date().toISOString(),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
