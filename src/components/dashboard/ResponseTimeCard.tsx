@@ -48,7 +48,7 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
   const withInbound = responseTime?.conversationsWithInbound ?? 0;
   const responseRate = withInbound > 0 ? (convs / withInbound) * 100 : null;
   const unanswered = responseTime?.unanswered ?? [];
-  const unansweredCount = Math.max(0, withInbound - convs);
+  const unansweredCount = unanswered.length;
   const rateColor =
     responseRate === null ? "text-muted-foreground"
     : responseRate >= 70 ? "text-success"
@@ -160,13 +160,13 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
                     style={{ width: `${Math.min(100, Math.max(2, responseRate))}%` }}
                   />
                 </div>
-                {unansweredCount > 0 && unanswered.length > 0 && (
+                {unansweredCount > 0 && (
                   <button
                     type="button"
                     onClick={() => setShowUnanswered(true)}
                     className="mt-3 w-full flex items-center justify-center gap-1 text-xs font-medium text-destructive hover:underline focus:outline-none"
                   >
-                    Ver {unansweredCount} sem resposta
+                    Ver {unansweredCount} ainda sem resposta
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -190,7 +190,7 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
             <DialogDescription>
               {unanswered.length === 0
                 ? "Nenhuma conversa sem resposta."
-                : `${unansweredCount} cliente(s) mandaram mensagem e não foram respondidos${unanswered.length < unansweredCount ? ` (mostrando ${unanswered.length})` : ""}. Ordenados pelo maior tempo de espera.`}
+                : `${unansweredCount} cliente(s) que mandaram mensagem e seguem sem resposta até hoje. Ordenados pelo maior tempo de espera.`}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[55vh] overflow-y-auto -mx-1 px-1 divide-y divide-border">

@@ -889,8 +889,11 @@ serve(async (req) => {
     let conversationsWithInbound = 0;
     // Por vendedor
     const sellerResponse = new Map<string, { totalMinutes: number; count: number }>();
-    // Clientes que mandaram mensagem e ficaram SEM resposta (taxa negativa).
-    const unansweredList: Array<{ name: string; seller: string | null; waitingDays: number }> = [];
+    // Clientes que mandaram mensagem e ficaram SEM resposta NA JANELA. Depois do
+    // loop, removemos os que já foram respondidos fora do período (lookahead),
+    // para a lista refletir "ainda sem resposta até hoje".
+    const unansweredCand: Array<{ convId: string; name: string; seller: string | null; lastInboundT: number }> = [];
+    let unansweredList: Array<{ name: string; seller: string | null; waitingDays: number }> = [];
     const nowMsResp = Date.now();
 
     if (convIds.length > 0) {
@@ -970,14 +973,43 @@ serve(async (req) => {
         }
         if (convHadResponse) conversationsWithResponse++;
         else if (convHadInbound) {
-          // Cliente falou e ninguém respondeu — entra na lista de sem resposta.
-          unansweredList.push({
+          // Cliente falou e ninguém respondeu DENTRO da janela — candidato.
+          unansweredCand.push({
+            convId,
             name: convToName.get(convId) || `Conversa ${convId.slice(0, 6)}`,
             seller: sid ? (sellersMap.get(sid)?.name || null) : null,
-            waitingDays: convLastInboundT ? Math.floor((nowMsResp - convLastInboundT) / 86400000) : 0,
+            lastInboundT: convLastInboundT,
           });
         }
         if (sid && acc) sellerResponse.set(sid, acc);
+      }
+
+      // Lookahead: remove da lista quem JÁ foi respondido depois do fim do
+      // período (qualquer outbound após o fim da janela). Assim a lista mostra
+      // só "ainda sem resposta até hoje".
+      if (unansweredCand.length > 0) {
+        const candIds = unansweredCand.map((c) => c.convId);
+        const answeredLater = new Set<string>();
+        const ID_CHUNK = 200;
+        for (let i = 0; i < candIds.length; i += ID_CHUNK) {
+          const chunk = candIds.slice(i, i + ID_CHUNK);
+          const { data: laterRows, error: laterErr } = await supabase
+            .from("ghl_messages")
+            .select("ghl_conversation_id")
+            .eq("workspace_id", workspaceId)
+            .eq("direction", "outbound")
+            .in("ghl_conversation_id", chunk)
+            .gt("date_added", endIso);
+          if (laterErr) { console.error("[unanswered] lookahead error", laterErr); continue; }
+          for (const r of (laterRows || [])) answeredLater.add((r as any).ghl_conversation_id);
+        }
+        unansweredList = unansweredCand
+          .filter((c) => !answeredLater.has(c.convId))
+          .map((c) => ({
+            name: c.name,
+            seller: c.seller,
+            waitingDays: c.lastInboundT ? Math.floor((nowMsResp - c.lastInboundT) / 86400000) : 0,
+          }));
       }
     }
 
