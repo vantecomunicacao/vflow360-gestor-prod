@@ -831,20 +831,36 @@ serve(async (req) => {
     const normalizePhone = (p: string | null | undefined) => (p || "").replace(/\D+/g, "");
     // Tempo de resposta considera SÓ leads ABERTOS: ganhos/perdidos (fechados)
     // não devem pesar na métrica nem aparecer como "sem resposta".
-    const phoneSet = new Set<string>();        // telefones de oportunidades abertas
-    const closedPhoneSet = new Set<string>();  // telefones de oportunidades ganhas/perdidas
+    const phoneSet = new Set<string>();        // telefones de oportunidades abertas do período (escopo)
     const allowedSellerIds = new Set<string>();
     for (const o of oppsForResponse) {
       const np = normalizePhone(o.contact_phone);
       const st = (o.status || "").toLowerCase();
       const closed = st === "lost" || st === "won" || (o.stage_id && wonStageIds.has(o.stage_id));
-      if (closed) {
-        if (np) closedPhoneSet.add(np);
-        continue;
-      }
+      if (closed) continue;
       if (np) phoneSet.add(np);
       if (o.assigned_to) allowedSellerIds.add(o.assigned_to);
     }
+
+    // Telefones de leads FECHADOS considerando TODAS as oportunidades (sem
+    // recorte de período) — um lead criado/fechado antes do período também
+    // precisa ser excluído. closedOnly = fechado e SEM nenhuma opp aberta.
+    const allClosedPhones = new Set<string>();
+    const allOpenPhones = new Set<string>();
+    try {
+      const { data: allOppRows } = await baseQuery();
+      for (const o of (allOppRows || [])) {
+        const np = normalizePhone(o.contact_phone);
+        if (!np) continue;
+        const st = (o.status || "").toLowerCase();
+        const closed = st === "lost" || st === "won" || (o.stage_id && wonStageIds.has(o.stage_id));
+        if (closed) allClosedPhones.add(np);
+        else allOpenPhones.add(np);
+      }
+    } catch (e) {
+      console.error("[response-time] erro ao carregar status dos leads", e);
+    }
+    const isClosedOnlyPhone = (phone: string) => !!phone && allClosedPhones.has(phone) && !allOpenPhones.has(phone);
 
     // Conversas 2.0 (ghl_conversations): filtra por:
     //  - phone match com oportunidades do escopo
@@ -873,7 +889,7 @@ serve(async (req) => {
           const phone = normalizePhone((c as any).contact_phone);
           const convSeller = (c as any).assigned_ghl_user_id as string | null;
           // Conversa de lead fechado (ganho/perdido) não entra na métrica.
-          if (phone && closedPhoneSet.has(phone) && !phoneSet.has(phone)) continue;
+          if (isClosedOnlyPhone(phone)) continue;
           const phoneMatch = phoneSet.has(phone);
           const sellerMatch = filterUserIds.length > 0
             ? (!!convSeller && filterUserIds.includes(convSeller))
