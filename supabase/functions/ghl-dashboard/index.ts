@@ -829,10 +829,19 @@ serve(async (req) => {
 
     // Normaliza telefones (mantém apenas dígitos) para casar com ghl_conversations
     const normalizePhone = (p: string | null | undefined) => (p || "").replace(/\D+/g, "");
-    const phoneSet = new Set<string>();
+    // Tempo de resposta considera SÓ leads ABERTOS: ganhos/perdidos (fechados)
+    // não devem pesar na métrica nem aparecer como "sem resposta".
+    const phoneSet = new Set<string>();        // telefones de oportunidades abertas
+    const closedPhoneSet = new Set<string>();  // telefones de oportunidades ganhas/perdidas
     const allowedSellerIds = new Set<string>();
     for (const o of oppsForResponse) {
       const np = normalizePhone(o.contact_phone);
+      const st = (o.status || "").toLowerCase();
+      const closed = st === "lost" || st === "won" || (o.stage_id && wonStageIds.has(o.stage_id));
+      if (closed) {
+        if (np) closedPhoneSet.add(np);
+        continue;
+      }
       if (np) phoneSet.add(np);
       if (o.assigned_to) allowedSellerIds.add(o.assigned_to);
     }
@@ -863,6 +872,8 @@ serve(async (req) => {
           if (seenConvIds.has(id)) continue;
           const phone = normalizePhone((c as any).contact_phone);
           const convSeller = (c as any).assigned_ghl_user_id as string | null;
+          // Conversa de lead fechado (ganho/perdido) não entra na métrica.
+          if (phone && closedPhoneSet.has(phone) && !phoneSet.has(phone)) continue;
           const phoneMatch = phoneSet.has(phone);
           const sellerMatch = filterUserIds.length > 0
             ? (!!convSeller && filterUserIds.includes(convSeller))
