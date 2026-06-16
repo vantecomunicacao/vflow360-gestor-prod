@@ -117,61 +117,16 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
               {convs > 0 && <> em <span className="font-bold text-foreground">{convs}</span> conversa{convs === 1 ? "" : "s"}</>}
             </p>
 
-            {responseRate !== null && (
-              <div className="w-full max-w-[260px] mt-5 pt-4 border-t border-border">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <MessageCircleReply className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span>Taxa de resposta</span>
-                    <SectionTooltip text="Percentual de conversas em que o vendedor respondeu pelo menos uma vez, considerando apenas conversas com mensagens recebidas do cliente no período." />
-                  </div>
-                  {rateTrend && (
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full cursor-help",
-                              rateTrend.isPositive ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
-                            )}
-                          >
-                            {rateTrend.isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                            {rateTrend.value}pp
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[220px] text-xs leading-relaxed">
-                          Variação em pontos percentuais vs. o período anterior.
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </div>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className={cn("text-2xl font-bold tabular-nums", rateColor)}>
-                    {responseRate.toFixed(0)}%
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {convs} de {withInbound} conversa{withInbound === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
-                  <div
-                    className={cn("h-full rounded-full transition-all", rateBarColor)}
-                    style={{ width: `${Math.min(100, Math.max(2, responseRate))}%` }}
-                  />
-                </div>
-                {unansweredCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowUnanswered(true)}
-                    className="mt-3 w-full flex items-center justify-center gap-1 text-xs font-medium text-destructive hover:underline focus:outline-none"
-                  >
-                    Ver {unansweredCount} ainda sem resposta
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
+            {/* Taxa de resposta temporariamente oculta — em desenvolvimento. */}
+            <div className="w-full max-w-[260px] mt-5 pt-4 border-t border-border">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <MessageCircleReply className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Taxa de resposta</span>
+                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  em breve
+                </span>
               </div>
-            )}
+            </div>
 
             <p className="text-[10px] text-muted-foreground mt-4">
               Expediente: {start} – {end}
