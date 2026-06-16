@@ -55,6 +55,7 @@ export interface CoolingLeads {
   thresholds: { warning: number; alert: number; critical: number };
   leads?: { warning: CoolingLead[]; alert: CoolingLead[]; critical: CoolingLead[] };
 }
+export interface UnansweredConversation { name: string; seller: string | null; waitingDays: number; }
 export interface ResponseTime {
   averageMinutes: number;
   responseCount: number;
@@ -62,6 +63,7 @@ export interface ResponseTime {
   conversationsWithInbound?: number;
   businessHoursStart: string;
   businessHoursEnd: string;
+  unanswered?: UnansweredConversation[];
 }
 
 export interface DashboardData {

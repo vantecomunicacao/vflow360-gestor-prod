@@ -846,13 +846,14 @@ serve(async (req) => {
     const convIds: string[] = [];
     const seenConvIds = new Set<string>();
     const convToSeller = new Map<string, string>(); // ghl_conversation_id -> sellerId
+    const convToName = new Map<string, string>(); // ghl_conversation_id -> nome do contato
     if (phoneSet.size > 0 || filterUserIds.length > 0 || allowedSellerIds.size > 0) {
       const PAGE = 1000;
       let from = 0;
       while (true) {
         const { data: convsRows, error: convErr } = await supabase
           .from("ghl_conversations")
-          .select("ghl_conversation_id,contact_phone,assigned_ghl_user_id")
+          .select("ghl_conversation_id,contact_phone,contact_name,assigned_ghl_user_id")
           .eq("workspace_id", workspaceId)
           .range(from, from + PAGE - 1);
         if (convErr) { console.error("ghl_conversations page error", convErr); break; }
@@ -872,6 +873,8 @@ serve(async (req) => {
             // prefere o vendedor atribuído na conversa, com fallback phone -> assigned_to
             const sid = convSeller || phoneToSeller.get(phone) || null;
             if (sid) convToSeller.set(id, sid);
+            const cname = (c as any).contact_name as string | null;
+            convToName.set(id, cname || (phone ? `+${phone}` : `Conversa ${id.slice(0, 6)}`));
           }
         }
         if (rows.length < PAGE) break;
@@ -886,6 +889,9 @@ serve(async (req) => {
     let conversationsWithInbound = 0;
     // Por vendedor
     const sellerResponse = new Map<string, { totalMinutes: number; count: number }>();
+    // Clientes que mandaram mensagem e ficaram SEM resposta (taxa negativa).
+    const unansweredList: Array<{ name: string; seller: string | null; waitingDays: number }> = [];
+    const nowMsResp = Date.now();
 
     if (convIds.length > 0) {
       // Pagina mensagens em lotes de conversation IDs e por páginas, sem cortar dados.
@@ -931,6 +937,7 @@ serve(async (req) => {
         let lastInbound: number | null = null;
         let convHadResponse = false;
         let convHadInbound = false;
+        let convLastInboundT = 0;
         const sid = convToSeller.get(convId);
         // Tempo de resposta conta SO conversas com vendedor responsavel
         // (atribuido na conversa ou dono da oportunidade). Conversa orfa nao
@@ -943,6 +950,7 @@ serve(async (req) => {
               convHadInbound = true;
               conversationsWithInbound++;
             }
+            convLastInboundT = m.t;
             if (lastInbound === null) lastInbound = m.t;
           } else if (m.dir === "outbound" && lastInbound !== null) {
             const minutes = businessMinutesBetween(lastInbound, m.t, startMin, endMin);
@@ -961,6 +969,14 @@ serve(async (req) => {
           }
         }
         if (convHadResponse) conversationsWithResponse++;
+        else if (convHadInbound) {
+          // Cliente falou e ninguém respondeu — entra na lista de sem resposta.
+          unansweredList.push({
+            name: convToName.get(convId) || `Conversa ${convId.slice(0, 6)}`,
+            seller: sid ? (sellersMap.get(sid)?.name || null) : null,
+            waitingDays: convLastInboundT ? Math.floor((nowMsResp - convLastInboundT) / 86400000) : 0,
+          });
+        }
         if (sid && acc) sellerResponse.set(sid, acc);
       }
     }
@@ -983,6 +999,7 @@ serve(async (req) => {
       conversationsWithInbound,
       businessHoursStart: businessStartStr,
       businessHoursEnd: businessEndStr,
+      unanswered: unansweredList.sort((a, b) => b.waitingDays - a.waitingDays).slice(0, 100),
     };
 
     // ===== Leads esfriando (sem atividade há X dias) =====

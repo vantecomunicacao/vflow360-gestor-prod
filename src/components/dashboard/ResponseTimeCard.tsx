@@ -1,7 +1,9 @@
-import { Clock, TrendingDown, TrendingUp, MessageCircleReply } from "lucide-react";
+import { useState } from "react";
+import { Clock, TrendingDown, TrendingUp, MessageCircleReply, User, ChevronRight } from "lucide-react";
 import { ResponseTime as RT } from "@/hooks/useGhlData";
 import { SectionTooltip } from "./SectionTooltip";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface ResponseTimeCardProps {
@@ -24,6 +26,7 @@ function formatDuration(minutes: number): { value: string; unit: string } {
 }
 
 export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTimeCardProps) {
+  const [showUnanswered, setShowUnanswered] = useState(false);
   const minutes = responseTime?.averageMinutes ?? 0;
   const { value, unit } = formatDuration(minutes);
   const responses = responseTime?.responseCount ?? 0;
@@ -44,6 +47,8 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
 
   const withInbound = responseTime?.conversationsWithInbound ?? 0;
   const responseRate = withInbound > 0 ? (convs / withInbound) * 100 : null;
+  const unanswered = responseTime?.unanswered ?? [];
+  const unansweredCount = Math.max(0, withInbound - convs);
   const rateColor =
     responseRate === null ? "text-muted-foreground"
     : responseRate >= 70 ? "text-success"
@@ -155,6 +160,16 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
                     style={{ width: `${Math.min(100, Math.max(2, responseRate))}%` }}
                   />
                 </div>
+                {unansweredCount > 0 && unanswered.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowUnanswered(true)}
+                    className="mt-3 w-full flex items-center justify-center gap-1 text-xs font-medium text-destructive hover:underline focus:outline-none"
+                  >
+                    Ver {unansweredCount} sem resposta
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             )}
 
@@ -164,6 +179,38 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
           </>
         )}
       </div>
+
+      <Dialog open={showUnanswered} onOpenChange={setShowUnanswered}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircleReply className="w-4 h-4 text-destructive" />
+              Clientes sem resposta
+            </DialogTitle>
+            <DialogDescription>
+              {unanswered.length === 0
+                ? "Nenhuma conversa sem resposta."
+                : `${unansweredCount} cliente(s) mandaram mensagem e não foram respondidos${unanswered.length < unansweredCount ? ` (mostrando ${unanswered.length})` : ""}. Ordenados pelo maior tempo de espera.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[55vh] overflow-y-auto -mx-1 px-1 divide-y divide-border">
+            {unanswered.map((c, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                    <User className="w-3 h-3 shrink-0" />
+                    {c.seller || "Não atribuído"}
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-muted-foreground shrink-0 whitespace-nowrap">
+                  {c.waitingDays === 0 ? "hoje" : `há ${c.waitingDays} dia${c.waitingDays === 1 ? "" : "s"}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
