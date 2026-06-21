@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
+import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { Pipeline, User } from "@/hooks/useGhlData";
@@ -48,6 +48,14 @@ const datePresets = [
   { label: "Mês passado", getValue: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
   { label: "Este ano", getValue: () => ({ from: startOfYear(new Date()), to: new Date() }) },
 ];
+
+// Um atalho está "ativo" quando o intervalo selecionado bate (no nível de dia,
+// ignorando horário) com o que ele geraria agora.
+function isPresetActive(preset: typeof datePresets[number], range: DateRange | undefined) {
+  if (!range?.from || !range?.to) return false;
+  const v = preset.getValue();
+  return isSameDay(range.from, v.from) && isSameDay(range.to, v.to);
+}
 
 function formatRangeLabel(range: DateRange | undefined) {
   if (!range?.from) return null;
@@ -134,17 +142,25 @@ function DateRangePicker({
         <div className="flex">
           <div className="border-r border-border p-1.5 pr-3 space-y-0.5 w-[120px]">
             <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-2 py-1.5">Atalhos</p>
-            {datePresets.map((p) => (
-              <Button
-                key={p.label}
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-xs h-7 px-2 rounded-md font-normal"
-                onClick={() => { const v = p.getValue(); setLocalRange(v); onDateRangeChange(v); setOpen(false); }}
-              >
-                {p.label}
-              </Button>
-            ))}
+            {datePresets.map((p) => {
+              const active = isPresetActive(p, localRange);
+              return (
+                <Button
+                  key={p.label}
+                  variant="ghost"
+                  size="sm"
+                  aria-pressed={active}
+                  className={cn(
+                    "w-full justify-start text-xs h-7 px-2 rounded-md font-normal gap-1.5",
+                    active && "bg-primary/10 text-primary-ink font-semibold hover:bg-primary/15",
+                  )}
+                  onClick={() => { const v = p.getValue(); setLocalRange(v); onDateRangeChange(v); setOpen(false); }}
+                >
+                  {active && <Check className="w-3 h-3 shrink-0" />}
+                  <span className="truncate">{p.label}</span>
+                </Button>
+              );
+            })}
           </div>
           <div className="flex flex-col">
             <Calendar
