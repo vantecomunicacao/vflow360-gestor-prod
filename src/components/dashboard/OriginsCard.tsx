@@ -54,6 +54,7 @@ export function OriginsCard({ mode, distribution, fillRate, configured, colorMap
 
   const grouped = useMemo(() => groupTopN(distribution, 6), [distribution]);
   const chartData = grouped.map((o) => ({ name: o.name, value: o.count }));
+  const total = chartData.reduce((sum, d) => sum + d.value, 0);
 
   const chartDescription = useMemo(() => {
     if (grouped.length === 0) return copy.emptyData;
@@ -117,7 +118,11 @@ export function OriginsCard({ mode, distribution, fillRate, configured, colorMap
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4">
-          <div className="w-full h-56" role="img" aria-label={chartDescription}>
+          <div className="relative w-full h-56" role="img" aria-label={chartDescription}>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-bold tabular-nums text-foreground leading-none">{total}</span>
+              <span className="text-xs text-muted-foreground mt-0.5">{copy.unitLabel}</span>
+            </div>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
