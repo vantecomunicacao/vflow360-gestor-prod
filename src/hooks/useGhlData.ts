@@ -138,6 +138,8 @@ interface UseGhlDataOptions {
 interface UseGhlDataReturn {
   data: DashboardData | null;
   isLoading: boolean;
+  /** true durante qualquer busca em background (ex.: troca de filtro com dados já em tela). */
+  isFetching: boolean;
   error: string | null;
   refetch: (forceRefresh?: boolean) => Promise<void>;
   cachedAt: string | null;
@@ -270,6 +272,7 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
   return {
     data: query.data ?? null,
     isLoading: query.isLoading || syncMutation.isPending,
+    isFetching: query.isFetching || syncMutation.isPending,
     error: query.error ? query.error.message : null,
     refetch,
     cachedAt: query.data?.cachedAt ?? null,

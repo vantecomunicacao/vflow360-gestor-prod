@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { subDays, startOfDay, endOfDay, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
@@ -30,27 +30,15 @@ import { DashboardSkeleton } from "@/components/skeletons/RouteSkeletons";
 import { ErrorState } from "@/components/dashboard/ErrorState";
 import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
 import { AIUsageCard } from "@/components/dashboard/AIUsageCard";
-
-type SavedFilters = {
-  from?: string;
-  to?: string;
-  addFrom?: string;
-  addTo?: string;
-  pipelineId?: string | null;
-  stageId?: string | null; // legado (seleção única)
-  stageIds?: string[];
-  sellerId?: string | null; // legado (seleção única)
-  sellerIds?: string[];
-  utmMedium?: string | null;
-  utmCampaign?: string | null;
-};
-
-const filtersStorageKey = (workspaceId: string) => `dashboard:filters:${workspaceId}`;
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { activeWorkspace } = useWorkspace();
   const { permissions } = usePermissions();
-  const [hydrated, setHydrated] = useState(false);
+  const { toast } = useToast();
+  // Conta na hidratação anterior — usado para mostrar o toast só quando a conta
+  // REALMENTE muda (e não na primeira montagem da página).
+  const prevWorkspaceRef = useRef<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 6),
     to: new Date(),
@@ -62,87 +50,47 @@ export default function Dashboard() {
   const [selectedUtmMedium, setSelectedUtmMedium] = useState<string | null>(null);
   const [selectedUtmCampaign, setSelectedUtmCampaign] = useState<string | null>(null);
 
-  // Hidratar filtros salvos por workspace (ou aplicar pipeline padrão)
+  // Ao trocar de conta, SEMPRE redefine os filtros para o padrão da conta.
+  // Os filtros não são mais memorizados entre contas: cada troca entra num
+  // estado limpo e previsível. Isso evita que uma seleção antiga (ex.: IDs de
+  // vendedor/etapa que mudaram após re-sync do GHL) filtre tudo para zero sem
+  // pista visível. Um toast deixa claro que o contexto mudou.
   useEffect(() => {
-    setHydrated(false);
     if (!activeWorkspace?.id) return;
     let cancelled = false;
 
     (async () => {
-      // 1) Tentar restaurar filtros salvos (inclusive período)
-      let restored = false;
-      try {
-        const raw = localStorage.getItem(filtersStorageKey(activeWorkspace.id));
-        if (raw) {
-          const saved = JSON.parse(raw) as SavedFilters;
-          setDateRange(
-            saved.from
-              ? { from: new Date(saved.from), to: saved.to ? new Date(saved.to) : undefined }
-              : { from: subDays(new Date(), 6), to: new Date() }
-          );
-          setAdditionalDateRange(
-            saved.addFrom
-              ? { from: new Date(saved.addFrom), to: saved.addTo ? new Date(saved.addTo) : undefined }
-              : undefined
-          );
-          setSelectedPipelineId(saved.pipelineId ?? null);
-          setSelectedStageIds(saved.stageIds ?? (saved.stageId ? [saved.stageId] : []));
-          setSelectedSellerIds(saved.sellerIds ?? (saved.sellerId ? [saved.sellerId] : []));
-          setSelectedUtmMedium(saved.utmMedium ?? null);
-          setSelectedUtmCampaign(saved.utmCampaign ?? null);
-          restored = true;
-        }
-      } catch {
-        // ignora storage corrompido
+      // Reset padrão: período (últimos 7 dias) e todos os filtros zerados.
+      setDateRange({ from: subDays(new Date(), 6), to: new Date() });
+      setAdditionalDateRange(undefined);
+      setSelectedSellerIds([]);
+      setSelectedUtmMedium(null);
+      setSelectedUtmCampaign(null);
+      setSelectedStageIds([]);
+      setSelectedPipelineId(null);
+
+      // Aplica o pipeline padrão da conta, se configurado.
+      const { data } = await supabase
+        .from("ghl_dashboard_settings")
+        .select("default_pipeline_ids")
+        .eq("workspace_id", activeWorkspace.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const def = (data?.default_pipeline_ids || [])[0];
+      if (def) setSelectedPipelineId(def);
+
+      // Toast só quando a conta realmente muda (não na 1ª montagem).
+      if (prevWorkspaceRef.current && prevWorkspaceRef.current !== activeWorkspace.id) {
+        toast({
+          title: `Agora vendo: ${activeWorkspace.name}`,
+          description: "Filtros redefinidos para o padrão da conta.",
+        });
       }
-
-      if (!restored) {
-        // Reset padrão
-        setDateRange({ from: subDays(new Date(), 6), to: new Date() });
-        setAdditionalDateRange(undefined);
-        setSelectedSellerIds([]);
-        setSelectedUtmMedium(null);
-        setSelectedUtmCampaign(null);
-        setSelectedStageIds([]);
-        setSelectedPipelineId(null);
-
-        // Aplicar pipeline padrão do workspace
-        const { data } = await supabase
-          .from("ghl_dashboard_settings")
-          .select("default_pipeline_ids")
-          .eq("workspace_id", activeWorkspace.id)
-          .maybeSingle();
-        if (cancelled) return;
-        const def = (data?.default_pipeline_ids || [])[0];
-        if (def) setSelectedPipelineId(def);
-      }
-
-      if (!cancelled) setHydrated(true);
+      prevWorkspaceRef.current = activeWorkspace.id;
     })();
 
     return () => { cancelled = true; };
-  }, [activeWorkspace?.id]);
-
-  // Persistir filtros no localStorage por workspace
-  useEffect(() => {
-    if (!hydrated || !activeWorkspace?.id) return;
-    const payload: SavedFilters = {
-      from: dateRange?.from ? dateRange.from.toISOString() : undefined,
-      to: dateRange?.to ? dateRange.to.toISOString() : undefined,
-      addFrom: additionalDateRange?.from ? additionalDateRange.from.toISOString() : undefined,
-      addTo: additionalDateRange?.to ? additionalDateRange.to.toISOString() : undefined,
-      pipelineId: selectedPipelineId,
-      stageIds: selectedStageIds,
-      sellerIds: selectedSellerIds,
-      utmMedium: selectedUtmMedium,
-      utmCampaign: selectedUtmCampaign,
-    };
-    try {
-      localStorage.setItem(filtersStorageKey(activeWorkspace.id), JSON.stringify(payload));
-    } catch {
-      // ignora quota cheia
-    }
-  }, [hydrated, activeWorkspace?.id, dateRange, additionalDateRange, selectedPipelineId, selectedStageIds, selectedSellerIds, selectedUtmMedium, selectedUtmCampaign]);
+  }, [activeWorkspace?.id, activeWorkspace?.name, toast]);
 
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 6)), [dateRange?.from]);
@@ -180,7 +128,9 @@ export default function Dashboard() {
     additionalEndDate: null,
   }), [filters, startDate, periodDays]);
 
-  const { data, isLoading, error, refetch, cachedAt } = useGhlData(filters);
+  const { data, isLoading, isFetching, error, refetch, cachedAt } = useGhlData(filters);
+  // "Aplicando filtro": busca em background com dados já na tela (não o load inicial).
+  const isApplyingFilter = isFetching && !isLoading && !!data;
   const { data: prevData } = useGhlData(prevFilters, { enabled: !!data });
 
   // Mapa nome→cor compartilhado entre os cards de origem (leads e vendas), para
@@ -259,6 +209,18 @@ export default function Dashboard() {
         additionalDateLabel={data.additionalDateFieldName || null}
       />
 
+      {/* Barra de progresso ao aplicar filtros — feedback de que a busca está rodando. */}
+      <div
+        className="relative h-0.5 -mt-2 overflow-hidden rounded-full"
+        role="status"
+        aria-label={isApplyingFilter ? "Aplicando filtros" : undefined}
+        aria-hidden={!isApplyingFilter}
+      >
+        {isApplyingFilter && (
+          <span className="absolute inset-y-0 rounded-full bg-primary animate-progress-indeterminate" />
+        )}
+      </div>
+
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
@@ -301,6 +263,15 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Conteúdo do dashboard — atenua e bloqueia interação enquanto o filtro
+          é aplicado, voltando ao normal quando os novos dados chegam. */}
+      <div
+        className={cn(
+          "space-y-5 sm:space-y-6 transition-opacity duration-200",
+          isApplyingFilter && "opacity-50 pointer-events-none",
+        )}
+        aria-busy={isApplyingFilter}
+      >
       <AnimatedSection className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5">
         <MetricCard title="Total de Oportunidades" value={data.totalLeads} icon={Users} variant="default" tooltip="Quantidade total de oportunidades criadas no período filtrado." trend={leadsTrend} />
         <MetricCard title="Vendas Ganhas" value={currentWon} icon={Target} variant="success" tooltip="Oportunidades que chegaram à etapa de venda ganha no período." trend={wonTrend} />
@@ -388,6 +359,7 @@ export default function Dashboard() {
       <AnimatedSection delay={0.05}>
         <AIUsageCard startDate={startDate} endDate={endDate} />
       </AnimatedSection>
+      </div>
     </div>
   );
 }

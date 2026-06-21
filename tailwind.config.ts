@@ -121,10 +121,18 @@ export default {
             height: "0",
           },
         },
+        // Barra de progresso indeterminada: um segmento desliza da esquerda
+        // para a direita, encolhendo nas pontas — feedback de "aplicando filtro".
+        "progress-indeterminate": {
+          "0%": { left: "-40%", width: "40%" },
+          "50%": { left: "20%", width: "60%" },
+          "100%": { left: "100%", width: "40%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "progress-indeterminate": "progress-indeterminate 1.1s ease-in-out infinite",
       },
     },
   },
