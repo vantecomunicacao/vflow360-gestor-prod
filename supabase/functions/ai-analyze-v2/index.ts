@@ -21,7 +21,7 @@ import { reportEdgeError } from "../_shared/error-reporter.ts";
 // Versao do prompt/guardrails desta function. Gravada em suggestions.prompt_version
 // para rastreabilidade (AI_DECISIONS #2). Bump SEMPRE que o system prompt OU os
 // guardrails pos-LLM (normalizacao, dedup, contradicao) mudarem.
-const PROMPT_VERSION = "suggest-v2-crm-actions-2026-06-07";
+const PROMPT_VERSION = "suggest-v2-crm-actions-2026-06-29";
 
 // ====== Helpers (identicos ao ai-analyze 1.0) ======
 const VALID_SUGGESTION_TYPES = [
@@ -206,7 +206,7 @@ serve(async (req) => {
       }
     }
 
-    // 1c. Filtro de pipeline — pula leads fora dos funis permitidos
+    // 1c. Filtros de oportunidade — pula leads fechados e fora dos funis permitidos
     {
       const { data: dashSettings } = await supabase
         .from("ghl_dashboard_settings")
@@ -214,23 +214,23 @@ serve(async (req) => {
         .eq("workspace_id", workspaceId)
         .maybeSingle();
       const allowedPipelines = (dashSettings?.ai_allowed_pipeline_ids as string[] | null) || [];
-      if (allowedPipelines.length > 0) {
-        const phone = conversation.contact_phone || "";
-        const digits = phone.replace(/\D/g, "");
-        const last10 = digits.slice(-10);
 
-        const clearAndSkip = async (reason: string) => {
-          await supabase.from("ghl_conversations").update({ analyze_after: null, analyze_started_at: null }).eq("id", ghlConvUuid);
-          return new Response(JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason } }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        };
+      const clearAndSkip = async (reason: string) => {
+        await supabase.from("ghl_conversations").update({ analyze_after: null, analyze_started_at: null }).eq("id", ghlConvUuid);
+        return new Response(JSON.stringify({ success: true, data: { suggestions: [], skipped: true, reason } }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      };
 
-        if (!phone) return await clearAndSkip("no_contact_phone_for_pipeline_filter");
+      const phone = conversation.contact_phone || "";
+      const digits = phone.replace(/\D/g, "");
+      const last10 = digits.slice(-10);
 
+      // Busca a oportunidade mais recente do contato (usada para status + pipeline).
+      if (phone) {
         let oppQuery = supabase
           .from("ghl_opportunities")
-          .select("pipeline_id, ghl_updated_at")
+          .select("pipeline_id, status, ghl_updated_at")
           .eq("workspace_id", workspaceId)
           .order("ghl_updated_at", { ascending: false, nullsFirst: false })
           .limit(1);
@@ -238,10 +238,21 @@ serve(async (req) => {
         else oppQuery = oppQuery.eq("contact_phone", phone);
 
         const { data: opp } = await oppQuery.maybeSingle();
-        if (!opp) return await clearAndSkip("no_opportunity_for_contact");
-        if (!opp.pipeline_id || !allowedPipelines.includes(opp.pipeline_id)) {
-          return await clearAndSkip("pipeline_not_allowed");
+
+        if (opp) {
+          // Pula oportunidades fechadas (ganha/perdida/abandonada) — não precisam de análise.
+          const status = String(opp.status || "").toLowerCase();
+          if (status === "won" || status === "lost" || status === "abandoned") {
+            return await clearAndSkip(`opportunity_closed_${status}`);
+          }
+          if (allowedPipelines.length > 0 && (!opp.pipeline_id || !allowedPipelines.includes(opp.pipeline_id))) {
+            return await clearAndSkip("pipeline_not_allowed");
+          }
+        } else if (allowedPipelines.length > 0) {
+          return await clearAndSkip("no_opportunity_for_contact");
         }
+      } else if (allowedPipelines.length > 0) {
+        return await clearAndSkip("no_contact_phone_for_pipeline_filter");
       }
     }
 
@@ -297,35 +308,8 @@ serve(async (req) => {
     const selectedStages = ghlConfig.selectedStages || [];
     const aiPrompt = ghlConfig.aiPrompt || "";
 
-    // 3b. Motivos de perda do GHL (para sugestoes ganho_perdido)
-    let lostReasonsDescription = "";
-    const lostReasonsMap: Record<string, string> = {};
-    if (ghlIntegration?.status === "connected" && ghlConfig.apiKey) {
-      try {
-        const GHL_BASE = "https://services.leadconnectorhq.com";
-        const lostReasonUrl = new URL("/opportunities/lost-reason", GHL_BASE);
-        lostReasonUrl.searchParams.set("locationId", ghlConfig.locationId);
-        const pResp = await fetch(lostReasonUrl.toString(), {
-          headers: { Authorization: `Bearer ${ghlConfig.apiKey}`, "Content-Type": "application/json", Version: "2021-07-28" },
-        });
-        if (pResp.ok) {
-          const pData = await pResp.json();
-          const reasons: { id: string; name: string }[] = [];
-          for (const reason of (pData?.lostReasons || [])) {
-            const rId = reason.id || reason._id;
-            reasons.push({ id: rId, name: reason.name });
-            lostReasonsMap[rId] = reason.name;
-          }
-          if (reasons.length > 0) {
-            lostReasonsDescription = `\n\nMotivos de perda disponíveis no CRM (para sugestões de "perdido", OBRIGATORIAMENTE escolha o motivo mais adequado usando o campo "lost_reason_id"):\n${reasons.map(r => `- ID: "${r.id}" → "${r.name}"`).join("\n")}`;
-          }
-        }
-      } catch (e) {
-        console.warn("Failed to fetch lost reasons:", e);
-      }
-    }
-
-    // 4. AI config (quais acoes estao habilitadas)
+    // 4. AI config (quais acoes estao habilitadas) — carregada ANTES do fetch de
+    // motivos de perda para evitar o round-trip ao GHL quando "perdido" esta off.
     const { data: aiConfigs } = await supabase
       .from("ai_config")
       .select("action_type, enabled, auto_approve")
@@ -345,6 +329,33 @@ serve(async (req) => {
     const ganhoCfg = enabledActions.get("marcar_ganho") || { enabled: true, autoApprove: false };
     const perdidoCfg = enabledActions.get("marcar_perdido") || { enabled: true, autoApprove: false };
     enabledActions.set("ganho_perdido", { enabled: ganhoCfg.enabled || perdidoCfg.enabled, autoApprove: false });
+
+    // 3b. Motivos de perda (para sugestoes ganho_perdido). Lidos da tabela
+    // ghl_loss_reasons, mantida pelo ghl-sync — evita um round-trip HTTP ao GHL
+    // por analise e nao depende de apiKey/locationId em runtime. So consulta
+    // quando "marcar_perdido" esta habilitado (senao lostReasonsDescription
+    // nunca e usado — ver allowLost no actionTypesDescription).
+    let lostReasonsDescription = "";
+    const lostReasonsMap: Record<string, string> = {};
+    if (perdidoCfg.enabled) {
+      try {
+        const { data: lossReasonRows } = await supabase
+          .from("ghl_loss_reasons")
+          .select("ghl_id, name")
+          .eq("workspace_id", workspaceId);
+        const reasons: { id: string; name: string }[] = [];
+        for (const row of (lossReasonRows || [])) {
+          if (!row.ghl_id || !row.name) continue;
+          reasons.push({ id: row.ghl_id, name: row.name });
+          lostReasonsMap[row.ghl_id] = row.name;
+        }
+        if (reasons.length > 0) {
+          lostReasonsDescription = `\n\nMotivos de perda disponíveis no CRM (para sugestões de "perdido", OBRIGATORIAMENTE escolha o motivo mais adequado usando o campo "lost_reason_id"):\n${reasons.map(r => `- ID: "${r.id}" → "${r.name}"`).join("\n")}`;
+        }
+      } catch (e) {
+        console.warn("Failed to load lost reasons from ghl_loss_reasons:", e);
+      }
+    }
 
     const activeActionTypes = [...enabledActions.entries()]
       .filter(([, v]) => v.enabled)
@@ -377,7 +388,19 @@ serve(async (req) => {
 
     let previousContext = "";
     if (previousSuggestions && previousSuggestions.length > 0) {
-      const prevTexts = previousSuggestions.map((s) => {
+      // Envia ao LLM apenas as ~10 mais relevantes (pending/approved primeiro,
+      // depois as mais recentes) para reduzir tokens. A dedup/contradicao
+      // pos-LLM (secoes 9c/9d) continua usando os 30 completos.
+      const PREV_CONTEXT_LIMIT = 10;
+      const statusRank = (st: string) => (st === "pending" ? 0 : st === "approved" ? 1 : 2);
+      const prevForPrompt = [...previousSuggestions]
+        .sort((a, b) => {
+          const r = statusRank(a.status) - statusRank(b.status);
+          if (r !== 0) return r;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        })
+        .slice(0, PREV_CONTEXT_LIMIT);
+      const prevTexts = prevForPrompt.map((s) => {
         const actionData = s.action_data as Record<string, any> || {};
         return `- [${s.status.toUpperCase()}] ${s.type}: "${s.title}" (campo: ${actionData.field || "N/A"}, valor: ${actionData.value || "N/A"})`;
       });
@@ -427,7 +450,7 @@ ${filteredActionTypes.includes("mover_funil") ? "- mover_funil: Sugerir mover o 
 ${filteredActionTypes.includes("campo_personalizado") ? "- campo_personalizado: Sugerir preencher/atualizar um campo personalizado" : ""}
 ${filteredActionTypes.includes("adicionar_nota") ? "- adicionar_nota: Sugerir adicionar uma nota no contato" : ""}
 ${filteredActionTypes.includes("valor_negociacao") ? "- valor_negociacao: Sugerir atualizar o valor monetário da oportunidade/negociação no CRM. Use ESTE tipo SOMENTE quando houver uma QUANTIA CONCRETA na conversa (ex: 'R$ 5.000', '10x de 300', 'fechamos por 2 mil'). Se o lead apenas PEDIU preços, falou de orçamento ou mencionou o ASSUNTO valor sem citar um número, NÃO gere esta sugestão. NUNCA sugira valor 0, vazio ou estimado por você. Quando usar, NÃO use campo_personalizado para valores monetários. O campo 'value' deve conter APENAS o número (ex: '1500' ou '1500.00'), sem 'R$' ou texto. IMPORTANTE: sempre use o VALOR TOTAL/CHEIO da negociação, NUNCA o valor da parcela. Se a conversa mencionar parcelamento (ex: '10x de R$150', '12 vezes de 200', 'entrada de 500 + 6x de 300'), CALCULE e sugira o valor total (ex: 10x150=1500, 12x200=2400, 500+6*300=2300). Se houver desconto à vista mencionado, prefira o valor cheio negociado, não o à vista — a menos que o lead confirme pagamento à vista." : ""}
-${filteredActionTypes.includes("agendar_lembrete") ? `- agendar_lembrete: Criar uma TAREFA no CRM com data de vencimento. Use 'task_title' para o título (ex: 'Retornar ligação', 'Enviar proposta') e 'due_date' no formato ISO 8601 com offset -03:00 (ex: '${new Date(Date.now() + 24*60*60*1000).toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).replace(" ", "T")}-03:00'). A data DEVE estar no fuso UTC-03 (horário de Brasília) e SEMPRE no futuro relativo à data atual informada acima. NUNCA use anos passados. Se a mensagem mencionar uma data/hora específica, use essa (sempre no futuro). Caso contrário, defina para 24 horas a partir de agora. O título deve refletir a ação mencionada na conversa ou 'Entrar em contato' como padrão.` : ""}
+${filteredActionTypes.includes("agendar_lembrete") ? `- agendar_lembrete: Criar uma TAREFA no CRM com data de vencimento. Use 'task_title' para o título (ex: 'Retornar ligação', 'Enviar proposta') e 'due_date' no formato ISO 8601 com offset -03:00 (formato: 'AAAA-MM-DDTHH:MM:SS-03:00'). A data DEVE estar no fuso UTC-03 (horário de Brasília) e SEMPRE no futuro relativo à DATA E HORA ATUAL informada na mensagem do usuário. NUNCA use anos passados. Se a mensagem mencionar uma data/hora específica, use essa (sempre no futuro). Caso contrário, defina para 24 horas a partir da DATA E HORA ATUAL informada. O título deve refletir a ação mencionada na conversa ou 'Entrar em contato' como padrão.` : ""}
 ${filteredActionTypes.includes("ganho_perdido") ? (() => {
   const allowWon = ganhoCfg.enabled;
   const allowLost = perdidoCfg.enabled;
@@ -464,19 +487,17 @@ ${filteredActionTypes.includes("ganho_perdido") ? (() => {
       }
     }
 
-    const nowBrazil = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" });
-    const systemPrompt = `Você é um assistente de CRM inteligente. Analise a conversa de WhatsApp abaixo e gere sugestões de ações para o CRM (Go High Level).
-
-DATA E HORA ATUAL (referência obrigatória, fuso UTC-03 / America/Sao_Paulo): ${nowBrazil}
-Qualquer data sugerida (como vencimento de tarefa) DEVE ser igual ou posterior a esta data. NUNCA use anos no passado.
+    // System prompt ESTATICO por workspace (papel + config de campos/etapas/acoes +
+    // regras). Mantido sem nada volatil (data/hora, contato, sugestoes anteriores,
+    // conversa) para que a OpenAI cacheie automaticamente o maior prefixo comum
+    // (>=1024 tokens, ~50% de desconto no input). Tudo que muda por chamada vai na
+    // mensagem do usuario abaixo.
+    const systemPrompt = `Você é um assistente de CRM inteligente. Analise a conversa de WhatsApp enviada pelo usuário e gere sugestões de ações para o CRM (Go High Level).
 
 ${aiPrompt}
 ${fieldsDescription}
 ${stagesDescription}
 ${actionTypesDescription}
-${previousContext}
-
-Contato: ${conversation.contact_name || "Desconhecido"} (${conversation.contact_phone || ""})
 
 REGRAS OBRIGATÓRIAS:
 - Gere APENAS sugestões baseadas em evidências claras na conversa
@@ -489,9 +510,24 @@ REGRAS OBRIGATÓRIAS:
 - No campo "field" da sugestão, use a CHAVE do campo (fieldKey), não o nome amigável.
 - No campo "value", use o valor exato (nome da etapa para funil, opção para dropdowns, texto para campos livres).
 - Para "valor_negociacao": use SOMENTE quando houver uma QUANTIA CONCRETA citada na conversa. Se o lead apenas pediu preços ou falou de orçamento sem número, NÃO sugira. NUNCA invente, estime ou sugira valor 0/vazio. NÃO coloque valores monetários em campos personalizados. O "value" deve ser APENAS o número (ex: "1500", "2300.50"), sem "R$", sem texto. SEMPRE use o VALOR TOTAL/CHEIO da negociação — se houver parcelamento (ex: "10x de R$150"), multiplique para obter o total (1500). NUNCA sugira o valor da parcela isolada.
+- Qualquer data sugerida (como vencimento de tarefa) DEVE ser igual ou posterior à DATA E HORA ATUAL informada na mensagem do usuário. NUNCA use anos no passado.
 - NUNCA gere sugestões contraditórias no mesmo lote (ex: ganho E perdido ao mesmo tempo)
 - Analise a conversa INTEIRA para entender a conclusão final do lead antes de sugerir ganho/perdido
 - Retorne as sugestões usando a tool fornecida`;
+
+    // Mensagem do usuario VOLATIL (muda a cada chamada): data/hora, contato,
+    // sugestoes anteriores e a conversa. Fica DEPOIS do prefixo cacheavel.
+    const nowBrazil = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" });
+    const exampleFutureDate = `${new Date(Date.now() + 24*60*60*1000).toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).replace(" ", "T")}-03:00`;
+    const userMessage = `DATA E HORA ATUAL (referência obrigatória, fuso UTC-03 / America/Sao_Paulo): ${nowBrazil}
+Exemplo de due_date no futuro (para agendar_lembrete, caso não haja data específica na conversa): ${exampleFutureDate}
+
+Contato: ${conversation.contact_name || "Desconhecido"} (${conversation.contact_phone || ""})
+${previousContext}
+
+Analise esta conversa e gere sugestões de ações para o CRM:
+
+${conversationText}`;
 
     // 7b. Provider config do owner
     const { data: providerConfig } = await supabase
@@ -510,9 +546,14 @@ REGRAS OBRIGATÓRIAS:
     // 8. Chamada de IA (tool calling)
     const aiRequestBody: any = {
       model: resolved.model,
+      // Teto de saida: o array de sugestoes (tool call) cabe folgado em 1500.
+      // Evita geracoes longas acidentais (output e o token mais caro). Se a IA
+      // bater nesse teto, o JSON do tool call vem truncado — tratado abaixo via
+      // finish_reason "length".
+      max_completion_tokens: 1500,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Analise esta conversa e gere sugestões de ações para o CRM:\n\n${conversationText}` },
+        { role: "user", content: userMessage },
       ],
       tools: [
         {
@@ -605,12 +646,19 @@ REGRAS OBRIGATÓRIAS:
 
     // Parse tool call
     let suggestions: any[] = [];
+    const finishReason = aiData.choices?.[0]?.finish_reason;
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
       try {
         suggestions = (JSON.parse(toolCall.function.arguments).suggestions) || [];
       } catch (e) {
-        console.error("Failed to parse AI suggestions:", e);
+        // finish_reason "length" => saida truncada no teto de max_completion_tokens.
+        // JSON incompleto cai aqui; logamos o motivo para diagnostico (subir o teto).
+        if (finishReason === "length") {
+          console.error(`AI output truncated (finish_reason=length, max_completion_tokens). Conversa ${ghlConversationId}. Considere aumentar o teto.`);
+        } else {
+          console.error("Failed to parse AI suggestions:", e);
+        }
       }
     }
 
