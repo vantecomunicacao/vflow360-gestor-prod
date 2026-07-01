@@ -615,16 +615,15 @@ serve(async (req) => {
     // ===== Origem (UTM Source + Campaign) — leads e vendas =====
     // Combina source + campaign por opportunity. Percentages relativos ao TOTAL
     // (não só os preenchidos), para que o pie represente 100% das opps do período.
-    // Opps sem UTM Source viram fatia "Não identificado". Desempate por contagem
-    // desc, depois alfabético.
+    // Quando o UTM Source está vazio, usa a fonte nativa do lead (getOrigin:
+    // origin_field_name OU source nativo) como fallback — só vira "Não
+    // identificado" quando nem UTM nem fonte nativa existem. Desempate por
+    // contagem desc, depois alfabético.
     const buildSourceCampaignDistribution = (oppsList: any[]) => {
-      if (!utmSourceFieldId) {
-        return { distribution: [] as Array<{ name: string; count: number; percentage: number }>, fillRate: 0 };
-      }
       const counts = new Map<string, number>();
       let filled = 0;
       for (const o of oppsList) {
-        const source = getUtm(o, utmSourceFieldId);
+        const source = (utmSourceFieldId ? getUtm(o, utmSourceFieldId) : null) || getOrigin(o);
         if (!source) continue;
         const campaign = utmCampaignFieldId ? getUtm(o, utmCampaignFieldId) : null;
         const key = campaign ? `${source} · ${campaign}` : source;
