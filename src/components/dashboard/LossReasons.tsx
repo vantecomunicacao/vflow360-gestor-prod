@@ -68,7 +68,11 @@ export function LossReasons({ lossReasons, totalLost }: LossReasonsProps) {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4">
-          <div className="w-full h-56" role="img" aria-label={chartDescription}>
+          <div className="relative w-full h-56" role="img" aria-label={chartDescription}>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-bold tabular-nums text-foreground leading-none">{totalLost}</span>
+              <span className="text-xs text-muted-foreground mt-0.5">perdas</span>
+            </div>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
