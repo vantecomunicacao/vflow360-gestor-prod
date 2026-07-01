@@ -621,6 +621,10 @@ ${conversationText}`;
       const promptTokens = Number(usage.prompt_tokens || 0);
       const completionTokens = Number(usage.completion_tokens || 0);
       const totalTokens = Number(usage.total_tokens || promptTokens + completionTokens);
+      // Tokens do prompt servidos pelo cache da OpenAI (prompt caching). Vem em
+      // usage.prompt_tokens_details.cached_tokens e JA estao inclusos em
+      // prompt_tokens — sao cobrados com ~50% de desconto no input.
+      const cachedTokens = Number(usage.prompt_tokens_details?.cached_tokens || 0);
       const PRICING: Record<string, { in: number; out: number }> = {
         "gpt-4o": { in: 2.5, out: 10 },
         "gpt-4o-mini": { in: 0.15, out: 0.6 },
@@ -628,7 +632,15 @@ ${conversationText}`;
         "gpt-3.5-turbo": { in: 0.5, out: 1.5 },
       };
       const pr = PRICING[resolved.model] || { in: 0, out: 0 };
-      const costUsd = (promptTokens * pr.in + completionTokens * pr.out) / 1_000_000;
+      // Custo real: tokens cacheados a 50% do preco de input; o restante cheio.
+      const uncachedPromptTokens = Math.max(0, promptTokens - cachedTokens);
+      const costUsd = (
+        uncachedPromptTokens * pr.in +
+        cachedTokens * pr.in * 0.5 +
+        completionTokens * pr.out
+      ) / 1_000_000;
+      const cacheHitPct = promptTokens > 0 ? Math.round((cachedTokens / promptTokens) * 100) : 0;
+      console.log(`[v2] usage: prompt=${promptTokens} (cache=${cachedTokens}/${cacheHitPct}%) completion=${completionTokens} cost=$${costUsd.toFixed(6)}`);
       await supabase.from("ai_usage_log").insert({
         workspace_id: workspaceId,
         user_id: resolvedUserId,
