@@ -650,6 +650,7 @@ ${conversationText}`;
         prompt_tokens: promptTokens,
         completion_tokens: completionTokens,
         total_tokens: totalTokens,
+        cached_tokens: cachedTokens,
         cost_usd: Number(costUsd.toFixed(6)),
       });
     } catch (e) {
