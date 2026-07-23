@@ -263,11 +263,21 @@ serve(async (req) => {
     // === 5. Opportunities (paginação) ===
     let totalOpps = 0;
     const pageLimit = 100;
-    const maxPages = 50; // safety: 5000 opportunities
+    // Cap de segurança contra runaway/timeout. 200 páginas = 20.000 opportunities:
+    // folga sobre o maior workspace atual (Tanques União ~5,4k). Importa para a
+    // reconciliação (5b): se truncar aqui, a sync fica INCOMPLETA e o soft-delete
+    // é pulado — logo o cap precisa cobrir o volume real, senão fantasmas nunca
+    // são limpos naquela conta.
+    const maxPages = 200;
     let nextPageUrl: string | null = null;
     let page = 0;
     // Fallback: coleta nomes de motivos de perda direto das oportunidades
     const lostReasonsFromOpps = new Map<string, string>();
+
+    // Marco para a reconciliação de exclusões: toda linha sincronizada abaixo
+    // grava updated_at = agora (> este marco). Quem ficar com updated_at < marco
+    // após uma rodada COMPLETA não veio do GHL → soft-delete.
+    const oppReconcileWatermark = new Date().toISOString();
 
     do {
       page++;
@@ -301,6 +311,7 @@ serve(async (req) => {
             ghl_updated_at: o.updatedAt || null,
             last_status_change_at: o.lastStatusChangeAt || o.lastStageChangeAt || null,
             updated_at: new Date().toISOString(),
+            deleted_at: null, // reaparecer no GHL revive um registro antes soft-deletado
           };
         });
         const { error } = await supabase.from("ghl_opportunities")
@@ -310,6 +321,28 @@ serve(async (req) => {
       }
       nextPageUrl = resp?.meta?.nextPageUrl || null;
     } while (nextPageUrl && page < maxPages);
+
+    // === 5b. Reconciliação de exclusões (soft-delete) ===
+    // Só roda quando a paginação terminou por conta própria (nextPageUrl null),
+    // NUNCA quando truncou no cap de páginas — senão apagaríamos oportunidades
+    // válidas que ficaram de fora. Também exige ter lido ao menos 1 página com
+    // dados, para não zerar tudo diante de uma resposta vazia anômala.
+    const oppSyncCompleted = !nextPageUrl;
+    if (oppSyncCompleted && totalOpps > 0) {
+      const { data: staleRows, error: reconErr } = await supabase
+        .from("ghl_opportunities")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .lt("updated_at", oppReconcileWatermark)
+        .select("ghl_id");
+      if (reconErr) console.warn("reconcile soft-delete falhou:", reconErr.message);
+      else console.log(`opportunities soft-deleted (sumiram do GHL): ${staleRows?.length ?? 0}`);
+    } else {
+      console.log(
+        `reconcile pulado (sync ${oppSyncCompleted ? "completo mas 0 opps" : "truncou no cap de páginas"}) — fantasmas preservados`,
+      );
+    }
 
     // === 6. Persiste motivos de perda capturados das oportunidades (fallback) ===
     if (lostReasonsFromOpps.size > 0) {

@@ -152,6 +152,7 @@ export async function computePeriodMetrics(
       .from("ghl_opportunities")
       .select("pipeline_id,stage_id,status,monetary_value,assigned_to,ghl_created_at,last_status_change_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null) // ignora fantasmas (excluídos no GHL, soft-deletados)
       .range(from, from + PAGE - 1);
     if (error) throw error;
     const rows = (data || []) as Array<any>;

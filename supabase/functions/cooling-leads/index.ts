@@ -84,15 +84,26 @@ serve(async (req) => {
     for (const u of (usersRows || []) as any[]) sellerNameById.set(u.ghl_id, u.name);
 
     // Oportunidades (sem filtro de data; aplica pipeline e escopo de vendedor).
-    let q = supabase
-      .from("ghl_opportunities")
-      .select("ghl_id,name,stage_id,status,assigned_to,ghl_created_at,last_status_change_at,contact_phone")
-      .eq("workspace_id", workspaceId)
-      .limit(10000);
-    if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
-    if (forcedSellerId) q = q.eq("assigned_to", forcedSellerId);
-    const { data: openRows, error: oppErr } = await q;
-    if (oppErr) throw oppErr;
+    // Pagina em blocos de 1000: o PostgREST corta cada request em max_rows=1000,
+    // então um único .limit(10000) subcontava funis com +1000 opportunities.
+    const OPP_PAGE = 1000;
+    const openRows: any[] = [];
+    for (let from = 0; ; from += OPP_PAGE) {
+      let q = supabase
+        .from("ghl_opportunities")
+        .select("ghl_id,name,stage_id,status,assigned_to,ghl_created_at,last_status_change_at,contact_phone")
+        .eq("workspace_id", workspaceId)
+        .is("deleted_at", null) // ignora fantasmas (excluídos no GHL, soft-deletados)
+        .range(from, from + OPP_PAGE - 1);
+      if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
+      if (forcedSellerId) q = q.eq("assigned_to", forcedSellerId);
+      const { data: pageRows, error: oppErr } = await q;
+      if (oppErr) throw oppErr;
+      const rows = (pageRows || []) as any[];
+      openRows.push(...rows);
+      if (rows.length < OPP_PAGE) break;
+      if (from > 200_000) break; // safety anti-runaway
+    }
 
     const nowMs = Date.now();
     const isOpen = (o: any) => {
