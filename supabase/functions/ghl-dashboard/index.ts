@@ -477,8 +477,12 @@ serve(async (req) => {
     }
 
     const totalLeads = opps.length;
+    // O GHL marca perda com dois status: "lost" e "abandoned". Tratar só "lost"
+    // fazia as abandonadas contarem como leads vivos no funil.
+    const LOST_STATUSES = new Set(["lost", "abandoned"]);
+    const isLost = (o: { status?: string | null }) => LOST_STATUSES.has((o.status || "").toLowerCase());
     const wonOpps = opps.filter(o => wonStageIds.has(o.stage_id) || (o.status || "").toLowerCase() === "won");
-    const lostOpps = opps.filter(o => (o.status || "").toLowerCase() === "lost");
+    const lostOpps = opps.filter(isLost);
     const lostLeads = lostOpps.length;
 
     const stageBucket = (stageId: string | null): keyof FunnelMapping | null => {
@@ -496,7 +500,7 @@ serve(async (req) => {
       contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [],
     };
     for (const o of opps) {
-      if ((o.status || "").toLowerCase() === "lost") continue; // perdidos saem do funil
+      if (isLost(o)) continue; // perdidos saem do funil
       const b = stageBucket(o.stage_id);
       if (b) {
         counts[b]++;
@@ -556,7 +560,7 @@ serve(async (req) => {
       }
       s.total++;
       const b = stageBucket(o.stage_id);
-      if ((o.status || "").toLowerCase() === "lost") {
+      if (isLost(o)) {
         // perdidos saem do funil (mesma regra do funil geral), mas continuam no total
         s.perdidas++;
       } else if (b === "contato_inicial") s.atualContatoInicial++;
@@ -833,7 +837,7 @@ serve(async (req) => {
     const totalMonetary = opps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
     const wonMonetary = wonOpps.reduce((a, o) => a + (Number(o.monetary_value) || 0), 0);
     const negotiatingMonetary = opps.reduce((a, o) => {
-      if ((o.status || "").toLowerCase() === "lost") return a;
+      if (isLost(o)) return a;
       const b = stageBucket(o.stage_id);
       return (b === "proposta_enviada" || b === "fechamento") ? a + (Number(o.monetary_value) || 0) : a;
     }, 0);
@@ -871,7 +875,7 @@ serve(async (req) => {
     for (const o of oppsForResponse) {
       const np = normalizePhone(o.contact_phone);
       const st = (o.status || "").toLowerCase();
-      const closed = st === "lost" || st === "won" || (o.stage_id && wonStageIds.has(o.stage_id));
+      const closed = isLost(o) || st === "won" || (o.stage_id && wonStageIds.has(o.stage_id));
       if (closed) continue;
       if (np) phoneSet.add(np);
       if (o.assigned_to) allowedSellerIds.add(o.assigned_to);
@@ -888,7 +892,7 @@ serve(async (req) => {
         const np = normalizePhone(o.contact_phone);
         if (!np) continue;
         const st = (o.status || "").toLowerCase();
-        const closed = st === "lost" || st === "won" || (o.stage_id && wonStageIds.has(o.stage_id));
+        const closed = isLost(o) || st === "won" || (o.stage_id && wonStageIds.has(o.stage_id));
         if (closed) allClosedPhones.add(np);
         else allOpenPhones.add(np);
       }
@@ -1137,7 +1141,7 @@ serve(async (req) => {
       const DAY = 86400000;
       const isOpen = (o: any) => {
         const st = (o.status || "").toLowerCase();
-        if (st === "lost" || st === "won") return false;
+        if (isLost(o) || st === "won") return false;
         if (o.stage_id && wonStageIds.has(o.stage_id)) return false;
         return true;
       };
