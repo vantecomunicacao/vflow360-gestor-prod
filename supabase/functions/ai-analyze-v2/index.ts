@@ -21,7 +21,7 @@ import { reportEdgeError } from "../_shared/error-reporter.ts";
 // Versao do prompt/guardrails desta function. Gravada em suggestions.prompt_version
 // para rastreabilidade (AI_DECISIONS #2). Bump SEMPRE que o system prompt OU os
 // guardrails pos-LLM (normalizacao, dedup, contradicao) mudarem.
-const PROMPT_VERSION = "suggest-v2-crm-actions-2026-06-29";
+const PROMPT_VERSION = "suggest-v2-crm-actions-2026-07-13";
 
 // ====== Helpers (identicos ao ai-analyze 1.0) ======
 const VALID_SUGGESTION_TYPES = [
@@ -232,6 +232,7 @@ serve(async (req) => {
           .from("ghl_opportunities")
           .select("pipeline_id, status, ghl_updated_at")
           .eq("workspace_id", workspaceId)
+          .is("deleted_at", null) // ignora fantasmas (excluídos no GHL, soft-deletados)
           .order("ghl_updated_at", { ascending: false, nullsFirst: false })
           .limit(1);
         if (last10) oppQuery = oppQuery.or(`contact_phone.eq.${phone},contact_phone.ilike.%${last10}`);
@@ -439,7 +440,11 @@ REGRAS SOBRE SUGESTÕES ANTERIORES:
       : "";
 
     const stageNames = selectedStages.map((s: any) => s.name);
-    const stagesDescription = selectedStages.length > 0
+    // Quando mover_funil esta desabilitado, NADA sobre etapas/funil entra no prompt
+    // nem no tool schema: listar as etapas (e a regra de "use um destes nomes")
+    // induzia o modelo a gerar mover_funil mesmo com o tipo fora do enum de tipos.
+    const moveEnabled = filteredActionTypes.includes("mover_funil");
+    const stagesDescription = moveEnabled && selectedStages.length > 0
       ? `\n\nEtapas do funil disponíveis (APENAS estas podem ser sugeridas):\n${selectedStages
           .map((s: any) => `- "${s.name}" — stage_id: ${s.id} (funil: "${s.pipelineName}")${s.description ? `: ${s.description}` : ""}`)
           .join("\n")}\n\nATENÇÃO: Cada etapa pertence a um pipeline específico. Para mover_funil, retorne o campo "stage_id" com o ID EXATO da etapa destino (isso desambigua etapas de mesmo nome em funis diferentes) e use o nome da etapa no campo "value". Pipelines de "vendas" são para conversas comerciais; de "organização interna", para conversas internas.`
@@ -503,8 +508,8 @@ REGRAS OBRIGATÓRIAS:
 - Gere APENAS sugestões baseadas em evidências claras na conversa
 - Cada sugestão deve ter um trecho da conversa que justifica a ação
 - Não invente informações que não estão na conversa
-- Seja conservador: na dúvida, não sugira
-- Para "mover_funil": use EXATAMENTE um dos nomes de etapa listados acima. NUNCA invente nomes de etapas.
+- Seja conservador: na dúvida, não sugira${moveEnabled ? `
+- Para "mover_funil": use EXATAMENTE um dos nomes de etapa listados acima. NUNCA invente nomes de etapas.` : ""}
 - Para "campo_personalizado": use APENAS campos listados acima (pela fieldKey). NUNCA sugira campos que não estão na lista.
 - Se o campo tem OPÇÕES VÁLIDAS listadas, use APENAS um valor dessa lista. NUNCA invente opções.
 - No campo "field" da sugestão, use a CHAVE do campo (fieldKey), não o nome amigável.
@@ -572,13 +577,20 @@ ${conversationText}`;
                       type: { type: "string", enum: filteredActionTypes, description: "Tipo da ação sugerida" },
                       title: { type: "string", description: "Título curto da sugestão (ex: 'Mover para Qualificado')" },
                       description: { type: "string", description: "Justificativa detalhada com trecho da conversa" },
-                      field: { type: "string", description: "Para mover_funil: nome EXATO da etapa destino. Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null." },
-                      stage_id: { type: "string", description: "Apenas para mover_funil: o stage_id EXATO da etapa destino (das listadas). Use para desambiguar etapas de mesmo nome em funis diferentes.", ...(stageIds.length > 0 ? { enum: stageIds } : {}) },
+                      field: {
+                        type: "string",
+                        description: moveEnabled
+                          ? "Para mover_funil: nome EXATO da etapa destino. Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null."
+                          : "Para campo_personalizado: a chave do campo (fieldKey). Para outros: campo relevante ou null.",
+                      },
+                      ...(moveEnabled ? {
+                        stage_id: { type: "string", description: "Apenas para mover_funil: o stage_id EXATO da etapa destino (das listadas). Use para desambiguar etapas de mesmo nome em funis diferentes.", ...(stageIds.length > 0 ? { enum: stageIds } : {}) },
+                      } : {}),
                       value: {
                         type: "string",
-                        description: stageNames.length > 0
+                        description: moveEnabled && stageNames.length > 0
                           ? `Para mover_funil: DEVE ser um destes valores exatos: ${stageNames.map((n: string) => `"${n}"`).join(", ")}. Para campo_personalizado com opções: use apenas valores da lista de opções válidas. Para outros: valor livre.`
-                          : "Valor sugerido para o campo ou nome da etapa destino",
+                          : "Valor sugerido para o campo (para campo_personalizado com opções: use apenas valores da lista de opções válidas)",
                       },
                       task_title: { type: "string", description: "Apenas para agendar_lembrete: título da tarefa. Padrão: 'Entrar em contato'." },
                       due_date: { type: "string", description: "Apenas para agendar_lembrete: data/hora de vencimento em ISO 8601 com offset -03:00. DEVE ser sempre no futuro. Se não mencionada, omitir." },
@@ -786,9 +798,16 @@ ${conversationText}`;
       if (s.type === "ganho_perdido") {
         const isWon = (s.value || "").toLowerCase().includes("ganh");
         effectiveCfg = isWon ? ganhoCfg : perdidoCfg;
-        if (!effectiveCfg.enabled) continue;
       }
-      const autoApprove = effectiveCfg?.autoApprove || false;
+      // Gate final: o enum de tipos no tool schema NAO e enforced pela OpenAI (nao
+      // usamos strict mode), entao o modelo as vezes devolve um tipo desabilitado
+      // mesmo sem ele no prompt. Esta e a unica garantia real de que uma acao
+      // desligada em ai_config nunca vira sugestao (nem, com auto_approve, execucao).
+      if (!effectiveCfg?.enabled) {
+        console.log(`Filtered ${s.type}: acao desabilitada em ai_config`);
+        continue;
+      }
+      const autoApprove = effectiveCfg.autoApprove || false;
       const { data: inserted, error: insertErr } = await supabase
         .from("suggestions")
         .insert({

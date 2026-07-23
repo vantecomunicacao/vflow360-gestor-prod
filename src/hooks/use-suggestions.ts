@@ -9,12 +9,18 @@ export function useSuggestions() {
     queryKey: ["suggestions", activeWorkspace?.id],
     queryFn: async () => {
       if (!activeWorkspace) return [];
+      // Janela de 30 dias no servidor (em vez de um limite fixo de linhas). Com
+      // um limite de 100, workspaces de alto volume (ex.: Tanques União, ~16
+      // sugestões/dia) só enxergavam ~1 semana — a UI prometia "30 dias" mas
+      // truncava. O `limit` alto abaixo é apenas uma trava de segurança.
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("suggestions")
         .select("*, ghl_conversations:ghl_conversation_id(channel_type)")
         .eq("workspace_id", activeWorkspace.id)
+        .gte("created_at", thirtyDaysAgo)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(5000);
       if (error) throw error;
       return data || [];
     },
