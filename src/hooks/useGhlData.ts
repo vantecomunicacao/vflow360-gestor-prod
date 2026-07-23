@@ -8,10 +8,22 @@ export interface FunnelStage { id: string; name: string; count: number; currentC
 export interface Seller {
   id?: string;
   name: string;
+  /** Funil de passagem: leads na etapa + os que já avançaram (mesma regra do funil geral) */
   contatoInicial: number;
   propostaEnviada: number;
   fechamento: number;
   vendaGanha: number;
+  /** Leads parados na etapa neste momento */
+  atualContatoInicial?: number;
+  atualPropostaEnviada?: number;
+  atualFechamento?: number;
+  atualVendaGanha?: number;
+  /** Oportunidades com status "lost" — fora do funil, dentro do total */
+  perdidas?: number;
+  /** Não perdidas, mas em etapa não mapeada no funil */
+  foraDoFunil?: number;
+  /** Total de oportunidades atribuídas no período (bate com o card Total de Oportunidades) */
+  total?: number;
   avgResponseMinutes?: number | null;
   responseCount?: number;
 }

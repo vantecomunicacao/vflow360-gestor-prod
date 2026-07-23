@@ -26,6 +26,31 @@ function formatResponseTime(minutes: number | null | undefined): string {
   return `${days.toFixed(1)} dias`;
 }
 
+// Classes completas (Tailwind não resolve nomes montados em runtime)
+const STAGE_TONE = {
+  "funnel-1": "bg-funnel-1/10 text-funnel-1-ink",
+  "funnel-2": "bg-funnel-2/10 text-funnel-2-ink",
+  "funnel-3": "bg-funnel-3/10 text-funnel-3-ink",
+  "funnel-4": "bg-funnel-4/10 text-funnel-4-ink",
+} as const;
+
+/** Número do funil de passagem, com a contagem "atual" logo abaixo (igual à Visão Geral). */
+function StageCell({ tone, passage, current }: { tone: keyof typeof STAGE_TONE; passage: number; current?: number }) {
+  return (
+    <td className="text-center">
+      <span
+        className={cn("inline-flex items-center justify-center min-w-10 h-7 px-2 rounded-lg font-bold text-sm", STAGE_TONE[tone])}
+        title="Passaram por esta etapa (nela ou já avançaram)"
+      >
+        {passage}
+      </span>
+      {current != null && (
+        <span className="block text-[10px] text-muted-foreground">atual: {current}</span>
+      )}
+    </td>
+  );
+}
+
 export function SellerPerformance({ sellers, selectedSellerIds = [], onSellerToggle, onClearSellers }: SellerPerformanceProps) {
   const [query, setQuery] = useState("");
   const sortedSellers = useMemo(
@@ -70,8 +95,8 @@ export function SellerPerformance({ sellers, selectedSellerIds = [], onSellerTog
           Performance por Vendedor
           <SectionTooltip text={
             interactive
-              ? "Comparativo entre vendedores: oportunidades atribuídas por etapa, taxa de conversão e tempo médio de resposta individual. Clique em uma linha para filtrar o dashboard inteiro por esse vendedor."
-              : "Comparativo entre vendedores: oportunidades atribuídas por etapa, taxa de conversão e tempo médio de resposta individual."
+              ? "Comparativo entre vendedores usando o funil de passagem: cada etapa mostra quantos passaram por ela (na etapa ou já avançaram), com a contagem atual abaixo. Total = Contato Inicial + Perdidas. Clique em uma linha para filtrar o dashboard inteiro por esse vendedor."
+              : "Comparativo entre vendedores usando o funil de passagem: cada etapa mostra quantos passaram por ela (na etapa ou já avançaram), com a contagem atual abaixo. Total = Contato Inicial + Perdidas."
           } />
         </h2>
         <div className="flex items-center gap-3 ml-auto">
@@ -105,10 +130,12 @@ export function SellerPerformance({ sellers, selectedSellerIds = [], onSellerTog
             <tr>
               <th>#</th>
               <th>Vendedor</th>
+              <th className="text-center">Total</th>
               <th className="text-center">Contato Inicial</th>
               <th className="text-center">Proposta Enviada</th>
               <th className="text-center">Fechamento</th>
               <th className="text-center">Venda Ganha</th>
+              <th className="text-center">Perdidas</th>
               <th className="text-center">Taxa Conversão</th>
               <th className="text-center">Tempo Médio Resposta</th>
             </tr>
@@ -145,16 +172,22 @@ export function SellerPerformance({ sellers, selectedSellerIds = [], onSellerTog
                   </td>
                   <td className="font-semibold">{s.name}</td>
                   <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-1/10 text-funnel-1-ink rounded-lg font-bold text-sm">{s.contatoInicial}</span>
+                    <span className="font-bold text-sm tabular-nums text-foreground">{s.total ?? s.contatoInicial + (s.perdidas ?? 0)}</span>
+                    {s.foraDoFunil ? (
+                      <span
+                        className="block text-[10px] text-muted-foreground"
+                        title="Oportunidades não perdidas em etapas fora do mapeamento do funil"
+                      >
+                        {s.foraDoFunil} fora do funil
+                      </span>
+                    ) : null}
                   </td>
+                  <StageCell tone="funnel-1" passage={s.contatoInicial} current={s.atualContatoInicial} />
+                  <StageCell tone="funnel-2" passage={s.propostaEnviada} current={s.atualPropostaEnviada} />
+                  <StageCell tone="funnel-3" passage={s.fechamento} current={s.atualFechamento} />
+                  <StageCell tone="funnel-4" passage={s.vendaGanha} current={s.atualVendaGanha} />
                   <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-2/10 text-funnel-2-ink rounded-lg font-bold text-sm">{s.propostaEnviada}</span>
-                  </td>
-                  <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-3/10 text-funnel-3-ink rounded-lg font-bold text-sm">{s.fechamento}</span>
-                  </td>
-                  <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-funnel-4/10 text-funnel-4-ink rounded-lg font-bold text-sm">{s.vendaGanha}</span>
+                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-destructive/10 text-destructive rounded-lg font-bold text-sm">{s.perdidas ?? 0}</span>
                   </td>
                   <td className="text-center"><span className="font-bold text-primary-ink">{rate}%</span></td>
                   <td className="text-center">
@@ -168,7 +201,7 @@ export function SellerPerformance({ sellers, selectedSellerIds = [], onSellerTog
             })}
             {visibleSellers.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-center text-muted-foreground py-8 text-sm">
+                <td colSpan={10} className="text-center text-muted-foreground py-8 text-sm">
                   Nenhum vendedor encontrado para "{query}".
                 </td>
               </tr>

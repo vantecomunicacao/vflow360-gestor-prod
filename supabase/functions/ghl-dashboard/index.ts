@@ -344,7 +344,7 @@ serve(async (req) => {
         .from("ghl_opportunities")
         .select(SELECT_COLS)
         .eq("workspace_id", workspaceId)
-        .limit(10000);
+        .is("deleted_at", null); // ignora fantasmas (excluídos no GHL, soft-deletados)
       if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
       if (filterStageIds.length === 1) q = q.eq("stage_id", filterStageIds[0]);
       else if (filterStageIds.length > 1) q = q.in("stage_id", filterStageIds);
@@ -353,25 +353,42 @@ serve(async (req) => {
       return q;
     };
 
-    let qA = baseQuery();
-    if (startDate) qA = qA.gte("ghl_created_at", startDate);
-    if (endDate) qA = qA.lte("ghl_created_at", endDate);
+    // Pagina em blocos de 1000 (o PostgREST corta cada request em max_rows=1000,
+    // ignorando .limit maior). Sem isso, contas com +1000 opps num funil eram
+    // subcontadas. `build` deve devolver uma query NOVA a cada página.
+    const PAGE = 1000;
+    const fetchAllRows = async (build: () => any): Promise<any[]> => {
+      const out: any[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await build().range(from, from + PAGE - 1);
+        if (error) throw error;
+        const rows = (data || []) as any[];
+        out.push(...rows);
+        if (rows.length < PAGE) break;
+        if (from > 200_000) break; // safety anti-runaway
+      }
+      return out;
+    };
+
+    const buildA = () => {
+      let q = baseQuery();
+      if (startDate) q = q.gte("ghl_created_at", startDate);
+      if (endDate) q = q.lte("ghl_created_at", endDate);
+      return q;
+    };
 
     // Query B: sem filtro de ghl_created_at no intervalo principal, mas com
     // .lte("ghl_created_at", additionalEndDate) como otimização — um lead não
     // pode ser fechado antes de ser criado.
-    const qB = useAdditionalUnion
-      ? baseQuery().lte("ghl_created_at", additionalEndDate!)
+    const buildB = useAdditionalUnion
+      ? () => baseQuery().lte("ghl_created_at", additionalEndDate!)
       : null;
 
-    const [resA, resB] = await Promise.all([
-      qA,
-      qB ? qB : Promise.resolve({ data: [] as any[], error: null }),
+    const [oppsA, oppsB0] = await Promise.all([
+      fetchAllRows(buildA),
+      buildB ? fetchAllRows(buildB) : Promise.resolve([] as any[]),
     ]);
-    if ((resA as any).error) throw (resA as any).error;
-    if ((resB as any).error) throw (resB as any).error;
-    const oppsA = (((resA as any).data) || []) as any[];
-    let oppsB = (((resB as any).data) || []) as any[];
+    let oppsB = oppsB0;
 
     // Filtra Query B em memória pelo campo de data customizado.
     if (useAdditionalUnion) {
@@ -512,23 +529,42 @@ serve(async (req) => {
     };
 
     // ===== Sellers =====
-    const sellersMap = new Map<string, { id: string; name: string; contatoInicial: number; propostaEnviada: number; fechamento: number; vendaGanha: number; avgResponseMinutes: number | null; responseCount: number }>();
-    for (const u of usersList) sellersMap.set(u.ghl_id, { id: u.ghl_id, name: u.name, contatoInicial: 0, propostaEnviada: 0, fechamento: 0, vendaGanha: 0, avgResponseMinutes: null, responseCount: 0 });
+    // Contagens "atuais" por vendedor (leads parados em cada etapa). O funil de passagem
+    // é derivado depois, para bater com o funil geral e com o card de Total de Oportunidades.
+    type SellerAgg = {
+      id: string; name: string;
+      atualContatoInicial: number; atualPropostaEnviada: number; atualFechamento: number; atualVendaGanha: number;
+      perdidas: number; foraDoFunil: number; total: number;
+      avgResponseMinutes: number | null; responseCount: number;
+    };
+    const newSeller = (id: string, name: string): SellerAgg => ({
+      id, name,
+      atualContatoInicial: 0, atualPropostaEnviada: 0, atualFechamento: 0, atualVendaGanha: 0,
+      perdidas: 0, foraDoFunil: 0, total: 0,
+      avgResponseMinutes: null, responseCount: 0,
+    });
+    const sellersMap = new Map<string, SellerAgg>();
+    for (const u of usersList) sellersMap.set(u.ghl_id, newSeller(u.ghl_id, u.name));
     // Mapa de phone -> assigned_to (para vincular conversas por telefone ao vendedor)
     const phoneToSeller = new Map<string, string>();
     for (const o of opps) {
-      const b = stageBucket(o.stage_id);
-      if (!b) continue;
       const userKey = o.assigned_to || "__unassigned__";
       let s = sellersMap.get(userKey);
       if (!s) {
-        s = { id: userKey, name: userKey === "__unassigned__" ? "Não atribuído" : `Usuário ${userKey.slice(0, 6)}`, contatoInicial: 0, propostaEnviada: 0, fechamento: 0, vendaGanha: 0, avgResponseMinutes: null, responseCount: 0 };
+        s = newSeller(userKey, userKey === "__unassigned__" ? "Não atribuído" : `Usuário ${userKey.slice(0, 6)}`);
         sellersMap.set(userKey, s);
       }
-      if (b === "contato_inicial") s.contatoInicial++;
-      if (b === "proposta_enviada") s.propostaEnviada++;
-      if (b === "fechamento") s.fechamento++;
-      if (b === "venda_ganha") s.vendaGanha++;
+      s.total++;
+      const b = stageBucket(o.stage_id);
+      if ((o.status || "").toLowerCase() === "lost") {
+        // perdidos saem do funil (mesma regra do funil geral), mas continuam no total
+        s.perdidas++;
+      } else if (b === "contato_inicial") s.atualContatoInicial++;
+      else if (b === "proposta_enviada") s.atualPropostaEnviada++;
+      else if (b === "fechamento") s.atualFechamento++;
+      else if (b === "venda_ganha") s.atualVendaGanha++;
+      else s.foraDoFunil++; // etapa não mapeada no funil: sobra do Total
+      if (!b) continue;
       const np = (o.contact_phone || "").replace(/\D+/g, "");
       if (np && o.assigned_to && !phoneToSeller.has(np)) phoneToSeller.set(np, o.assigned_to);
     }
@@ -1048,7 +1084,27 @@ serve(async (req) => {
       }
     }
 
-    const sellers = Array.from(sellersMap.values()).filter(s => s.contatoInicial + s.propostaEnviada + s.fechamento + s.vendaGanha > 0);
+    // Funil de passagem por vendedor: cada etapa soma quem está nela + quem avançou.
+    // Invariante: total = contatoInicial (passagem) + perdidas + foraDoFunil
+    const sellers = Array.from(sellersMap.values())
+      .filter(s => s.total > 0)
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        contatoInicial: s.atualContatoInicial + s.atualPropostaEnviada + s.atualFechamento + s.atualVendaGanha,
+        propostaEnviada: s.atualPropostaEnviada + s.atualFechamento + s.atualVendaGanha,
+        fechamento: s.atualFechamento + s.atualVendaGanha,
+        vendaGanha: s.atualVendaGanha,
+        atualContatoInicial: s.atualContatoInicial,
+        atualPropostaEnviada: s.atualPropostaEnviada,
+        atualFechamento: s.atualFechamento,
+        atualVendaGanha: s.atualVendaGanha,
+        perdidas: s.perdidas,
+        foraDoFunil: s.foraDoFunil,
+        total: s.total,
+        avgResponseMinutes: s.avgResponseMinutes,
+        responseCount: s.responseCount,
+      }));
 
     const responseTime = {
       averageMinutes: responseCount > 0 ? totalResponseMinutes / responseCount : 0,
