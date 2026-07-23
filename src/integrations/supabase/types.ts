@@ -14,6 +14,79 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_assistant_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          refs: Json
+          role: string
+          thread_id: string
+          tokens: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          refs?: Json
+          role: string
+          thread_id: string
+          tokens?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          refs?: Json
+          role?: string
+          thread_id?: string
+          tokens?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_assistant_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "ai_assistant_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_assistant_threads: {
+        Row: {
+          created_at: string
+          id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_assistant_threads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_config: {
         Row: {
           action_type: string
@@ -48,6 +121,68 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ai_config_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_insights: {
+        Row: {
+          batch_id: string | null
+          body: string
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          kind: string
+          period_end: string | null
+          period_label: string | null
+          period_start: string | null
+          prompt_version: string | null
+          refs: Json
+          severity: string
+          status: string
+          title: string
+          workspace_id: string
+        }
+        Insert: {
+          batch_id?: string | null
+          body: string
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          kind: string
+          period_end?: string | null
+          period_label?: string | null
+          period_start?: string | null
+          prompt_version?: string | null
+          refs?: Json
+          severity?: string
+          status?: string
+          title: string
+          workspace_id: string
+        }
+        Update: {
+          batch_id?: string | null
+          body?: string
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          kind?: string
+          period_end?: string | null
+          period_label?: string | null
+          period_start?: string | null
+          prompt_version?: string | null
+          refs?: Json
+          severity?: string
+          status?: string
+          title?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_insights_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -98,6 +233,7 @@ export type Database = {
       }
       ai_usage_log: {
         Row: {
+          cached_tokens: number
           completion_tokens: number
           conversation_id: string | null
           cost_usd: number
@@ -111,6 +247,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          cached_tokens?: number
           completion_tokens?: number
           conversation_id?: string | null
           cost_usd?: number
@@ -124,6 +261,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          cached_tokens?: number
           completion_tokens?: number
           conversation_id?: string | null
           cost_usd?: number
@@ -138,61 +276,34 @@ export type Database = {
         }
         Relationships: []
       }
-      conversations: {
+      analytics_snapshots: {
         Row: {
-          analyze_after: string | null
-          analyze_started_at: string | null
-          contact_name: string | null
-          contact_phone: string | null
           created_at: string
-          ghl_user_id: string | null
+          granularity: string
           id: string
-          integration_label: string | null
-          integration_type: string | null
-          last_message: string | null
-          last_message_at: string | null
-          unread_count: number
-          updated_at: string
-          user_id: string
-          workspace_id: string | null
+          metrics: Json
+          period_date: string
+          workspace_id: string
         }
         Insert: {
-          analyze_after?: string | null
-          analyze_started_at?: string | null
-          contact_name?: string | null
-          contact_phone?: string | null
           created_at?: string
-          ghl_user_id?: string | null
+          granularity?: string
           id?: string
-          integration_label?: string | null
-          integration_type?: string | null
-          last_message?: string | null
-          last_message_at?: string | null
-          unread_count?: number
-          updated_at?: string
-          user_id: string
-          workspace_id?: string | null
+          metrics?: Json
+          period_date: string
+          workspace_id: string
         }
         Update: {
-          analyze_after?: string | null
-          analyze_started_at?: string | null
-          contact_name?: string | null
-          contact_phone?: string | null
           created_at?: string
-          ghl_user_id?: string | null
+          granularity?: string
           id?: string
-          integration_label?: string | null
-          integration_type?: string | null
-          last_message?: string | null
-          last_message_at?: string | null
-          unread_count?: number
-          updated_at?: string
-          user_id?: string
-          workspace_id?: string | null
+          metrics?: Json
+          period_date?: string
+          workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "conversations_workspace_id_fkey"
+            foreignKeyName: "analytics_snapshots_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -232,6 +343,62 @@ export type Database = {
           },
         ]
       }
+      ghl_contacts: {
+        Row: {
+          attribution_source: Json | null
+          created_at: string
+          custom_fields: Json | null
+          email: string | null
+          ghl_created_at: string | null
+          ghl_id: string
+          ghl_updated_at: string | null
+          id: string
+          name: string | null
+          phone: string | null
+          source: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attribution_source?: Json | null
+          created_at?: string
+          custom_fields?: Json | null
+          email?: string | null
+          ghl_created_at?: string | null
+          ghl_id: string
+          ghl_updated_at?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          source?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attribution_source?: Json | null
+          created_at?: string
+          custom_fields?: Json | null
+          email?: string | null
+          ghl_created_at?: string | null
+          ghl_id?: string
+          ghl_updated_at?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          source?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_contacts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ghl_conversations: {
         Row: {
           analyze_after: string | null
@@ -246,6 +413,7 @@ export type Database = {
           ghl_date_added: string | null
           ghl_date_updated: string | null
           ghl_location_id: string
+          has_messages: boolean
           id: string
           last_analyzed_at: string | null
           last_message_at: string | null
@@ -270,6 +438,7 @@ export type Database = {
           ghl_date_added?: string | null
           ghl_date_updated?: string | null
           ghl_location_id: string
+          has_messages?: boolean
           id?: string
           last_analyzed_at?: string | null
           last_message_at?: string | null
@@ -294,6 +463,7 @@ export type Database = {
           ghl_date_added?: string | null
           ghl_date_updated?: string | null
           ghl_location_id?: string
+          has_messages?: boolean
           id?: string
           last_analyzed_at?: string | null
           last_message_at?: string | null
@@ -366,6 +536,7 @@ export type Database = {
         Row: {
           additional_date_field: string | null
           ai_allowed_pipeline_ids: string[]
+          ai_insights_config: Json
           business_hours_end: string
           business_hours_start: string
           chart_custom_fields: string[]
@@ -386,6 +557,7 @@ export type Database = {
         Insert: {
           additional_date_field?: string | null
           ai_allowed_pipeline_ids?: string[]
+          ai_insights_config?: Json
           business_hours_end?: string
           business_hours_start?: string
           chart_custom_fields?: string[]
@@ -406,6 +578,7 @@ export type Database = {
         Update: {
           additional_date_field?: string | null
           ai_allowed_pipeline_ids?: string[]
+          ai_insights_config?: Json
           business_hours_end?: string
           business_hours_start?: string
           chart_custom_fields?: string[]
@@ -549,6 +722,7 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           custom_fields: Json | null
+          deleted_at: string | null
           ghl_created_at: string | null
           ghl_id: string
           ghl_updated_at: string | null
@@ -572,6 +746,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           custom_fields?: Json | null
+          deleted_at?: string | null
           ghl_created_at?: string | null
           ghl_id: string
           ghl_updated_at?: string | null
@@ -595,6 +770,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           custom_fields?: Json | null
+          deleted_at?: string | null
           ghl_created_at?: string | null
           ghl_id?: string
           ghl_updated_at?: string | null
@@ -705,6 +881,7 @@ export type Database = {
       ghl_sync_watermarks: {
         Row: {
           conversations_last_seen_at: string | null
+          enrich_cutoff_at: string | null
           last_run_at: string | null
           last_run_count: number | null
           last_run_error: string | null
@@ -713,6 +890,7 @@ export type Database = {
         }
         Insert: {
           conversations_last_seen_at?: string | null
+          enrich_cutoff_at?: string | null
           last_run_at?: string | null
           last_run_count?: number | null
           last_run_error?: string | null
@@ -721,6 +899,7 @@ export type Database = {
         }
         Update: {
           conversations_last_seen_at?: string | null
+          enrich_cutoff_at?: string | null
           last_run_at?: string | null
           last_run_count?: number | null
           last_run_error?: string | null
@@ -775,72 +954,6 @@ export type Database = {
           },
         ]
       }
-      integration_pairing_tokens: {
-        Row: {
-          created_at: string
-          created_by_user_id: string
-          expires_at: string | null
-          id: string
-          integration_id: string
-          last_paired_at: string | null
-          last_seen_at: string | null
-          max_uses: number | null
-          revoked_at: string | null
-          token_hash: string
-          token_prefix: string
-          updated_at: string
-          use_count: number
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by_user_id: string
-          expires_at?: string | null
-          id?: string
-          integration_id: string
-          last_paired_at?: string | null
-          last_seen_at?: string | null
-          max_uses?: number | null
-          revoked_at?: string | null
-          token_hash: string
-          token_prefix: string
-          updated_at?: string
-          use_count?: number
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by_user_id?: string
-          expires_at?: string | null
-          id?: string
-          integration_id?: string
-          last_paired_at?: string | null
-          last_seen_at?: string | null
-          max_uses?: number | null
-          revoked_at?: string | null
-          token_hash?: string
-          token_prefix?: string
-          updated_at?: string
-          use_count?: number
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "integration_pairing_tokens_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_pairing_tokens_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       integrations: {
         Row: {
           config: Json
@@ -882,41 +995,6 @@ export type Database = {
           },
         ]
       }
-      messages: {
-        Row: {
-          content: string
-          conversation_id: string
-          created_at: string
-          direction: string
-          id: string
-          media_url: string | null
-        }
-        Insert: {
-          content: string
-          conversation_id: string
-          created_at?: string
-          direction: string
-          id?: string
-          media_url?: string | null
-        }
-        Update: {
-          content?: string
-          conversation_id?: string
-          created_at?: string
-          direction?: string
-          id?: string
-          media_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "messages_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -948,11 +1026,11 @@ export type Database = {
         Row: {
           action_data: Json
           ai_provider: string | null
-          conversation_id: string | null
           created_at: string
           description: string | null
           ghl_conversation_id: string | null
           id: string
+          prompt_version: string | null
           status: string
           title: string
           type: string
@@ -963,11 +1041,11 @@ export type Database = {
         Insert: {
           action_data?: Json
           ai_provider?: string | null
-          conversation_id?: string | null
           created_at?: string
           description?: string | null
           ghl_conversation_id?: string | null
           id?: string
+          prompt_version?: string | null
           status?: string
           title: string
           type: string
@@ -978,11 +1056,11 @@ export type Database = {
         Update: {
           action_data?: Json
           ai_provider?: string | null
-          conversation_id?: string | null
           created_at?: string
           description?: string | null
           ghl_conversation_id?: string | null
           id?: string
+          prompt_version?: string | null
           status?: string
           title?: string
           type?: string
@@ -991,13 +1069,6 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "suggestions_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "suggestions_ghl_conversation_id_fkey"
             columns: ["ghl_conversation_id"]
@@ -1058,6 +1129,41 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: []
+      }
+      user_ghl_links: {
+        Row: {
+          created_at: string
+          ghl_user_id: string
+          id: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          ghl_user_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          ghl_user_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ghl_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_permissions: {
         Row: {
@@ -1215,7 +1321,12 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: undefined
       }
+      trigger_ai_insights_all: { Args: never; Returns: undefined }
+      trigger_ai_snapshot_all: { Args: never; Returns: undefined }
       trigger_ghl_sync_all: { Args: never; Returns: undefined }
+      trigger_ghl_v2_analyze_due: { Args: never; Returns: undefined }
+      trigger_ghl_v2_auto_execute: { Args: never; Returns: undefined }
+      trigger_ghl_v2_sync_all: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
