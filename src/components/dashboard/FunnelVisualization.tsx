@@ -68,8 +68,11 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
     conversionRates.fechamentoToVenda,
   ];
 
+  // O funil de passagem exclui as perdidas (elas saem do funil), então a base da
+  // taxa de perda é o total que entrou: passagem no topo + perdidas.
   const topPassage = funnelStages[0]?.count ?? 0;
-  const lostPercentage = topPassage > 0 ? (lostLeads / topPassage) * 100 : 0;
+  const lostBase = topPassage + lostLeads;
+  const lostPercentage = lostBase > 0 ? (lostLeads / lostBase) * 100 : 0;
 
   // Tapering widths to keep the funnel feel without trapezoidal shapes
   const stageWidths = ["w-full", "w-[92%]", "w-[80%]", "w-[66%]"];
