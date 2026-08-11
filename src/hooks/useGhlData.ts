@@ -10,11 +10,13 @@ export interface Seller {
   name: string;
   /** Funil de passagem: leads na etapa + os que já avançaram (mesma regra do funil geral) */
   contatoInicial: number;
+  qualificando?: number;
   propostaEnviada: number;
   fechamento: number;
   vendaGanha: number;
   /** Leads parados na etapa neste momento */
   atualContatoInicial?: number;
+  atualQualificando?: number;
   atualPropostaEnviada?: number;
   atualFechamento?: number;
   atualVendaGanha?: number;
@@ -36,6 +38,9 @@ export interface CustomField {
   filledCount: number;
 }
 export interface ConversionRates {
+  /** Contato Inicial → Qualificando */
+  contatoToQualificando?: number;
+  /** Qualificando → Proposta Enviada (nome legado do campo) */
   contatoToProsposta: number;
   propostaToFechamento: number;
   fechamentoToVenda: number;
@@ -43,6 +48,7 @@ export interface ConversionRates {
 }
 export interface AverageTimePerStage {
   contatoInicial: number;
+  qualificando?: number;
   propostaEnviada: number;
   fechamento: number;
 }

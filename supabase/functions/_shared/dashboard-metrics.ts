@@ -13,19 +13,20 @@
 //     movimento). E o estado atual; o GHL nao guarda estado passado, entao isso
 //     e sempre "agora" (aproxima o que a foto daria, via last_status_change_at).
 
-export type BucketKey = "contato_inicial" | "proposta_enviada" | "fechamento" | "venda_ganha";
+export type BucketKey = "contato_inicial" | "qualificando" | "proposta_enviada" | "fechamento" | "venda_ganha";
 export type FunnelMapping = Record<BucketKey, string[]>;
 
-const VALID_BUCKETS: BucketKey[] = ["contato_inicial", "proposta_enviada", "fechamento", "venda_ganha"];
+const VALID_BUCKETS: BucketKey[] = ["contato_inicial", "qualificando", "proposta_enviada", "fechamento", "venda_ganha"];
 const STUCK_DAYS = 14; // aberto sem se mexer ha mais de N dias = "parado"
 
 export function inferFunnelMapping(stages: Array<{ id: string; name: string }>): FunnelMapping {
-  const out: FunnelMapping = { contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
+  const out: FunnelMapping = { contato_inicial: [], qualificando: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
   for (const s of stages) {
     const n = (s.name || "").toLowerCase();
     if (/(ganho|ganha|won|venda)/.test(n)) out.venda_ganha.push(s.id);
     else if (/(fechamento|closing|negocia)/.test(n)) out.fechamento.push(s.id);
     else if (/(proposta|proposal|enviada|sent)/.test(n)) out.proposta_enviada.push(s.id);
+    else if (/(qualific|nutri|contato futuro|follow)/.test(n)) out.qualificando.push(s.id);
     else out.contato_inicial.push(s.id);
   }
   if (!out.contato_inicial.length && stages[0]) out.contato_inicial.push(stages[0].id);
@@ -37,7 +38,7 @@ function resolveStageMap(
   rawMapping: Record<string, any>,
 ): { stageMap: FunnelMapping; bucketOf: (stageId: string) => BucketKey | null } {
   const inferred = inferFunnelMapping(activeStages);
-  const stageMap: FunnelMapping = { contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
+  const stageMap: FunnelMapping = { contato_inicial: [], qualificando: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
   let hasUserMapping = false;
   for (const b of VALID_BUCKETS) {
     const v = rawMapping[b];
@@ -50,7 +51,10 @@ function resolveStageMap(
       }
     }
   }
-  for (const b of VALID_BUCKETS) if (!stageMap[b].length) stageMap[b] = inferred[b];
+  // Inferência é tudo-ou-nada: completar bucket a bucket faria um bucket novo
+  // (sem correspondente no mapeamento salvo) puxar etapas que o usuário já
+  // atribuiu explicitamente a outro bucket, duplicando-as.
+  if (!hasUserMapping) for (const b of VALID_BUCKETS) stageMap[b] = inferred[b];
   const idToBucket = new Map<string, BucketKey>();
   for (const b of VALID_BUCKETS) for (const id of stageMap[b]) idToBucket.set(id, b);
   return { stageMap, bucketOf: (id) => idToBucket.get(id) ?? null };
@@ -133,7 +137,7 @@ export async function computePeriodMetrics(
   };
   const newAcc = (): Acc => ({
     period: { leads_created: 0, deals_won: 0, deals_lost: 0, value_won: 0 },
-    open: 0, open_value: 0, funnel: { contato_inicial: 0, proposta_enviada: 0, fechamento: 0, venda_ganha: 0 },
+    open: 0, open_value: 0, funnel: { contato_inicial: 0, qualificando: 0, proposta_enviada: 0, fechamento: 0, venda_ganha: 0 },
     ageSum: 0, ageCount: 0, stuck: 0, sellers: new Map(),
   });
   const accs = new Map<string, Acc>();

@@ -57,16 +57,20 @@ const stageAccents = [
   { bg: "bg-funnel-2", border: "border-funnel-2/40", icon: "text-funnel-2-ink" },
   { bg: "bg-funnel-3", border: "border-funnel-3/40", icon: "text-funnel-3-ink" },
   { bg: "bg-funnel-4", border: "border-funnel-4/40", icon: "text-funnel-4-ink" },
+  { bg: "bg-funnel-5", border: "border-funnel-5/40", icon: "text-funnel-5-ink" },
 ];
 
 export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [], belowLostCard }: FunnelVisualizationProps) {
   const [selectedStage, setSelectedStage] = useState<{ title: string; leads: StageLead[] } | null>(null);
 
-  const conversionLabels = [
-    conversionRates.contatoToProsposta,
-    conversionRates.propostaToFechamento,
-    conversionRates.fechamentoToVenda,
-  ];
+  // Derivado do próprio funil de passagem: a taxa entre duas etapas é a razão
+  // entre elas. Assim o componente acompanha qualquer número de etapas sem
+  // depender de um array de taxas com índices fixos.
+  const rateAfter = (index: number) => {
+    const from = funnelStages[index]?.count ?? 0;
+    const to = funnelStages[index + 1]?.count ?? 0;
+    return from > 0 ? (to / from) * 100 : 0;
+  };
 
   // O funil de passagem exclui as perdidas (elas saem do funil), então a base da
   // taxa de perda é o total que entrou: passagem no topo + perdidas.
@@ -74,8 +78,9 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
   const lostBase = topPassage + lostLeads;
   const lostPercentage = lostBase > 0 ? (lostLeads / lostBase) * 100 : 0;
 
-  // Tapering widths to keep the funnel feel without trapezoidal shapes
-  const stageWidths = ["w-full", "w-[92%]", "w-[80%]", "w-[66%]"];
+  // Afunilamento redistribuído para 5 etapas: degraus menores no topo, onde as
+  // etapas são mais próximas em volume, e mais acentuados na saída.
+  const stageWidths = ["w-full", "w-[93%]", "w-[85%]", "w-[74%]", "w-[62%]"];
 
   return (
     <div className="dashboard-section animate-slide-up">
@@ -107,35 +112,35 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
                   onClick={() => setSelectedStage({ title: stage.name, leads: stage.leads || [] })}
                   className={`relative w-full text-left rounded-xl border transition-all overflow-hidden cursor-pointer shadow-sm hover:shadow-md hover:brightness-105 ${accent.border} ${accent.bg}`}
                 >
-                  <div className="relative p-4 flex justify-between items-center">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
+                  <div className="relative px-4 py-2.5 flex justify-between items-center gap-3">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-white/75 leading-tight">
                         {isLast ? "Final" : `Etapa ${stageNumber}`}
                       </span>
-                      <h3 className="text-base font-bold text-white">
+                      <h3 className="text-[13px] font-bold text-white leading-snug truncate">
                         {stage.name}
                       </h3>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-extrabold leading-none text-white">
-                        {stage.count}
-                      </div>
+                    <div className="flex items-baseline gap-2.5 shrink-0">
                       {typeof stage.currentCount === "number" && (
-                        <div className="text-[11px] font-medium mt-1 text-white/80">
-                          <span className="opacity-70">atual:</span> {stage.currentCount}
-                        </div>
+                        <span className="text-[10px] font-semibold text-white/85 tabular-nums whitespace-nowrap">
+                          <span className="font-normal text-white/60">atual</span> {stage.currentCount}
+                        </span>
                       )}
+                      <span className="text-xl font-extrabold leading-none text-white tabular-nums">
+                        {stage.count}
+                      </span>
                     </div>
                   </div>
                 </button>
 
                 {!isLast && (
-                  <div className="h-9 flex flex-col items-center justify-center relative w-full">
+                  <div className="h-7 flex flex-col items-center justify-center relative w-full">
                     <div className="w-px h-full bg-border"></div>
-                    <div className="absolute bg-card border border-border px-2.5 py-1 rounded-full shadow-sm">
-                      <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
-                        <ArrowDown className={`w-3 h-3 ${accent.icon}`} />
-                        {formatPercentage(conversionLabels[index])}
+                    <div className="absolute bg-card border border-border px-2 py-0.5 rounded-full shadow-sm">
+                      <span className="text-[9px] font-bold text-muted-foreground flex items-center gap-1 tabular-nums">
+                        <ArrowDown className={`w-2.5 h-2.5 ${accent.icon}`} />
+                        {formatPercentage(rateAfter(index))}
                       </span>
                     </div>
                   </div>

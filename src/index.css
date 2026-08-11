@@ -86,16 +86,20 @@
     --info: 221 83% 53%;
     --info-foreground: 0 0% 100%;
 
-    /* Funil — progressão laranja → vermelho da marca */
+    /* Funil — progressão laranja → vermelho → ouro da marca (5 etapas) */
     --funnel-1: var(--laranja-300);
-    --funnel-2: var(--laranja-600);
-    --funnel-3: var(--laranja-500);
-    --funnel-4: var(--laranja-700);
+    --funnel-2: var(--laranja-400);
+    --funnel-3: var(--laranja-600);
+    --funnel-4: var(--laranja-500);
+    /* Venda Ganha sai da escala laranja: verde de sucesso do DS, para o
+       desfecho positivo se distinguir das etapas em andamento. */
+    --funnel-5: var(--success);
     /* Inks p/ texto sobre tints (acessível em ambos os temas) */
     --funnel-1-ink: var(--laranja-800);
     --funnel-2-ink: var(--laranja-800);
     --funnel-3-ink: var(--laranja-800);
-    --funnel-4-ink: var(--laranja-900);
+    --funnel-4-ink: var(--laranja-800);
+    --funnel-5-ink: 142 72% 26%;
 
     /* Gráficos — marca + cores de apoio do DS */
     --chart-1: var(--laranja-700);
@@ -173,13 +177,15 @@
 
     /* Funil dark — usa mesma escala, com inks clareados */
     --funnel-1: var(--laranja-300);
-    --funnel-2: var(--laranja-600);
-    --funnel-3: var(--laranja-500);
-    --funnel-4: var(--laranja-700);
+    --funnel-2: var(--laranja-400);
+    --funnel-3: var(--laranja-600);
+    --funnel-4: var(--laranja-500);
+    --funnel-5: var(--success);
     --funnel-1-ink: var(--laranja-200);
-    --funnel-2-ink: var(--laranja-300);
+    --funnel-2-ink: var(--laranja-200);
     --funnel-3-ink: var(--laranja-300);
     --funnel-4-ink: var(--laranja-300);
+    --funnel-5-ink: 142 60% 62%;
 
     --chart-1: var(--laranja-700);
     --chart-2: var(--laranja-500);

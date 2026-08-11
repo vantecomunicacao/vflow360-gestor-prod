@@ -36,16 +36,16 @@ export function AIInsights() {
   const periodText = periodLabel(period.start, period.end);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 sm:p-6 h-full flex flex-col">
-      <div className="flex items-center justify-between gap-2 mb-4">
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 h-full flex flex-col">
+      <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="p-2 rounded-lg bg-accent/10 shrink-0">
-            <Sparkles className="h-5 w-5 text-primary-ink" />
+          <div className="p-1.5 rounded-lg bg-accent/10 shrink-0">
+            <Sparkles className="h-4 w-4 text-primary-ink" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-foreground leading-tight">Insights com I.A.</h2>
+            <h2 className="text-base font-semibold text-foreground leading-tight">Insights com I.A.</h2>
             {periodText && (
-              <p className="text-xs text-muted-foreground">Análise de {periodText}</p>
+              <p className="text-[11px] text-muted-foreground">Análise de {periodText}</p>
             )}
           </div>
         </div>
@@ -77,21 +77,21 @@ export function AIInsights() {
         </div>
       ) : (
         <>
-          <ul className="flex-1 min-h-0 max-h-[480px] lg:max-h-[360px] space-y-3 overflow-y-auto pr-1">
+          <ul className="flex-1 min-h-0 max-h-[480px] lg:max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {insights.map((ins) => {
               const Icon = KIND_ICON[ins.kind] ?? Sparkles;
               return (
                 <li
                   key={ins.id}
-                  className={`group relative rounded-lg border p-3 ${SEVERITY_STYLE[ins.severity]}`}
+                  className={`group relative rounded-lg border p-2.5 ${SEVERITY_STYLE[ins.severity]}`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 p-1.5 rounded-md bg-accent/10 shrink-0">
-                      <Icon className="h-4 w-4 text-primary-ink" />
+                  <div className="flex items-start gap-2.5">
+                    <div className="mt-0.5 p-1 rounded-md bg-accent/10 shrink-0">
+                      <Icon className="h-3.5 w-3.5 text-primary-ink" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground">{ins.title}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{ins.body}</p>
+                      <p className="text-[13px] font-medium text-foreground leading-snug">{ins.title}</p>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">{ins.body}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                           {ins.refs?.pipeline_name || "Visão geral"}

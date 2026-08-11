@@ -256,7 +256,7 @@ export default function DashboardSettings() {
         <CardHeader>
           <CardTitle>Mapeamento do funil</CardTitle>
           <CardDescription>
-            Associe cada etapa do CRM a uma das 4 fases do funil analítico. Etapas sem mapeamento são ignoradas.
+            Associe cada etapa do CRM a uma das 5 fases do funil analítico. Etapas sem mapeamento são ignoradas.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">

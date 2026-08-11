@@ -15,6 +15,7 @@ const corsHeaders = {
 
 interface FunnelMapping {
   contato_inicial: string[];
+  qualificando: string[];
   proposta_enviada: string[];
   fechamento: string[];
   venda_ganha: string[];
@@ -133,12 +134,13 @@ function parseHHMM(s: string | null | undefined, fallbackMin: number): number {
 }
 
 function inferFunnelMapping(stages: Array<{ id: string; name: string }>): FunnelMapping {
-  const out: FunnelMapping = { contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
+  const out: FunnelMapping = { contato_inicial: [], qualificando: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
   for (const s of stages) {
     const n = (s.name || "").toLowerCase();
     if (/(ganho|ganha|won|venda)/.test(n)) out.venda_ganha.push(s.id);
     else if (/(fechamento|closing|negocia)/.test(n)) out.fechamento.push(s.id);
     else if (/(proposta|proposal|enviada|sent)/.test(n)) out.proposta_enviada.push(s.id);
+    else if (/(qualific|nutri|contato futuro|follow)/.test(n)) out.qualificando.push(s.id);
     else out.contato_inicial.push(s.id);
   }
   // se algum bucket ficou vazio, distribuir os primeiros stages
@@ -230,10 +232,10 @@ serve(async (req) => {
     //   B) {stageId: "bucket"}    (formato salvo pela UI atual)
     const inferred = inferFunnelMapping(activeStages);
     const rawMapping = (settings?.funnel_stage_mapping || {}) as Record<string, any>;
-    const VALID_BUCKETS = ["contato_inicial", "proposta_enviada", "fechamento", "venda_ganha"] as const;
+    const VALID_BUCKETS = ["contato_inicial", "qualificando", "proposta_enviada", "fechamento", "venda_ganha"] as const;
     type BucketKey = typeof VALID_BUCKETS[number];
 
-    const stageMap: FunnelMapping = { contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
+    const stageMap: FunnelMapping = { contato_inicial: [], qualificando: [], proposta_enviada: [], fechamento: [], venda_ganha: [] };
     let hasUserMapping = false;
 
     // Tenta formato A
@@ -253,9 +255,11 @@ serve(async (req) => {
         }
       }
     }
-    // Para qualquer bucket vazio, completa com inferência
-    for (const b of VALID_BUCKETS) {
-      if (!stageMap[b].length) stageMap[b] = inferred[b];
+    // Inferência é tudo-ou-nada: completar bucket a bucket faria um bucket novo
+    // (sem correspondente no mapeamento salvo) puxar etapas que o usuário já
+    // atribuiu explicitamente a outro bucket, duplicando-as.
+    if (!hasUserMapping) {
+      for (const b of VALID_BUCKETS) stageMap[b] = inferred[b];
     }
 
     // won_stage_keys: aceita stage IDs OU bucket keys (ex: "venda_ganha")
@@ -490,14 +494,15 @@ serve(async (req) => {
       if (stageMap.venda_ganha.includes(stageId)) return "venda_ganha";
       if (stageMap.fechamento.includes(stageId)) return "fechamento";
       if (stageMap.proposta_enviada.includes(stageId)) return "proposta_enviada";
+      if (stageMap.qualificando.includes(stageId)) return "qualificando";
       if (stageMap.contato_inicial.includes(stageId)) return "contato_inicial";
       return null;
     };
 
-    // ===== Funnel stages (4 buckets) — exclui perdidos do funil =====
-    const counts = { contato_inicial: 0, proposta_enviada: 0, fechamento: 0, venda_ganha: 0 };
+    // ===== Funnel stages (5 buckets) — exclui perdidos do funil =====
+    const counts = { contato_inicial: 0, qualificando: 0, proposta_enviada: 0, fechamento: 0, venda_ganha: 0 };
     const leadsByBucket: Record<keyof FunnelMapping, Array<{ id: number; name: string }>> = {
-      contato_inicial: [], proposta_enviada: [], fechamento: [], venda_ganha: [],
+      contato_inicial: [], qualificando: [], proposta_enviada: [], fechamento: [], venda_ganha: [],
     };
     for (const o of opps) {
       if (isLost(o)) continue; // perdidos saem do funil
@@ -511,13 +516,21 @@ serve(async (req) => {
     }
     // Funil de passagem: cada etapa soma os leads que estão nela + os que avançaram
     const passage = {
-      contato_inicial: counts.contato_inicial + counts.proposta_enviada + counts.fechamento + counts.venda_ganha,
+      contato_inicial: counts.contato_inicial + counts.qualificando + counts.proposta_enviada + counts.fechamento + counts.venda_ganha,
+      qualificando: counts.qualificando + counts.proposta_enviada + counts.fechamento + counts.venda_ganha,
       proposta_enviada: counts.proposta_enviada + counts.fechamento + counts.venda_ganha,
       fechamento: counts.fechamento + counts.venda_ganha,
       venda_ganha: counts.venda_ganha,
     };
+    // "Qualificando" só entra no funil quando o workspace mapeou alguma etapa do
+    // CRM para ela. Sem isso a faixa apareceria vazia, com 100% de conversão,
+    // em todo workspace que ainda não revisou o mapeamento.
+    const hasQualificando = stageMap.qualificando.length > 0;
     const funnelStages = [
       { id: "contato_inicial", name: "Contato Inicial", count: passage.contato_inicial, currentCount: counts.contato_inicial, leads: leadsByBucket.contato_inicial },
+      ...(hasQualificando
+        ? [{ id: "qualificando", name: "Qualificando", count: passage.qualificando, currentCount: counts.qualificando, leads: leadsByBucket.qualificando }]
+        : []),
       { id: "proposta_enviada", name: "Proposta Enviada", count: passage.proposta_enviada, currentCount: counts.proposta_enviada, leads: leadsByBucket.proposta_enviada },
       { id: "fechamento", name: "Fechamento", count: passage.fechamento, currentCount: counts.fechamento, leads: leadsByBucket.fechamento },
       { id: "venda_ganha", name: "Venda Ganha", count: passage.venda_ganha, currentCount: counts.venda_ganha, leads: leadsByBucket.venda_ganha },
@@ -526,7 +539,13 @@ serve(async (req) => {
     const safeRate = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0);
     // Taxas baseadas no funil de passagem (passou para a próxima etapa)
     const conversionRates = {
-      contatoToProsposta: safeRate(passage.proposta_enviada, passage.contato_inicial),
+      contatoToQualificando: hasQualificando ? safeRate(passage.qualificando, passage.contato_inicial) : 0,
+      // Nome legado do campo. O denominador é a etapa imediatamente anterior:
+      // Qualificando quando ela existe, Contato Inicial quando não.
+      contatoToProsposta: safeRate(
+        passage.proposta_enviada,
+        hasQualificando ? passage.qualificando : passage.contato_inicial,
+      ),
       propostaToFechamento: safeRate(passage.fechamento, passage.proposta_enviada),
       fechamentoToVenda: safeRate(passage.venda_ganha, passage.fechamento),
       overallConversion: safeRate(passage.venda_ganha, passage.contato_inicial || totalLeads),
@@ -537,13 +556,13 @@ serve(async (req) => {
     // é derivado depois, para bater com o funil geral e com o card de Total de Oportunidades.
     type SellerAgg = {
       id: string; name: string;
-      atualContatoInicial: number; atualPropostaEnviada: number; atualFechamento: number; atualVendaGanha: number;
+      atualContatoInicial: number; atualQualificando: number; atualPropostaEnviada: number; atualFechamento: number; atualVendaGanha: number;
       perdidas: number; foraDoFunil: number; total: number;
       avgResponseMinutes: number | null; responseCount: number;
     };
     const newSeller = (id: string, name: string): SellerAgg => ({
       id, name,
-      atualContatoInicial: 0, atualPropostaEnviada: 0, atualFechamento: 0, atualVendaGanha: 0,
+      atualContatoInicial: 0, atualQualificando: 0, atualPropostaEnviada: 0, atualFechamento: 0, atualVendaGanha: 0,
       perdidas: 0, foraDoFunil: 0, total: 0,
       avgResponseMinutes: null, responseCount: 0,
     });
@@ -564,6 +583,7 @@ serve(async (req) => {
         // perdidos saem do funil (mesma regra do funil geral), mas continuam no total
         s.perdidas++;
       } else if (b === "contato_inicial") s.atualContatoInicial++;
+      else if (b === "qualificando") s.atualQualificando++;
       else if (b === "proposta_enviada") s.atualPropostaEnviada++;
       else if (b === "fechamento") s.atualFechamento++;
       else if (b === "venda_ganha") s.atualVendaGanha++;
@@ -769,8 +789,8 @@ serve(async (req) => {
     // ===== Tempo médio por etapa (proxy) =====
     // Sem histórico, usamos média de (now - last_status_change_at) por bucket atual
     const now = Date.now();
-    const sumHours = { contato_inicial: 0, proposta_enviada: 0, fechamento: 0 };
-    const counters = { contato_inicial: 0, proposta_enviada: 0, fechamento: 0 };
+    const sumHours = { contato_inicial: 0, qualificando: 0, proposta_enviada: 0, fechamento: 0 };
+    const counters = { contato_inicial: 0, qualificando: 0, proposta_enviada: 0, fechamento: 0 };
     for (const o of opps) {
       const b = stageBucket(o.stage_id);
       if (b === "venda_ganha" || !b) continue;
@@ -782,6 +802,7 @@ serve(async (req) => {
     }
     const averageTimePerStage = {
       contatoInicial: counters.contato_inicial ? Math.round(sumHours.contato_inicial / counters.contato_inicial) : 0,
+      qualificando: counters.qualificando ? Math.round(sumHours.qualificando / counters.qualificando) : 0,
       propostaEnviada: counters.proposta_enviada ? Math.round(sumHours.proposta_enviada / counters.proposta_enviada) : 0,
       fechamento: counters.fechamento ? Math.round(sumHours.fechamento / counters.fechamento) : 0,
     };
@@ -854,6 +875,7 @@ serve(async (req) => {
     // Conjunto de stage_ids "comerciais" (todos os buckets + won)
     const mappedStageIds = new Set<string>([
       ...stageMap.contato_inicial,
+      ...stageMap.qualificando,
       ...stageMap.proposta_enviada,
       ...stageMap.fechamento,
       ...stageMap.venda_ganha,
@@ -1095,11 +1117,13 @@ serve(async (req) => {
       .map(s => ({
         id: s.id,
         name: s.name,
-        contatoInicial: s.atualContatoInicial + s.atualPropostaEnviada + s.atualFechamento + s.atualVendaGanha,
+        contatoInicial: s.atualContatoInicial + s.atualQualificando + s.atualPropostaEnviada + s.atualFechamento + s.atualVendaGanha,
+        qualificando: s.atualQualificando + s.atualPropostaEnviada + s.atualFechamento + s.atualVendaGanha,
         propostaEnviada: s.atualPropostaEnviada + s.atualFechamento + s.atualVendaGanha,
         fechamento: s.atualFechamento + s.atualVendaGanha,
         vendaGanha: s.atualVendaGanha,
         atualContatoInicial: s.atualContatoInicial,
+        atualQualificando: s.atualQualificando,
         atualPropostaEnviada: s.atualPropostaEnviada,
         atualFechamento: s.atualFechamento,
         atualVendaGanha: s.atualVendaGanha,

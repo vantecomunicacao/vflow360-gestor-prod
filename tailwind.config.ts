@@ -87,10 +87,12 @@ export default {
         "funnel-2": "hsl(var(--funnel-2))",
         "funnel-3": "hsl(var(--funnel-3))",
         "funnel-4": "hsl(var(--funnel-4))",
+        "funnel-5": "hsl(var(--funnel-5))",
         "funnel-1-ink": "hsl(var(--funnel-1-ink))",
         "funnel-2-ink": "hsl(var(--funnel-2-ink))",
         "funnel-3-ink": "hsl(var(--funnel-3-ink))",
         "funnel-4-ink": "hsl(var(--funnel-4-ink))",
+        "funnel-5-ink": "hsl(var(--funnel-5-ink))",
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",

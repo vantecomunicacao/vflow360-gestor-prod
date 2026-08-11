@@ -15,8 +15,12 @@ const formatHoursToTime = (hours: number): string => {
 export function TimePerStage({ averageTimePerStage }: TimePerStageProps) {
   const stages = [
     { name: "Contato Inicial", hours: averageTimePerStage.contatoInicial, color: "funnel-1" },
-    { name: "Proposta Enviada", hours: averageTimePerStage.propostaEnviada, color: "funnel-2" },
-    { name: "Fechamento", hours: averageTimePerStage.fechamento, color: "funnel-3" },
+    // Só aparece quando o workspace mapeou etapas do CRM para Qualificando.
+    ...(averageTimePerStage.qualificando
+      ? [{ name: "Qualificando", hours: averageTimePerStage.qualificando, color: "funnel-2" }]
+      : []),
+    { name: "Proposta Enviada", hours: averageTimePerStage.propostaEnviada, color: "funnel-3" },
+    { name: "Fechamento", hours: averageTimePerStage.fechamento, color: "funnel-4" },
   ];
   const maxHours = Math.max(...stages.map((s) => s.hours), 1);
 

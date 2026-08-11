@@ -32,6 +32,7 @@ const STAGE_TONE = {
   "funnel-2": "bg-funnel-2/10 text-funnel-2-ink",
   "funnel-3": "bg-funnel-3/10 text-funnel-3-ink",
   "funnel-4": "bg-funnel-4/10 text-funnel-4-ink",
+  "funnel-5": "bg-funnel-5/10 text-funnel-5-ink",
 } as const;
 
 /** Número do funil de passagem, com a contagem "atual" logo abaixo (igual à Visão Geral). */
@@ -183,9 +184,9 @@ export function SellerPerformance({ sellers, selectedSellerIds = [], onSellerTog
                     ) : null}
                   </td>
                   <StageCell tone="funnel-1" passage={s.contatoInicial} current={s.atualContatoInicial} />
-                  <StageCell tone="funnel-2" passage={s.propostaEnviada} current={s.atualPropostaEnviada} />
-                  <StageCell tone="funnel-3" passage={s.fechamento} current={s.atualFechamento} />
-                  <StageCell tone="funnel-4" passage={s.vendaGanha} current={s.atualVendaGanha} />
+                  <StageCell tone="funnel-3" passage={s.propostaEnviada} current={s.atualPropostaEnviada} />
+                  <StageCell tone="funnel-4" passage={s.fechamento} current={s.atualFechamento} />
+                  <StageCell tone="funnel-5" passage={s.vendaGanha} current={s.atualVendaGanha} />
                   <td className="text-center">
                     <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-destructive/10 text-destructive rounded-lg font-bold text-sm">{s.perdidas ?? 0}</span>
                   </td>
