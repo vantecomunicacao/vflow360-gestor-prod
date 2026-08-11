@@ -112,7 +112,7 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
                   onClick={() => setSelectedStage({ title: stage.name, leads: stage.leads || [] })}
                   className={`relative w-full text-left rounded-xl border transition-all overflow-hidden cursor-pointer shadow-sm hover:shadow-md hover:brightness-105 ${accent.border} ${accent.bg}`}
                 >
-                  <div className="relative px-4 py-2.5 flex justify-between items-center gap-3">
+                  <div className="relative px-4 py-3.5 flex justify-between items-center gap-3">
                     <div className="flex flex-col min-w-0">
                       <span className="text-[9px] font-semibold uppercase tracking-wider text-white/75 leading-tight">
                         {isLast ? "Final" : `Etapa ${stageNumber}`}
