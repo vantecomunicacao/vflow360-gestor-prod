@@ -213,6 +213,88 @@ export function rpcResult(fn: string, role: Role): unknown {
 // Edge functions (functions.invoke / fetch direto)
 // ---------------------------------------------------------------------------
 
+// Payload da edge function "ghl-dashboard" (formato DashboardData). Números
+// fixos e pequenos — o que importa nos E2E é a tela renderizar com filtros.
+export function dashboardData() {
+  const empty = { count: 0, percentage: 0 };
+  return {
+    totalLeads: 10,
+    lostLeads: 2,
+    funnelStages: [
+      { id: "contato_inicial", name: "Contato Inicial", count: 10, currentCount: 4 },
+      { id: "proposta_enviada", name: "Proposta Enviada", count: 6, currentCount: 3 },
+      { id: "fechamento", name: "Fechamento", count: 4, currentCount: 2 },
+      { id: "venda_ganha", name: "Venda Ganha", count: 3, currentCount: 3 },
+    ],
+    conversionRates: {
+      contatoToProsposta: 60,
+      propostaToFechamento: 66.7,
+      fechamentoToVenda: 75,
+      overallConversion: 30,
+    },
+    sellers: [
+      {
+        id: "ghlu-1",
+        name: "Vendedor Teste",
+        contatoInicial: 10,
+        propostaEnviada: 6,
+        fechamento: 4,
+        vendaGanha: 3,
+        total: 10,
+      },
+    ],
+    leadOrigins: [],
+    origemDistribution: [],
+    origemFillRate: 0,
+    wonOrigemDistribution: [],
+    wonOrigemFillRate: 0,
+    utmSourceDistribution: [],
+    utmSourceFillRate: 0,
+    utmSourceValues: [],
+    utmMediumDistribution: [],
+    utmMediumFillRate: 0,
+    utmMediumValues: ["cpc"],
+    utmCampaignDistribution: [],
+    utmCampaignFillRate: 0,
+    utmCampaignValues: ["campanha-teste"],
+    wonUtmSourceDistribution: [],
+    wonUtmSourceFillRate: 0,
+    leadsOriginDistribution: [{ name: "Instagram", ...empty, count: 6, percentage: 60 }],
+    leadsOriginFillRate: 100,
+    wonOriginDistribution: [{ name: "Instagram", ...empty, count: 3, percentage: 100 }],
+    wonOriginFillRate: 100,
+    utmConfigured: { source: true, medium: true, campaign: true, content: false, term: false },
+    customFields: [],
+    customFieldDistributions: [],
+    averageTimePerStage: { contatoInicial: 1, propostaEnviada: 2, fechamento: 3 },
+    dailyLeads: [{ date: "2026-08-10", count: 5, dayName: "seg" }],
+    pipelines: [
+      {
+        id: "pipe-1",
+        name: "Funil de Vendas",
+        stages: [
+          { id: "stage-1", name: "Contato Inicial" },
+          { id: "stage-2", name: "Proposta Enviada" },
+        ],
+      },
+    ],
+    users: [{ id: "ghlu-1", name: "Vendedor Teste" }],
+    origins: ["Instagram"],
+    overallFillRate: 100,
+    lossReasons: [],
+    totalMonetary: 10000,
+    wonMonetary: 6000,
+    negotiatingMonetary: 4000,
+    cachedAt: now(),
+    additionalDateFieldId: null,
+    additionalDateFieldName: null,
+    additionalDateFieldId2: null,
+    additionalDateFieldName2: null,
+    responseTime: null,
+    coolingLeads: null,
+  };
+}
+
 export function edgeResult(fn: string): unknown {
   switch (fn) {
     case "evolution-pairing-public":
@@ -225,7 +307,7 @@ export function edgeResult(fn: string): unknown {
         label: "WhatsApp Comercial",
       };
     case "ghl-dashboard":
-      return { ok: true, metrics: {}, series: [] };
+      return dashboardData();
     default:
       return { ok: true };
   }

@@ -31,6 +31,7 @@ import { ErrorState } from "@/components/dashboard/ErrorState";
 import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
 import { AIUsageCard } from "@/components/dashboard/AIUsageCard";
 import { useToast } from "@/hooks/use-toast";
+import { loadDashboardFilters, saveDashboardFilters, clearDashboardFilters } from "@/lib/dashboard-filters-storage";
 
 export default function Dashboard() {
   const { activeWorkspace } = useWorkspace();
@@ -51,17 +52,40 @@ export default function Dashboard() {
   const [selectedUtmMedium, setSelectedUtmMedium] = useState<string | null>(null);
   const [selectedUtmCampaign, setSelectedUtmCampaign] = useState<string | null>(null);
 
-  // Ao trocar de conta, SEMPRE redefine os filtros para o padrão da conta.
-  // Os filtros não são mais memorizados entre contas: cada troca entra num
-  // estado limpo e previsível. Isso evita que uma seleção antiga (ex.: IDs de
-  // vendedor/etapa que mudaram após re-sync do GHL) filtre tudo para zero sem
-  // pista visível. Um toast deixa claro que o contexto mudou.
+  // Conta cujos filtros já foram hidratados — libera a gravação no localStorage
+  // só depois da restauração, para não sobrescrever o estado salvo com o padrão.
+  const [hydratedWorkspaceId, setHydratedWorkspaceId] = useState<string | null>(null);
+
+  // Ao MONTAR a página, restaura os filtros que o usuário estava usando nessa
+  // conta (persistidos no localStorage) — assim um F5 não joga tudo para o
+  // padrão. Ao TROCAR de conta, redefine para o padrão da conta: cada troca
+  // entra num estado limpo e previsível, evitando que uma seleção antiga (ex.:
+  // IDs de vendedor/etapa que mudaram após re-sync do GHL) filtre tudo para
+  // zero sem pista visível. Um toast deixa claro que o contexto mudou.
   useEffect(() => {
     if (!activeWorkspace?.id) return;
     let cancelled = false;
+    const workspaceId = activeWorkspace.id;
+    const isSwitch = !!prevWorkspaceRef.current && prevWorkspaceRef.current !== workspaceId;
+    const saved = isSwitch ? null : loadDashboardFilters(workspaceId);
 
     (async () => {
+      if (saved) {
+        setDateRange(saved.dateRange);
+        setAdditionalDateRange(saved.additionalDateRange);
+        setAdditionalDateRange2(saved.additionalDateRange2);
+        setSelectedSellerIds(saved.selectedSellerIds);
+        setSelectedUtmMedium(saved.selectedUtmMedium);
+        setSelectedUtmCampaign(saved.selectedUtmCampaign);
+        setSelectedStageIds(saved.selectedStageIds);
+        setSelectedPipelineId(saved.selectedPipelineId);
+        prevWorkspaceRef.current = workspaceId;
+        setHydratedWorkspaceId(workspaceId);
+        return;
+      }
+
       // Reset padrão: período (últimos 7 dias) e todos os filtros zerados.
+      if (isSwitch) clearDashboardFilters(workspaceId);
       setDateRange({ from: subDays(new Date(), 6), to: new Date() });
       setAdditionalDateRange(undefined);
       setAdditionalDateRange2(undefined);
@@ -75,48 +99,70 @@ export default function Dashboard() {
       const { data } = await supabase
         .from("ghl_dashboard_settings")
         .select("default_pipeline_ids")
-        .eq("workspace_id", activeWorkspace.id)
+        .eq("workspace_id", workspaceId)
         .maybeSingle();
       if (cancelled) return;
       const def = (data?.default_pipeline_ids || [])[0];
       if (def) setSelectedPipelineId(def);
 
       // Toast só quando a conta realmente muda (não na 1ª montagem).
-      if (prevWorkspaceRef.current && prevWorkspaceRef.current !== activeWorkspace.id) {
+      if (isSwitch) {
         toast({
           title: `Agora vendo: ${activeWorkspace.name}`,
           description: "Filtros redefinidos para o padrão da conta.",
         });
       }
-      prevWorkspaceRef.current = activeWorkspace.id;
+      prevWorkspaceRef.current = workspaceId;
+      setHydratedWorkspaceId(workspaceId);
     })();
 
     return () => { cancelled = true; };
   }, [activeWorkspace?.id, activeWorkspace?.name, toast]);
 
+  // Grava cada mudança de filtro para a conta ativa (só após a hidratação).
+  useEffect(() => {
+    if (!activeWorkspace?.id || hydratedWorkspaceId !== activeWorkspace.id) return;
+    saveDashboardFilters(activeWorkspace.id, {
+      dateRange,
+      additionalDateRange,
+      additionalDateRange2,
+      selectedPipelineId,
+      selectedStageIds,
+      selectedSellerIds,
+      selectedUtmMedium,
+      selectedUtmCampaign,
+    });
+  }, [
+    activeWorkspace?.id, hydratedWorkspaceId, dateRange, additionalDateRange, additionalDateRange2,
+    selectedPipelineId, selectedStageIds, selectedSellerIds, selectedUtmMedium, selectedUtmCampaign,
+  ]);
+
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 6)), [dateRange?.from]);
   const endDate = useMemo(() => endOfDay(dateRange?.to || dateRange?.from || new Date()), [dateRange?.to, dateRange?.from]);
 
+  // Os campos de data adicionais são DATE no CRM — datas de calendário, sem hora.
+  // O GHL grava esses valores em meia-noite UTC. Por isso mandamos o período como
+  // "YYYY-MM-DD" puro, e não como instante: converter para startOfDay/endOfDay no
+  // fuso do navegador (UTC-3 no Brasil) deslocava a janela em 3h e fazia o filtro
+  // casar com o dia seguinte ao escolhido.
+  const asCalendarDay = (d: Date | undefined) => (d ? format(d, "yyyy-MM-dd") : null);
+
   const additionalStartDate = useMemo(
-    () => (additionalDateRange?.from ? startOfDay(additionalDateRange.from) : null),
+    () => asCalendarDay(additionalDateRange?.from),
     [additionalDateRange?.from]
   );
   const additionalEndDate = useMemo(
-    () => (additionalDateRange?.to || additionalDateRange?.from
-      ? endOfDay(additionalDateRange.to || additionalDateRange.from!)
-      : null),
+    () => asCalendarDay(additionalDateRange?.to || additionalDateRange?.from),
     [additionalDateRange?.to, additionalDateRange?.from]
   );
 
   const additionalStartDate2 = useMemo(
-    () => (additionalDateRange2?.from ? startOfDay(additionalDateRange2.from) : null),
+    () => asCalendarDay(additionalDateRange2?.from),
     [additionalDateRange2?.from]
   );
   const additionalEndDate2 = useMemo(
-    () => (additionalDateRange2?.to || additionalDateRange2?.from
-      ? endOfDay(additionalDateRange2.to || additionalDateRange2.from!)
-      : null),
+    () => asCalendarDay(additionalDateRange2?.to || additionalDateRange2?.from),
     [additionalDateRange2?.to, additionalDateRange2?.from]
   );
 

@@ -146,10 +146,11 @@ export interface DashboardFilters {
   utmMedium: string | null;
   utmCampaign: string | null;
   workspaceId: string | null;
-  additionalStartDate?: Date | null;
-  additionalEndDate?: Date | null;
-  additionalStartDate2?: Date | null;
-  additionalEndDate2?: Date | null;
+  /** Data de calendário "YYYY-MM-DD" — ver comentário em Dashboard.tsx. */
+  additionalStartDate?: string | null;
+  additionalEndDate?: string | null;
+  additionalStartDate2?: string | null;
+  additionalEndDate2?: string | null;
 }
 
 interface UseGhlDataOptions {
@@ -185,10 +186,10 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
       [...filters.sellerIds].sort().join(","),
       filters.utmMedium,
       filters.utmCampaign,
-      filters.additionalStartDate?.getTime() ?? null,
-      filters.additionalEndDate?.getTime() ?? null,
-      filters.additionalStartDate2?.getTime() ?? null,
-      filters.additionalEndDate2?.getTime() ?? null,
+      filters.additionalStartDate ?? null,
+      filters.additionalEndDate ?? null,
+      filters.additionalStartDate2 ?? null,
+      filters.additionalEndDate2 ?? null,
     ],
     [
       filters.workspaceId,
@@ -219,10 +220,10 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
           sellerIds: filters.sellerIds,
           utmMedium: filters.utmMedium,
           utmCampaign: filters.utmCampaign,
-          additionalStartDate: filters.additionalStartDate ? filters.additionalStartDate.toISOString() : null,
-          additionalEndDate: filters.additionalEndDate ? filters.additionalEndDate.toISOString() : null,
-          additionalStartDate2: filters.additionalStartDate2 ? filters.additionalStartDate2.toISOString() : null,
-          additionalEndDate2: filters.additionalEndDate2 ? filters.additionalEndDate2.toISOString() : null,
+          additionalStartDate: filters.additionalStartDate ?? null,
+          additionalEndDate: filters.additionalEndDate ?? null,
+          additionalStartDate2: filters.additionalStartDate2 ?? null,
+          additionalEndDate2: filters.additionalEndDate2 ?? null,
         },
       });
       if (functionError) throw new Error(functionError.message);

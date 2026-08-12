@@ -189,10 +189,18 @@ serve(async (req) => {
     const filterOrigin: string | null = payload.sourceOrigin || null;
     const filterUtmMedium: string | null = payload.utmMedium || null;
     const filterUtmCampaign: string | null = payload.utmCampaign || null;
-    const additionalStartDate: string | null = payload.additionalStartDate || null;
-    const additionalEndDate: string | null = payload.additionalEndDate || null;
-    const additionalStartDate2: string | null = payload.additionalStartDate2 || null;
-    const additionalEndDate2: string | null = payload.additionalEndDate2 || null;
+    // Períodos dos campos de data adicionais: datas de calendário "YYYY-MM-DD".
+    // Aceita também ISO completo (frontend antigo em cache durante um rollout),
+    // ficando com a parte da data.
+    const asCalendarDay = (v: unknown): string | null => {
+      if (typeof v !== "string" || v.length < 10) return null;
+      const day = v.slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+    };
+    const additionalStartDate = asCalendarDay(payload.additionalStartDate);
+    const additionalEndDate = asCalendarDay(payload.additionalEndDate);
+    const additionalStartDate2 = asCalendarDay(payload.additionalStartDate2);
+    const additionalEndDate2 = asCalendarDay(payload.additionalEndDate2);
 
     // ===== Carrega catálogos =====
     const [
@@ -419,6 +427,11 @@ serve(async (req) => {
       return null;
     };
 
+    // Campos DATE do GHL guardam data de calendário em meia-noite UTC. Comparar
+    // com instantes no fuso do usuário desloca a janela (UTC-3 => 3h) e o filtro
+    // casa com o dia seguinte ao escolhido. Então a comparação é dia contra dia.
+    const utcDayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
     // Queries extras (uma por slot de data adicional ativo): sem filtro de
     // ghl_created_at no intervalo principal, mas com .lte("ghl_created_at", fim
     // do período adicional) como otimização — um lead não pode ser fechado
@@ -426,14 +439,14 @@ serve(async (req) => {
     const [oppsA, ...oppsExtraRaw] = await Promise.all([
       fetchAllRows(buildA),
       ...additionalDateSlots.map((slot) =>
-        fetchAllRows(() => baseQuery().lte("ghl_created_at", slot.end))
+        // fim do dia: com "YYYY-MM-DD" puro o Postgres entenderia 00:00Z e
+        // cortaria quem foi criado no próprio último dia da janela.
+        fetchAllRows(() => baseQuery().lte("ghl_created_at", `${slot.end}T23:59:59.999Z`))
       ),
     ]);
 
     const oppsExtra = oppsExtraRaw.map((rows, i) => {
       const slot = additionalDateSlots[i];
-      const addStart = new Date(slot.start).getTime();
-      const addEnd = new Date(slot.end).getTime();
       return rows.filter((o) => {
         const raw = extractCfValue(o.custom_fields, [
           slot.fieldId,
@@ -442,7 +455,8 @@ serve(async (req) => {
         ]);
         const t = parseDateVal(raw);
         if (t === null) return false;
-        return t >= addStart && t <= addEnd;
+        const day = utcDayOf(t);
+        return day >= slot.start && day <= slot.end;
       });
     });
 
