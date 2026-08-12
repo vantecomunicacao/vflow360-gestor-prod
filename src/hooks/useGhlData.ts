@@ -131,6 +131,8 @@ export interface DashboardData {
   cachedAt?: string;
   additionalDateFieldId?: string | null;
   additionalDateFieldName?: string | null;
+  additionalDateFieldId2?: string | null;
+  additionalDateFieldName2?: string | null;
   responseTime?: ResponseTime | null;
   coolingLeads?: CoolingLeads | null;
 }
@@ -146,6 +148,8 @@ export interface DashboardFilters {
   workspaceId: string | null;
   additionalStartDate?: Date | null;
   additionalEndDate?: Date | null;
+  additionalStartDate2?: Date | null;
+  additionalEndDate2?: Date | null;
 }
 
 interface UseGhlDataOptions {
@@ -183,6 +187,8 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
       filters.utmCampaign,
       filters.additionalStartDate?.getTime() ?? null,
       filters.additionalEndDate?.getTime() ?? null,
+      filters.additionalStartDate2?.getTime() ?? null,
+      filters.additionalEndDate2?.getTime() ?? null,
     ],
     [
       filters.workspaceId,
@@ -195,6 +201,8 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
       filters.utmCampaign,
       filters.additionalStartDate,
       filters.additionalEndDate,
+      filters.additionalStartDate2,
+      filters.additionalEndDate2,
     ],
   );
 
@@ -213,6 +221,8 @@ export function useGhlData(filters: DashboardFilters, options: UseGhlDataOptions
           utmCampaign: filters.utmCampaign,
           additionalStartDate: filters.additionalStartDate ? filters.additionalStartDate.toISOString() : null,
           additionalEndDate: filters.additionalEndDate ? filters.additionalEndDate.toISOString() : null,
+          additionalStartDate2: filters.additionalStartDate2 ? filters.additionalStartDate2.toISOString() : null,
+          additionalEndDate2: filters.additionalEndDate2 ? filters.additionalEndDate2.toISOString() : null,
         },
       });
       if (functionError) throw new Error(functionError.message);

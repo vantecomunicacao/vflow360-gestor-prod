@@ -191,6 +191,8 @@ serve(async (req) => {
     const filterUtmCampaign: string | null = payload.utmCampaign || null;
     const additionalStartDate: string | null = payload.additionalStartDate || null;
     const additionalEndDate: string | null = payload.additionalEndDate || null;
+    const additionalStartDate2: string | null = payload.additionalStartDate2 || null;
+    const additionalEndDate2: string | null = payload.additionalEndDate2 || null;
 
     // ===== Carrega catálogos =====
     const [
@@ -328,20 +330,35 @@ serve(async (req) => {
       return s === "" ? null : s;
     };
 
-    // ===== Configuração do campo de data adicional (ex: "Data de Venda") =====
+    // ===== Configuração dos campos de data adicionais (ex: "Data de Venda") =====
+    const resolveDateField = (fieldId: string | null) =>
+      fieldId
+        ? customFieldDefs.find(d => d.ghl_id === fieldId || d.field_key === fieldId) || null
+        : null;
+
     const additionalDateFieldId: string | null = settings?.additional_date_field || null;
-    const additionalDateFieldDef = additionalDateFieldId
-      ? customFieldDefs.find(d => d.ghl_id === additionalDateFieldId || d.field_key === additionalDateFieldId)
-      : null;
+    const additionalDateFieldDef = resolveDateField(additionalDateFieldId);
     const additionalDateFieldName: string | null = additionalDateFieldDef?.name || null;
-    const useAdditionalUnion = !!(additionalDateFieldId && additionalStartDate && additionalEndDate);
+
+    const additionalDateFieldId2: string | null = settings?.additional_date_field_2 || null;
+    const additionalDateFieldDef2 = resolveDateField(additionalDateFieldId2);
+    const additionalDateFieldName2: string | null = additionalDateFieldDef2?.name || null;
+
+    // Cada slot ativo (campo configurado + período informado) vira uma query extra
+    // unida por OR à query principal.
+    const additionalDateSlots = [
+      { fieldId: additionalDateFieldId, def: additionalDateFieldDef, start: additionalStartDate, end: additionalEndDate },
+      { fieldId: additionalDateFieldId2, def: additionalDateFieldDef2, start: additionalStartDate2, end: additionalEndDate2 },
+    ].filter((s): s is { fieldId: string; def: typeof additionalDateFieldDef; start: string; end: string } =>
+      !!(s.fieldId && s.start && s.end)
+    );
 
     // ===== Query opportunities com filtros =====
-    // Semântica de UNIÃO (lead aparece se A OR B):
+    // Semântica de UNIÃO (lead aparece se A OR qualquer slot adicional):
     //   - Query A: leads criados no período principal (ghl_created_at em [startDate, endDate]).
-    //   - Query B (apenas se filtro adicional ativo): leads cujo campo de data customizado
-    //     (ex: data de venda) caia no período adicional, independente de quando criados.
-    // Dedup por ghl_id ao mesclar A e B.
+    //   - Uma query por slot de data adicional ativo: leads cujo campo de data customizado
+    //     (ex: data de venda) caia no período daquele slot, independente de quando criados.
+    // Dedup por ghl_id ao mesclar todas.
     const SELECT_COLS = "ghl_id,name,pipeline_id,stage_id,status,monetary_value,source,assigned_to,lost_reason_id,custom_fields,ghl_created_at,last_status_change_at,contact_phone";
     const baseQuery = () => {
       let q = supabase
@@ -381,59 +398,58 @@ serve(async (req) => {
       return q;
     };
 
-    // Query B: sem filtro de ghl_created_at no intervalo principal, mas com
-    // .lte("ghl_created_at", additionalEndDate) como otimização — um lead não
-    // pode ser fechado antes de ser criado.
-    const buildB = useAdditionalUnion
-      ? () => baseQuery().lte("ghl_created_at", additionalEndDate!)
-      : null;
-
-    const [oppsA, oppsB0] = await Promise.all([
-      fetchAllRows(buildA),
-      buildB ? fetchAllRows(buildB) : Promise.resolve([] as any[]),
-    ]);
-    let oppsB = oppsB0;
-
-    // Filtra Query B em memória pelo campo de data customizado.
-    if (useAdditionalUnion) {
-      const addStart = new Date(additionalStartDate!).getTime();
-      const addEnd = new Date(additionalEndDate!).getTime();
-      const parseDateVal = (v: any): number | null => {
-        if (v == null || v === "") return null;
-        if (typeof v === "number") {
-          // Heurística: se for em segundos (10 dígitos), converte para ms
-          const ms = v < 1e12 ? v * 1000 : v;
+    const parseDateVal = (v: any): number | null => {
+      if (v == null || v === "") return null;
+      if (typeof v === "number") {
+        // Heurística: se for em segundos (10 dígitos), converte para ms
+        const ms = v < 1e12 ? v * 1000 : v;
+        const t = new Date(ms).getTime();
+        return isNaN(t) ? null : t;
+      }
+      if (typeof v === "string") {
+        const asNum = Number(v);
+        if (!isNaN(asNum) && v.trim() !== "") {
+          const ms = asNum < 1e12 ? asNum * 1000 : asNum;
           const t = new Date(ms).getTime();
-          return isNaN(t) ? null : t;
+          if (!isNaN(t)) return t;
         }
-        if (typeof v === "string") {
-          const asNum = Number(v);
-          if (!isNaN(asNum) && v.trim() !== "") {
-            const ms = asNum < 1e12 ? asNum * 1000 : asNum;
-            const t = new Date(ms).getTime();
-            if (!isNaN(t)) return t;
-          }
-          const t = new Date(v).getTime();
-          return isNaN(t) ? null : t;
-        }
-        return null;
-      };
-      oppsB = oppsB.filter((o) => {
+        const t = new Date(v).getTime();
+        return isNaN(t) ? null : t;
+      }
+      return null;
+    };
+
+    // Queries extras (uma por slot de data adicional ativo): sem filtro de
+    // ghl_created_at no intervalo principal, mas com .lte("ghl_created_at", fim
+    // do período adicional) como otimização — um lead não pode ser fechado
+    // antes de ser criado. O filtro pelo campo de data em si é feito em memória.
+    const [oppsA, ...oppsExtraRaw] = await Promise.all([
+      fetchAllRows(buildA),
+      ...additionalDateSlots.map((slot) =>
+        fetchAllRows(() => baseQuery().lte("ghl_created_at", slot.end))
+      ),
+    ]);
+
+    const oppsExtra = oppsExtraRaw.map((rows, i) => {
+      const slot = additionalDateSlots[i];
+      const addStart = new Date(slot.start).getTime();
+      const addEnd = new Date(slot.end).getTime();
+      return rows.filter((o) => {
         const raw = extractCfValue(o.custom_fields, [
-          additionalDateFieldId,
-          additionalDateFieldDef?.field_key,
-          additionalDateFieldDef?.name,
+          slot.fieldId,
+          slot.def?.field_key,
+          slot.def?.name,
         ]);
         const t = parseDateVal(raw);
         if (t === null) return false;
         return t >= addStart && t <= addEnd;
       });
-    }
+    });
 
-    // União A ∪ B com dedup por ghl_id.
+    // União A ∪ (slots adicionais) com dedup por ghl_id.
     const mergedOpps = new Map<string, any>();
     for (const o of oppsA) mergedOpps.set(o.ghl_id, o);
-    for (const o of oppsB) mergedOpps.set(o.ghl_id, o);
+    for (const rows of oppsExtra) for (const o of rows) mergedOpps.set(o.ghl_id, o);
     let opps = Array.from(mergedOpps.values());
 
     // Origem: source nativo ou custom field configurado
@@ -1319,6 +1335,8 @@ serve(async (req) => {
       negotiatingMonetary,
       additionalDateFieldId,
       additionalDateFieldName,
+      additionalDateFieldId2,
+      additionalDateFieldName2,
       responseTime,
       coolingLeads,
       cachedAt: new Date().toISOString(),

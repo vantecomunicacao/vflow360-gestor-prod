@@ -34,6 +34,7 @@ export default function DashboardSettings() {
   const [utmContentField, setUtmContentField] = useState<string>("");
   const [utmTermField, setUtmTermField] = useState<string>("");
   const [additionalDateField, setAdditionalDateField] = useState<string>("");
+  const [additionalDateField2, setAdditionalDateField2] = useState<string>("");
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [chartFields, setChartFields] = useState<string[]>([]);
   const [businessStart, setBusinessStart] = useState<string>("09:00");
@@ -72,6 +73,7 @@ export default function DashboardSettings() {
         setUtmContentField((settings as any).utm_content_field_id || "");
         setUtmTermField((settings as any).utm_term_field_id || "");
         setAdditionalDateField(settings.additional_date_field || "");
+        setAdditionalDateField2(settings.additional_date_field_2 || "");
         setVisibleFields(settings.visible_custom_fields || []);
         setChartFields((settings as any).chart_custom_fields || []);
         setBusinessStart((settings as any).business_hours_start || "09:00");
@@ -99,6 +101,7 @@ export default function DashboardSettings() {
         utm_content_field_id: utmContentField || null,
         utm_term_field_id: utmTermField || null,
         additional_date_field: additionalDateField || null,
+        additional_date_field_2: additionalDateField2 || null,
         visible_custom_fields: visibleFields,
         chart_custom_fields: chartFields.filter((id) => visibleFields.includes(id)),
         business_hours_start: businessStart || "09:00",
@@ -443,16 +446,16 @@ export default function DashboardSettings() {
         </CardContent>
       </Card>
 
-      {/* Campo de data adicional */}
+      {/* Campos de data adicionais */}
       <Card>
         <CardHeader>
-          <CardTitle>Campo de data adicional (opcional)</CardTitle>
+          <CardTitle>Campos de data adicionais (opcional)</CardTitle>
           <CardDescription>
-            Quando configurado, o dashboard ganha um segundo filtro de período baseado nesse campo (ex: data de fechamento).
+            Cada campo configurado adiciona um filtro de período extra no dashboard (ex: data de fechamento, data de entrega).
             Apenas campos do tipo data do CRM são listados.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           {(() => {
             const dateFields = customFields.filter((f) =>
               f.data_type ? DATE_TYPES.includes(f.data_type) : false
@@ -460,20 +463,32 @@ export default function DashboardSettings() {
             if (dateFields.length === 0) {
               return <p className="text-sm text-muted-foreground">Nenhum campo de data sincronizado do CRM.</p>;
             }
-            return (
-              <Select
-                value={additionalDateField || "__none__"}
-                onValueChange={(v) => setAdditionalDateField(v === "__none__" ? "" : v)}
-              >
-                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Nenhum</SelectItem>
-                  {dateFields.map((f) => (
-                    <SelectItem key={f.id} value={f.ghl_id}>{f.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            );
+            const slots = [
+              { key: "1", label: "Campo de data adicional 1", value: additionalDateField, setter: setAdditionalDateField, taken: additionalDateField2 },
+              { key: "2", label: "Campo de data adicional 2", value: additionalDateField2, setter: setAdditionalDateField2, taken: additionalDateField },
+            ];
+            return slots.map((slot) => (
+              <div key={slot.key} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                <Label className="text-sm font-medium">{slot.label}</Label>
+                <div className="md:col-span-2">
+                  <Select
+                    value={slot.value || "__none__"}
+                    onValueChange={(v) => slot.setter(v === "__none__" ? "" : v)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Nenhum</SelectItem>
+                      {dateFields
+                        // não deixa escolher o mesmo campo nos dois slots
+                        .filter((f) => f.ghl_id === slot.value || f.ghl_id !== slot.taken)
+                        .map((f) => (
+                          <SelectItem key={f.id} value={f.ghl_id}>{f.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ));
           })()}
         </CardContent>
       </Card>

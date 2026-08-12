@@ -535,6 +535,7 @@ export type Database = {
       ghl_dashboard_settings: {
         Row: {
           additional_date_field: string | null
+          additional_date_field_2: string | null
           ai_allowed_pipeline_ids: string[]
           ai_insights_config: Json
           business_hours_end: string
@@ -556,6 +557,7 @@ export type Database = {
         }
         Insert: {
           additional_date_field?: string | null
+          additional_date_field_2?: string | null
           ai_allowed_pipeline_ids?: string[]
           ai_insights_config?: Json
           business_hours_end?: string
@@ -577,6 +579,7 @@ export type Database = {
         }
         Update: {
           additional_date_field?: string | null
+          additional_date_field_2?: string | null
           ai_allowed_pipeline_ids?: string[]
           ai_insights_config?: Json
           business_hours_end?: string

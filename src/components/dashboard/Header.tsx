@@ -36,6 +36,9 @@ interface HeaderProps {
   additionalDateRange?: DateRange | undefined;
   onAdditionalDateRangeChange?: (r: DateRange | undefined) => void;
   additionalDateLabel?: string | null;
+  additionalDateRange2?: DateRange | undefined;
+  onAdditionalDateRangeChange2?: (r: DateRange | undefined) => void;
+  additionalDateLabel2?: string | null;
 }
 
 const datePresets = [
@@ -319,11 +322,14 @@ export function Header({
   onUtmMediumChange, onUtmCampaignChange,
   cachedAt,
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
+  additionalDateRange2, onAdditionalDateRangeChange2, additionalDateLabel2,
 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const hasAdditionalRange = !!additionalDateRange?.from;
-  const activeFilterCount = [selectedPipelineId, selectedStageIds.length > 0, selectedSellerIds.length > 0, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange].filter(Boolean).length;
+  const hasAdditionalRange2 = !!additionalDateRange2?.from;
+  const activeFilterCount = [selectedPipelineId, selectedStageIds.length > 0, selectedSellerIds.length > 0, selectedUtmMedium, selectedUtmCampaign, hasAdditionalRange, hasAdditionalRange2].filter(Boolean).length;
   const showAdditional = !!additionalDateLabel && !!onAdditionalDateRangeChange;
+  const showAdditional2 = !!additionalDateLabel2 && !!onAdditionalDateRangeChange2;
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const stages = selectedPipeline?.stages || [];
 
@@ -334,6 +340,7 @@ export function Header({
     onUtmMediumChange?.(null);
     onUtmCampaignChange?.(null);
     onAdditionalDateRangeChange?.(undefined);
+    onAdditionalDateRangeChange2?.(undefined);
   };
 
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -413,17 +420,28 @@ export function Header({
         </Field>
       )}
 
+      {(showAdditional || showAdditional2) && (
+        <Separator orientation="vertical" className="h-10 hidden md:block self-end mb-1" />
+      )}
+
       {showAdditional && (
-        <>
-          <Separator orientation="vertical" className="h-10 hidden md:block self-end mb-1" />
-          <Field label={additionalDateLabel!}>
-            <DateRangePicker
-              dateRange={additionalDateRange}
-              onDateRangeChange={onAdditionalDateRangeChange!}
-              clearable
-            />
-          </Field>
-        </>
+        <Field label={additionalDateLabel!}>
+          <DateRangePicker
+            dateRange={additionalDateRange}
+            onDateRangeChange={onAdditionalDateRangeChange!}
+            clearable
+          />
+        </Field>
+      )}
+
+      {showAdditional2 && (
+        <Field label={additionalDateLabel2!}>
+          <DateRangePicker
+            dateRange={additionalDateRange2}
+            onDateRangeChange={onAdditionalDateRangeChange2!}
+            clearable
+          />
+        </Field>
       )}
     </>
   );

@@ -44,6 +44,7 @@ export default function Dashboard() {
     to: new Date(),
   });
   const [additionalDateRange, setAdditionalDateRange] = useState<DateRange | undefined>(undefined);
+  const [additionalDateRange2, setAdditionalDateRange2] = useState<DateRange | undefined>(undefined);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const [selectedStageIds, setSelectedStageIds] = useState<string[]>([]);
   const [selectedSellerIds, setSelectedSellerIds] = useState<string[]>([]);
@@ -63,6 +64,7 @@ export default function Dashboard() {
       // Reset padrão: período (últimos 7 dias) e todos os filtros zerados.
       setDateRange({ from: subDays(new Date(), 6), to: new Date() });
       setAdditionalDateRange(undefined);
+      setAdditionalDateRange2(undefined);
       setSelectedSellerIds([]);
       setSelectedUtmMedium(null);
       setSelectedUtmCampaign(null);
@@ -107,6 +109,17 @@ export default function Dashboard() {
     [additionalDateRange?.to, additionalDateRange?.from]
   );
 
+  const additionalStartDate2 = useMemo(
+    () => (additionalDateRange2?.from ? startOfDay(additionalDateRange2.from) : null),
+    [additionalDateRange2?.from]
+  );
+  const additionalEndDate2 = useMemo(
+    () => (additionalDateRange2?.to || additionalDateRange2?.from
+      ? endOfDay(additionalDateRange2.to || additionalDateRange2.from!)
+      : null),
+    [additionalDateRange2?.to, additionalDateRange2?.from]
+  );
+
   const filters: DashboardFilters = useMemo(() => ({
     startDate, endDate,
     pipelineId: selectedPipelineId,
@@ -117,7 +130,9 @@ export default function Dashboard() {
     workspaceId: activeWorkspace?.id || null,
     additionalStartDate,
     additionalEndDate,
-  }), [startDate, endDate, selectedPipelineId, selectedStageIds, selectedSellerIds, selectedUtmMedium, selectedUtmCampaign, activeWorkspace?.id, additionalStartDate, additionalEndDate]);
+    additionalStartDate2,
+    additionalEndDate2,
+  }), [startDate, endDate, selectedPipelineId, selectedStageIds, selectedSellerIds, selectedUtmMedium, selectedUtmCampaign, activeWorkspace?.id, additionalStartDate, additionalEndDate, additionalStartDate2, additionalEndDate2]);
 
   const periodDays = useMemo(() => differenceInDays(endDate, startDate) + 1, [startDate, endDate]);
   const prevFilters: DashboardFilters = useMemo(() => ({
@@ -126,6 +141,8 @@ export default function Dashboard() {
     endDate: endOfDay(subDays(startDate, 1)),
     additionalStartDate: null,
     additionalEndDate: null,
+    additionalStartDate2: null,
+    additionalEndDate2: null,
   }), [filters, startDate, periodDays]);
 
   const { data, isLoading, isFetching, error, refetch, cachedAt } = useGhlData(filters);
@@ -207,6 +224,9 @@ export default function Dashboard() {
         additionalDateRange={additionalDateRange}
         onAdditionalDateRangeChange={setAdditionalDateRange}
         additionalDateLabel={data.additionalDateFieldName || null}
+        additionalDateRange2={additionalDateRange2}
+        onAdditionalDateRangeChange2={setAdditionalDateRange2}
+        additionalDateLabel2={data.additionalDateFieldName2 || null}
       />
 
       {/* Barra de progresso ao aplicar filtros — feedback de que a busca está rodando. */}
