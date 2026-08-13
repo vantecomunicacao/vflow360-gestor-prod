@@ -60,15 +60,21 @@ serve(async (req) => {
     if (!isMember) throw new Error("Forbidden");
 
     // Escopo do vendedor: se houver vínculo em user_ghl_links, FORÇA o filtro
-    // ao ghl_user_id dele (ignora qualquer sellerId vindo do cliente).
+    // ao ghl_user_id dele (ignora qualquer sellerId vindo do cliente) — a menos
+    // que o admin tenha dado a permissão `view_all_cooling_leads`, que libera a
+    // conta inteira. Admin do sistema sempre vê tudo.
+    const [{ data: linkRow }, { data: permRow }, { data: adminRow }] = await Promise.all([
+      supabase.from("user_ghl_links").select("ghl_user_id")
+        .eq("user_id", userId).eq("workspace_id", workspaceId).maybeSingle(),
+      supabase.from("user_permissions").select("view_all_cooling_leads")
+        .eq("user_id", userId).maybeSingle(),
+      supabase.from("user_roles").select("role")
+        .eq("user_id", userId).eq("role", "admin").maybeSingle(),
+    ]);
+    const canSeeWholeAccount = !!permRow?.view_all_cooling_leads || !!adminRow;
+
     let forcedSellerId: string | null = null;
-    const { data: linkRow } = await supabase
-      .from("user_ghl_links")
-      .select("ghl_user_id")
-      .eq("user_id", userId)
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    if (linkRow?.ghl_user_id) forcedSellerId = linkRow.ghl_user_id as string;
+    if (linkRow?.ghl_user_id && !canSeeWholeAccount) forcedSellerId = linkRow.ghl_user_id as string;
 
     // Vendedor com escopo forçado nunca amplia o filtro pelo payload; gestor
     // usa livremente os sellerIds que vieram da tela.

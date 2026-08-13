@@ -1175,6 +1175,7 @@ export type Database = {
           user_id: string
           view_integrations: boolean
           view_settings: boolean
+          view_all_cooling_leads: boolean
           view_suggestions: boolean
         }
         Insert: {
@@ -1183,6 +1184,7 @@ export type Database = {
           user_id: string
           view_integrations?: boolean
           view_settings?: boolean
+          view_all_cooling_leads?: boolean
           view_suggestions?: boolean
         }
         Update: {
@@ -1191,6 +1193,7 @@ export type Database = {
           user_id?: string
           view_integrations?: boolean
           view_settings?: boolean
+          view_all_cooling_leads?: boolean
           view_suggestions?: boolean
         }
         Relationships: []
@@ -1296,6 +1299,7 @@ export type Database = {
           is_admin: boolean
           view_integrations: boolean
           view_settings: boolean
+          view_all_cooling_leads: boolean
           view_suggestions: boolean
         }[]
       }

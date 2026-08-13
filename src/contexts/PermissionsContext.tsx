@@ -6,6 +6,8 @@ export interface Permissions {
   viewSuggestions: boolean;
   viewIntegrations: boolean;
   viewSettings: boolean;
+  /** Ve os leads esfriando da conta inteira, e nao so os proprios. */
+  viewAllCoolingLeads: boolean;
   isAdmin: boolean;
 }
 
@@ -13,6 +15,7 @@ const DEFAULT: Permissions = {
   viewSuggestions: false,
   viewIntegrations: false,
   viewSettings: false,
+  viewAllCoolingLeads: false,
   isAdmin: false,
 };
 
@@ -68,6 +71,7 @@ export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
           viewSuggestions: !!r.view_suggestions,
           viewIntegrations: !!r.view_integrations,
           viewSettings: !!r.view_settings,
+          viewAllCoolingLeads: !!r.view_all_cooling_leads,
           isAdmin: !!r.is_admin,
         });
       }

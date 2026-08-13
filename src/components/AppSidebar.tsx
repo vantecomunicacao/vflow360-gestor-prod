@@ -27,7 +27,7 @@ export function AppSidebar() {
   const { signOut } = useAuth();
   const { displayName, email, initial } = useProfile();
   const { permissions } = usePermissions();
-  const { isAdmin, viewSuggestions, viewIntegrations, viewSettings } = permissions;
+  const { isAdmin, viewSuggestions, viewIntegrations, viewSettings, viewAllCoolingLeads } = permissions;
   // Vendedor (so sugestoes) nao ve os itens de gestor no menu.
   const gestor = !isSuggestionsOnly(permissions);
 
@@ -41,7 +41,7 @@ export function AppSidebar() {
     { title: "Analista IA", url: "/assistant", icon: Brain, show: gestor },
     { title: "Conversas", url: "/conversations", icon: MessageSquare, show: gestor },
     { title: "Sugestões IA", url: "/suggestions", icon: Sparkles, show: viewSuggestions },
-    { title: "Leads esfriando", url: "/cooling-leads", icon: Snowflake, show: viewSuggestions },
+    { title: "Leads esfriando", url: "/cooling-leads", icon: Snowflake, show: viewSuggestions || viewAllCoolingLeads },
     { title: "Integrações", url: "/integrations", icon: Plug, show: viewIntegrations },
     { title: "Documentação", url: "/docs", icon: BookOpen, show: gestor },
     { title: "Admin", url: "/admin", icon: ShieldCheck, show: isAdmin },

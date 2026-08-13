@@ -84,7 +84,7 @@ const App = () => (
                 />
                 <Route
                   path="/cooling-leads"
-                  element={<PermissionGuard require="viewSuggestions">{lazyRoute(<CoolingLeads />, <GenericPageSkeleton />)}</PermissionGuard>}
+                  element={<PermissionGuard require={["viewSuggestions", "viewAllCoolingLeads"]}>{lazyRoute(<CoolingLeads />, <GenericPageSkeleton />)}</PermissionGuard>}
                 />
                 <Route
                   path="/integrations"

@@ -18,6 +18,7 @@ interface UserPerms {
   view_suggestions: boolean;
   view_integrations: boolean;
   view_settings: boolean;
+  view_all_cooling_leads: boolean;
 }
 
 interface AdminUser {
@@ -52,6 +53,7 @@ export default function Admin() {
     view_suggestions: false,
     view_integrations: false,
     view_settings: false,
+    view_all_cooling_leads: false,
   });
   const [creating, setCreating] = useState(false);
   // vendedor (acesso só a Sugestões, vinculado a um GHL user)
@@ -74,6 +76,7 @@ export default function Admin() {
     view_suggestions: false,
     view_integrations: false,
     view_settings: false,
+    view_all_cooling_leads: false,
   });
 
   const callAdmin = async <T = Record<string, unknown>>(
@@ -183,7 +186,7 @@ export default function Admin() {
       toast.success(isVendor ? "Vendedor criado" : "Usuário criado");
       setCreateOpen(false);
       setNewEmail(""); setNewPassword(""); setNewName(""); setNewWorkspace(""); setNewRole("user");
-      setNewPerms({ view_suggestions: false, view_integrations: false, view_settings: false });
+      setNewPerms({ view_suggestions: false, view_integrations: false, view_settings: false, view_all_cooling_leads: false });
       setIsVendor(false); setNewGhlUser(""); setGhlUsers([]);
       refresh();
     } catch (e) {
@@ -375,6 +378,18 @@ export default function Admin() {
                     onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_settings: v }))}
                   />
                 </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Label className="font-normal">Ver leads esfriando de toda a conta</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Sem isto, quem está vinculado a um vendedor do GHL vê só as próprias oportunidades.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={newPerms.view_all_cooling_leads}
+                    onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_all_cooling_leads: v }))}
+                  />
+                </div>
               </div>
               </>)}
             </div>
@@ -519,6 +534,19 @@ export default function Admin() {
               <Switch
                 checked={permsDraft.view_settings}
                 onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_settings: v }))}
+              />
+            </div>
+            <div className="flex items-start justify-between gap-3 pt-2 border-t border-border">
+              <div>
+                <Label className="font-normal">Ver leads esfriando de toda a conta</Label>
+                <p className="text-xs text-muted-foreground">
+                  Libera os leads esfriando de todos os vendedores da conta, com filtro por vendedor.
+                  Sem isto, quem está vinculado a um vendedor do GHL vê só as próprias oportunidades.
+                </p>
+              </div>
+              <Switch
+                checked={permsDraft.view_all_cooling_leads}
+                onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_all_cooling_leads: v }))}
               />
             </div>
           </div>
