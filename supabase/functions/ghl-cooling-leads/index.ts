@@ -1,10 +1,14 @@
-// VFlowGHL — cooling-leads
+// VFlowGHL — ghl-cooling-leads
 // Calcula APENAS os "leads esfriando" (oportunidades abertas sem atividade há
 // X dias), isolando os dados sensíveis do dashboard do gestor. Para vendedores
 // (com vínculo em user_ghl_links) o escopo é FORÇADO ao ghl_user_id dele.
 //
+// O slug leva o prefixo `ghl-` porque o projeto Kommo compartilha este mesmo
+// projeto Supabase e publica a função dele em `cooling-leads` (schema kommo).
+//
 // Atividade = o mais recente entre a última mudança de etapa
-// (last_status_change_at, fallback ghl_created_at) e a última mensagem trocada.
+// (last_status_change_at, fallback ghl_created_at) e a última mensagem trocada
+// (ghl_messages + o last_message_at que a própria conversa já traz do GHL).
 // Faixas não-sobrepostas: 7–9 / 10–13 / 14+.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -46,6 +50,9 @@ serve(async (req) => {
     const workspaceId = payload.workspace_id as string;
     if (!workspaceId) throw new Error("workspace_id is required");
     const filterPipelineId: string | null = payload.pipelineId || null;
+    const requestedSellerIds: string[] = Array.isArray(payload.sellerIds)
+      ? payload.sellerIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
+      : [];
 
     const { data: isMember } = await supabase.rpc("is_workspace_member", {
       _user_id: userId, _workspace_id: workspaceId,
@@ -62,6 +69,10 @@ serve(async (req) => {
       .eq("workspace_id", workspaceId)
       .maybeSingle();
     if (linkRow?.ghl_user_id) forcedSellerId = linkRow.ghl_user_id as string;
+
+    // Vendedor com escopo forçado nunca amplia o filtro pelo payload; gestor
+    // usa livremente os sellerIds que vieram da tela.
+    const sellerIdFilter: string[] = forcedSellerId ? [forcedSellerId] : requestedSellerIds;
 
     // Stages "ganhas" para excluir do "aberto" (por nome + won_stage_keys).
     const [{ data: pipelinesRows }, { data: settingsRow }, { data: usersRows }] = await Promise.all([
@@ -91,12 +102,13 @@ serve(async (req) => {
     for (let from = 0; ; from += OPP_PAGE) {
       let q = supabase
         .from("ghl_opportunities")
-        .select("ghl_id,name,stage_id,status,assigned_to,ghl_created_at,last_status_change_at,contact_phone")
+        .select("ghl_id,name,stage_id,status,assigned_to,ghl_created_at,last_status_change_at,contact_id,contact_phone")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null) // ignora fantasmas (excluídos no GHL, soft-deletados)
         .range(from, from + OPP_PAGE - 1);
       if (filterPipelineId) q = q.eq("pipeline_id", filterPipelineId);
-      if (forcedSellerId) q = q.eq("assigned_to", forcedSellerId);
+      if (sellerIdFilter.length === 1) q = q.eq("assigned_to", sellerIdFilter[0]);
+      else if (sellerIdFilter.length > 1) q = q.in("assigned_to", sellerIdFilter);
       const { data: pageRows, error: oppErr } = await q;
       if (oppErr) throw oppErr;
       const rows = (pageRows || []) as any[];
@@ -114,7 +126,11 @@ serve(async (req) => {
     };
 
     // Candidatos: abertas paradas (por etapa/criação) há >= warning dias.
-    const candidates: Array<{ phone: string; baseMs: number; name: string; seller: string | null }> = [];
+    type Candidate = {
+      contactId: string | null; phone: string; phoneRaw: string | null;
+      baseMs: number; name: string; seller: string | null;
+    };
+    const candidates: Candidate[] = [];
     for (const o of (openRows || [])) {
       if (!isOpen(o)) continue;
       const baseStr = o.last_status_change_at || o.ghl_created_at;
@@ -123,42 +139,73 @@ serve(async (req) => {
       if (isNaN(baseMs)) continue;
       if ((nowMs - baseMs) / DAY < COOLING_THRESHOLDS.warning) continue;
       candidates.push({
+        contactId: o.contact_id || null,
         phone: normalizePhone(o.contact_phone),
+        phoneRaw: o.contact_phone || null,
         baseMs,
         name: o.name || `Oportunidade ${String(o.ghl_id).slice(0, 6)}`,
         seller: o.assigned_to ? (sellerNameById.get(o.assigned_to) || null) : null,
       });
     }
 
-    // Última mensagem por telefone dos candidatos (janela de 90 dias).
-    const candPhones = new Set(candidates.map((c) => c.phone).filter(Boolean));
-    const lastMsgByPhone = new Map<string, number>();
-    if (candPhones.size > 0) {
-      const convIdToPhone = new Map<string, string>();
-      const coolConvIds: string[] = [];
-      const PAGE = 1000;
-      let from = 0;
-      while (true) {
-        const { data: convsRows, error: convErr } = await supabase
-          .from("ghl_conversations")
-          .select("ghl_conversation_id,contact_phone")
-          .eq("workspace_id", workspaceId)
-          .range(from, from + PAGE - 1);
-        if (convErr) { console.error("[cooling] ghl_conversations error", convErr); break; }
-        const rows = convsRows || [];
-        for (const c of rows) {
-          const phone = normalizePhone((c as any).contact_phone);
-          if (!candPhones.has(phone)) continue;
-          const id = (c as any).ghl_conversation_id as string;
-          if (convIdToPhone.has(id)) continue;
-          convIdToPhone.set(id, phone);
-          coolConvIds.push(id);
-        }
-        if (rows.length < PAGE) break;
-        from += PAGE;
-        if (from > 50000) break; // safety
-      }
+    // Última atividade de conversa dos candidatos. As conversas são buscadas por
+    // chave exata em lotes (contact_id e telefone como está gravado) — varrer
+    // todas as conversas do workspace estourava o tempo em contas grandes.
+    // Guardamos por contato E por telefone porque nem toda oportunidade tem
+    // contact_id; na hora de pontuar vale o mais recente entre os dois.
+    const lastActByContact = new Map<string, number>();
+    const lastActByPhone = new Map<string, number>();
+    const bump = (map: Map<string, number>, key: string | null | undefined, t: number) => {
+      if (!key || isNaN(t)) return;
+      if (t > (map.get(key) || 0)) map.set(key, t);
+    };
 
+    const contactIds = [...new Set(candidates.map((c) => c.contactId).filter(Boolean))] as string[];
+    const rawPhones = [...new Set(candidates.map((c) => c.phoneRaw).filter(Boolean))] as string[];
+    const convMeta = new Map<string, { contactId: string | null; phone: string }>();
+    const PAGE = 1000;
+    const IN_CHUNK = 300;
+
+    const collectConvs = async (column: "ghl_contact_id" | "contact_phone", values: string[]) => {
+      for (let i = 0; i < values.length; i += IN_CHUNK) {
+        const chunk = values.slice(i, i + IN_CHUNK);
+        for (let from = 0; ; from += PAGE) {
+          const { data: convsRows, error: convErr } = await supabase
+            .from("ghl_conversations")
+            .select("ghl_conversation_id,ghl_contact_id,contact_phone,last_message_at")
+            .eq("workspace_id", workspaceId)
+            .in(column, chunk)
+            .range(from, from + PAGE - 1);
+          if (convErr) { console.error("[cooling] ghl_conversations error", convErr); return; }
+          const rows = (convsRows || []) as any[];
+          for (const c of rows) {
+            convMeta.set(c.ghl_conversation_id, {
+              contactId: c.ghl_contact_id || null,
+              phone: normalizePhone(c.contact_phone),
+            });
+            // A conversa já traz a data da última mensagem vinda do GHL; usar
+            // isso cobre o período em que o sync de mensagens ainda não chegou.
+            if (c.last_message_at) {
+              const t = new Date(c.last_message_at).getTime();
+              bump(lastActByContact, c.ghl_contact_id, t);
+              bump(lastActByPhone, normalizePhone(c.contact_phone), t);
+            }
+          }
+          if (rows.length < PAGE) break;
+          if (from > 50_000) break; // safety
+        }
+      }
+    };
+
+    // Todo o sinal de conversa é best-effort: se algo aqui falhar, as faixas
+    // ainda saem pela data de etapa/criação (como no card do dashboard, que
+    // degrada em vez de derrubar a tela inteira).
+    try {
+      if (contactIds.length > 0) await collectConvs("ghl_contact_id", contactIds);
+      if (rawPhones.length > 0) await collectConvs("contact_phone", rawPhones);
+
+      // Mensagens das conversas encontradas (janela de 90 dias).
+      const coolConvIds = [...convMeta.keys()];
       if (coolConvIds.length > 0) {
         const sinceIso = new Date(nowMs - 90 * DAY).toISOString();
         const ID_CHUNK = 200;
@@ -178,11 +225,11 @@ serve(async (req) => {
             if (msgErr) { console.error("[cooling] ghl_messages error", msgErr); break; }
             const rows = (msgsRows || []) as any[];
             for (const m of rows) {
-              const phone = convIdToPhone.get(m.ghl_conversation_id);
-              if (!phone) continue;
+              const meta = convMeta.get(m.ghl_conversation_id);
+              if (!meta) continue;
               const t = new Date(m.date_added).getTime();
-              if (isNaN(t)) continue;
-              if (t > (lastMsgByPhone.get(phone) || 0)) lastMsgByPhone.set(phone, t);
+              bump(lastActByContact, meta.contactId, t);
+              bump(lastActByPhone, meta.phone, t);
             }
             if (rows.length < MSG_PAGE) break;
             mFrom += MSG_PAGE;
@@ -190,6 +237,8 @@ serve(async (req) => {
           }
         }
       }
+    } catch (e) {
+      console.error("[cooling] sinal de conversa indisponível, seguindo só com data de etapa", e);
     }
 
     type CoolingLead = { name: string; seller: string | null; days: number };
@@ -201,7 +250,11 @@ serve(async (req) => {
     };
 
     for (const c of candidates) {
-      const effMs = Math.max(c.baseMs, c.phone ? (lastMsgByPhone.get(c.phone) || 0) : 0);
+      const effMs = Math.max(
+        c.baseMs,
+        c.contactId ? (lastActByContact.get(c.contactId) || 0) : 0,
+        c.phone ? (lastActByPhone.get(c.phone) || 0) : 0,
+      );
       const days = (nowMs - effMs) / DAY;
       if (days < COOLING_THRESHOLDS.warning) continue;
       result.total++;
@@ -222,9 +275,15 @@ serve(async (req) => {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("cooling-leads error:", msg);
+    console.error("ghl-cooling-leads error:", msg);
+    // Status por tipo de falha: a tela mostra a mensagem, então "Forbidden"
+    // (usuário fora da conta) não pode chegar como um 500 genérico.
+    const status = msg === "Missing authorization" || msg === "Unauthorized" ? 401
+      : msg === "Forbidden" ? 403
+      : msg === "workspace_id is required" ? 400
+      : 500;
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
