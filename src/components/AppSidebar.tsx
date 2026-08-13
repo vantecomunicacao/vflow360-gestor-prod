@@ -3,7 +3,7 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceSelector } from "@/components/WorkspaceSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { usePermissions, isSuggestionsOnly } from "@/contexts/PermissionsContext";
+import { usePermissions, isRestricted } from "@/contexts/PermissionsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import {
@@ -28,8 +28,8 @@ export function AppSidebar() {
   const { displayName, email, initial } = useProfile();
   const { permissions } = usePermissions();
   const { isAdmin, viewSuggestions, viewIntegrations, viewSettings, viewAllCoolingLeads } = permissions;
-  // Vendedor (so sugestoes) nao ve os itens de gestor no menu.
-  const gestor = !isSuggestionsOnly(permissions);
+  // Usuario restrito (vendedor/operacional) nao ve os itens de gestor no menu.
+  const gestor = !isRestricted(permissions);
 
   const handleSignOut = async () => {
     await signOut();

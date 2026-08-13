@@ -1,9 +1,9 @@
 import { Navigate } from "react-router-dom";
-import { usePermissions, isSuggestionsOnly } from "@/contexts/PermissionsContext";
+import { usePermissions, isRestricted, landingPath } from "@/contexts/PermissionsContext";
 import { Loader2 } from "lucide-react";
 
-// Bloqueia usuarios "so sugestoes" (vendedor) das rotas de gestor, redirecionando
-// para /suggestions. Gestores/admins passam normalmente.
+// Bloqueia usuarios restritos (vendedor/operacional) das rotas de gestor,
+// redirecionando para a tela que eles podem ver. Gestores/admins passam.
 const GestorGuard = ({ children }: { children: React.ReactNode }) => {
   const { permissions, loading } = usePermissions();
   if (loading) {
@@ -13,8 +13,8 @@ const GestorGuard = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  if (isSuggestionsOnly(permissions)) {
-    return <Navigate to="/suggestions" replace />;
+  if (isRestricted(permissions)) {
+    return <Navigate to={landingPath(permissions)} replace />;
   }
   return <>{children}</>;
 };

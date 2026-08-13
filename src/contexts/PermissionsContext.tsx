@@ -31,14 +31,21 @@ const PermissionsContext = createContext<PermissionsContextType>({
 
 export const usePermissions = () => useContext(PermissionsContext);
 
-// Usuario "so sugestoes" (vendedor): nao-admin, ve sugestoes e nada mais.
-export function isSuggestionsOnly(p: Permissions): boolean {
-  return !p.isAdmin && p.viewSuggestions && !p.viewIntegrations && !p.viewSettings;
+// Usuario restrito (vendedor/operacional): nao-admin, sem Integracoes nem
+// Configuracoes, com acesso SO as telas que as permissoes dele liberam — nada
+// de Dashboard, Analista IA, Conversas ou Documentacao. Basta uma das
+// permissoes restritas para cair aqui; quem nao tem nenhuma segue como gestor,
+// que era o comportamento antes de existir viewAllCoolingLeads.
+export function isRestricted(p: Permissions): boolean {
+  return !p.isAdmin && !p.viewIntegrations && !p.viewSettings
+    && (p.viewSuggestions || p.viewAllCoolingLeads);
 }
 
-// Rota de destino conforme o perfil: vendedor -> Sugestoes; demais -> Dashboard.
+// Rota de destino conforme o perfil. Restrito vai para a tela que ele pode
+// ver (Sugestoes tem prioridade quando tem as duas); demais, Dashboard.
 export function landingPath(p: Permissions): string {
-  return isSuggestionsOnly(p) ? "/suggestions" : "/dashboard";
+  if (!isRestricted(p)) return "/dashboard";
+  return p.viewSuggestions ? "/suggestions" : "/cooling-leads";
 }
 
 export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
