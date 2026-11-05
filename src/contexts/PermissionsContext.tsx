@@ -8,6 +8,9 @@ export interface Permissions {
   viewSettings: boolean;
   /** Ve os leads esfriando da conta inteira, e nao so os proprios. */
   viewAllCoolingLeads: boolean;
+  /** Tela "Meu desempenho": qualidade de preenchimento e tempo de resposta
+   *  dos proprios leads (escopo forcado no servidor). Admin nao recebe. */
+  viewMyPerformance: boolean;
   isAdmin: boolean;
 }
 
@@ -16,6 +19,7 @@ const DEFAULT: Permissions = {
   viewIntegrations: false,
   viewSettings: false,
   viewAllCoolingLeads: false,
+  viewMyPerformance: false,
   isAdmin: false,
 };
 
@@ -38,14 +42,18 @@ export const usePermissions = () => useContext(PermissionsContext);
 // que era o comportamento antes de existir viewAllCoolingLeads.
 export function isRestricted(p: Permissions): boolean {
   return !p.isAdmin && !p.viewIntegrations && !p.viewSettings
-    && (p.viewSuggestions || p.viewAllCoolingLeads);
+    && (p.viewSuggestions || p.viewAllCoolingLeads || p.viewMyPerformance);
 }
 
-// Rota de destino conforme o perfil. Restrito vai para a tela que ele pode
-// ver (Sugestoes tem prioridade quando tem as duas); demais, Dashboard.
+// Rota de destino conforme o perfil. Restrito vai para a primeira tela que ele
+// pode ver, nesta ordem: Sugestoes, Leads esfriando, Meu desempenho. Cada
+// destino precisa bater com o PermissionGuard da rota, senao vira loop de
+// redirecionamento. Demais, Dashboard.
 export function landingPath(p: Permissions): string {
   if (!isRestricted(p)) return "/dashboard";
-  return p.viewSuggestions ? "/suggestions" : "/cooling-leads";
+  if (p.viewSuggestions) return "/suggestions";
+  if (p.viewAllCoolingLeads) return "/cooling-leads";
+  return "/my-performance";
 }
 
 export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
@@ -79,6 +87,7 @@ export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
           viewIntegrations: !!r.view_integrations,
           viewSettings: !!r.view_settings,
           viewAllCoolingLeads: !!r.view_all_cooling_leads,
+          viewMyPerformance: !!r.view_my_performance,
           isAdmin: !!r.is_admin,
         });
       }

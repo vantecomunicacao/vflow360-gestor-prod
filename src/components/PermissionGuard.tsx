@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 import { usePermissions, landingPath } from "@/contexts/PermissionsContext";
 import { Loader2 } from "lucide-react";
 
-type PermKey = "viewSuggestions" | "viewIntegrations" | "viewSettings" | "viewAllCoolingLeads";
+type PermKey = "viewSuggestions" | "viewIntegrations" | "viewSettings" | "viewAllCoolingLeads" | "viewMyPerformance";
 
 // `require` aceita uma lista: basta UMA das permissoes para liberar a rota.
 const PermissionGuard = ({

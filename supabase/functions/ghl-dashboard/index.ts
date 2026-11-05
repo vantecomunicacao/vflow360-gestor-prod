@@ -21,6 +21,14 @@ interface FunnelMapping {
   venda_ganha: string[];
 }
 
+// Erro esperado (acesso negado, falta de vínculo): volta com status próprio e
+// mensagem legível para a tela, sem ir para o reporter de erros.
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
 const DAY_MS = 86_400_000;
 const MIN_MS = 60_000;
 const TZ_OFFSET_MS = 3 * 60 * MIN_MS; // Brasília (UTC-3, sem DST desde 2019)
@@ -177,18 +185,64 @@ serve(async (req) => {
     });
     if (!isMember) throw new Error("Forbidden");
 
+    // ===== Modo "Meu desempenho" (tela do vendedor) =====
+    // Mesmo cálculo do dashboard, mas com o vendedor FORÇADO ao ghl_user_id do
+    // vínculo em user_ghl_links (ignora sellerIds do payload) e devolvendo só
+    // Qualidade de Preenchimento + Tempo de Resposta. Exige a permissão
+    // view_my_performance. Filtros de origem/UTM/datas adicionais não existem
+    // nessa tela e são ignorados.
+    const myPerformance = payload.view === "my_performance";
+    const [{ data: permRow, error: permErr }, { data: adminRow, error: adminErr }] = await Promise.all([
+      supabase.from("user_permissions")
+        .select("view_suggestions,view_integrations,view_settings,view_all_cooling_leads,view_my_performance")
+        .eq("user_id", userId).maybeSingle(),
+      supabase.from("user_roles").select("role")
+        .eq("user_id", userId).eq("role", "admin").maybeSingle(),
+    ]);
+    // Falha ao ler permissões não pode virar "libera tudo".
+    if (permErr || adminErr) throw permErr || adminErr;
+    const perm = (permRow || {}) as Record<string, boolean | null>;
+
+    // Usuário restrito (vendedor/operacional) não pode receber o dashboard
+    // completo: faturamento, funil e dados dos colegas. Mesma regra de
+    // isRestricted() no front (PermissionsContext) — antes só a tela barrava,
+    // e uma chamada direta à function devolvia tudo.
+    const restricted = !adminRow && !perm.view_integrations && !perm.view_settings
+      && (!!perm.view_suggestions || !!perm.view_all_cooling_leads || !!perm.view_my_performance);
+    if (restricted && !myPerformance) {
+      throw new HttpError(403, "Você não tem acesso ao Dashboard.");
+    }
+
+    let mySellerId: string | null = null;
+    if (myPerformance) {
+      if (!perm.view_my_performance) {
+        throw new HttpError(403, "Você não tem acesso à tela Meu desempenho.");
+      }
+      const { data: linkRow } = await supabase.from("user_ghl_links").select("ghl_user_id")
+        .eq("user_id", userId).eq("workspace_id", workspaceId).maybeSingle();
+      if (!linkRow?.ghl_user_id) {
+        throw new HttpError(
+          403,
+          "Seu usuário não está vinculado a um vendedor do GHL nesta conta. Peça ao administrador para fazer o vínculo.",
+        );
+      }
+      mySellerId = linkRow.ghl_user_id as string;
+    }
+
     const startDate: string | null = payload.startDate || null;
     const endDate: string | null = payload.endDate || null;
     const filterPipelineId: string | null = payload.pipelineId || null;
     const filterStageIds: string[] = Array.isArray(payload.stageIds)
       ? payload.stageIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
       : (payload.stageId ? [payload.stageId] : []);
-    const filterUserIds: string[] = Array.isArray(payload.sellerIds)
-      ? payload.sellerIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
-      : (payload.sellerId ? [payload.sellerId] : []);
-    const filterOrigin: string | null = payload.sourceOrigin || null;
-    const filterUtmMedium: string | null = payload.utmMedium || null;
-    const filterUtmCampaign: string | null = payload.utmCampaign || null;
+    const filterUserIds: string[] = mySellerId
+      ? [mySellerId]
+      : Array.isArray(payload.sellerIds)
+        ? payload.sellerIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
+        : (payload.sellerId ? [payload.sellerId] : []);
+    const filterOrigin: string | null = myPerformance ? null : (payload.sourceOrigin || null);
+    const filterUtmMedium: string | null = myPerformance ? null : (payload.utmMedium || null);
+    const filterUtmCampaign: string | null = myPerformance ? null : (payload.utmCampaign || null);
     // Períodos dos campos de data adicionais: datas de calendário "YYYY-MM-DD".
     // Aceita também ISO completo (frontend antigo em cache durante um rollout),
     // ficando com a parte da data.
@@ -197,10 +251,10 @@ serve(async (req) => {
       const day = v.slice(0, 10);
       return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
     };
-    const additionalStartDate = asCalendarDay(payload.additionalStartDate);
-    const additionalEndDate = asCalendarDay(payload.additionalEndDate);
-    const additionalStartDate2 = asCalendarDay(payload.additionalStartDate2);
-    const additionalEndDate2 = asCalendarDay(payload.additionalEndDate2);
+    const additionalStartDate = myPerformance ? null : asCalendarDay(payload.additionalStartDate);
+    const additionalEndDate = myPerformance ? null : asCalendarDay(payload.additionalEndDate);
+    const additionalStartDate2 = myPerformance ? null : asCalendarDay(payload.additionalStartDate2);
+    const additionalEndDate2 = myPerformance ? null : asCalendarDay(payload.additionalEndDate2);
 
     // ===== Carrega catálogos =====
     const [
@@ -783,6 +837,59 @@ serve(async (req) => {
       ? 0
       : customFields.reduce((a, b) => a + b.filledPercentage, 0) / customFields.length;
 
+    // ===== Meu desempenho: leads com campos vazios =====
+    // A mesma base do percentual acima (opps do período/filtros), virada em
+    // lista de pendências: quais leads estão com quais campos em branco.
+    // Abertos primeiro, depois quem tem mais campos faltando.
+    const INCOMPLETE_LIMIT = 300;
+    type IncompleteLead = {
+      id: string; name: string; stage: string | null;
+      status: "open" | "won" | "lost"; missing: string[]; createdAt: string | null;
+    };
+    let incompleteLeads: IncompleteLead[] = [];
+    let incompleteLeadsTotal = 0;
+    if (myPerformance && visibleFieldKeys.length > 0) {
+      const stageNameById = new Map<string, string>();
+      for (const p of allPipelines) {
+        for (const s of (Array.isArray(p.stages) ? p.stages : []) as Array<{ id: string; name: string }>) {
+          stageNameById.set(s.id, s.name);
+        }
+      }
+      const fieldDefs = visibleFieldKeys.map((key) => {
+        const def = customFieldDefs.find(d => d.ghl_id === key)
+          || customFieldDefs.find(d => d.field_key === key)
+          || customFieldDefs.find(d => d.name === key);
+        return { key, def, name: def?.name || key };
+      });
+      const all: IncompleteLead[] = [];
+      for (const o of opps) {
+        const missing = fieldDefs
+          .filter(({ key, def }) =>
+            cfValueToString(extractCfValue(o.custom_fields, [def?.ghl_id, def?.field_key, def?.name, key])) === null)
+          .map((f) => f.name);
+        if (missing.length === 0) continue;
+        const st = (o.status || "").toLowerCase();
+        const status: IncompleteLead["status"] = isLost(o) ? "lost"
+          : (st === "won" || (o.stage_id && wonStageIds.has(o.stage_id))) ? "won"
+          : "open";
+        all.push({
+          id: o.ghl_id,
+          name: o.name || `Oportunidade ${String(o.ghl_id).slice(0, 6)}`,
+          stage: o.stage_id ? (stageNameById.get(o.stage_id) || null) : null,
+          status,
+          missing,
+          createdAt: o.ghl_created_at || null,
+        });
+      }
+      const statusOrder = { open: 0, won: 1, lost: 2 } as const;
+      all.sort((a, b) =>
+        statusOrder[a.status] - statusOrder[b.status]
+        || b.missing.length - a.missing.length
+        || a.name.localeCompare(b.name, "pt-BR"));
+      incompleteLeadsTotal = all.length;
+      incompleteLeads = all.slice(0, INCOMPLETE_LIMIT);
+    }
+
     // ===== Custom field distributions (mini pie charts) =====
     const rawChartFieldKeys: string[] = Array.isArray(settings?.chart_custom_fields) ? settings.chart_custom_fields : [];
     const chartFieldKeys = rawChartFieldKeys.filter(isOpportunityField);
@@ -1064,6 +1171,10 @@ serve(async (req) => {
         // (atribuido na conversa ou dono da oportunidade). Conversa orfa nao
         // entra na media global, na contagem nem na taxa de resposta.
         if (!sid) continue;
+        // Meu desempenho: só as respostas do próprio vendedor. Conversa de um
+        // lead dele que esteja atribuída a outro vendedor não entra (é o mesmo
+        // critério do tempo por vendedor da tabela de desempenho do gestor).
+        if (mySellerId && sid !== mySellerId) continue;
         const acc = sellerResponse.get(sid) || { totalMinutes: 0, count: 0 };
         for (const m of msgs) {
           if (m.dir === "inbound") {
@@ -1173,6 +1284,39 @@ serve(async (req) => {
       businessHoursEnd: businessEndStr,
       unanswered: unansweredList.sort((a, b) => b.waitingDays - a.waitingDays).slice(0, 100),
     };
+
+    // ===== Meu desempenho: resposta enxuta =====
+    // Lista FECHADA de campos (nunca o objeto completo do dashboard): o vendedor
+    // não pode receber faturamento, funil nem dados dos colegas. Sai antes dos
+    // leads esfriando, que essa tela não usa.
+    if (myPerformance) {
+      // locationId só para montar o link da oportunidade no GHL; o resto do
+      // config (apiKey) nunca sai daqui.
+      let ghlLocationId: string | null = null;
+      try {
+        const { data: integ } = await supabase
+          .from("integrations").select("config")
+          .eq("type", "ghl").eq("workspace_id", workspaceId)
+          .eq("status", "connected").maybeSingle();
+        const cfg = ((integ as any)?.config || {}) as Record<string, any>;
+        ghlLocationId = cfg.locationId || cfg.location_id || null;
+      } catch (e) {
+        console.error("[my-performance] locationId indisponível", e);
+      }
+      return new Response(JSON.stringify({
+        scope: "seller",
+        sellerName: usersList.find((u) => u.ghl_id === mySellerId)?.name || null,
+        pipelines,
+        totalLeads,
+        customFields,
+        overallFillRate,
+        incompleteLeads,
+        incompleteLeadsTotal,
+        responseTime,
+        ghlLocationId,
+        cachedAt: new Date().toISOString(),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // ===== Leads esfriando (sem atividade há X dias) =====
     // Olha TODAS as oportunidades ABERTAS (ignora o período do header),
@@ -1358,6 +1502,12 @@ serve(async (req) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("ghl-dashboard error:", msg);
+    if (err instanceof HttpError) {
+      return new Response(JSON.stringify({ error: msg }), {
+        status: err.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     await reportEdgeError("edge:ghl-dashboard", err);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,

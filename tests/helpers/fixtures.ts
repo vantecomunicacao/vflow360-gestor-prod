@@ -73,6 +73,9 @@ export function permissionsFor(role: Role) {
       view_suggestions: true,
       view_integrations: true,
       view_settings: true,
+      view_all_cooling_leads: true,
+      // admin não recebe "Meu desempenho" (já vê tudo no Dashboard)
+      view_my_performance: false,
       is_admin: true,
     };
   }
@@ -80,6 +83,8 @@ export function permissionsFor(role: Role) {
     view_suggestions: true,
     view_integrations: false,
     view_settings: false,
+    view_all_cooling_leads: false,
+    view_my_performance: true,
     is_admin: false,
   };
 }
@@ -295,7 +300,42 @@ export function dashboardData() {
   };
 }
 
-export function edgeResult(fn: string): unknown {
+// Payload do ghl-dashboard em modo view="my_performance" (tela do vendedor):
+// só qualidade de preenchimento, tempo de resposta e a lista de pendências.
+export function myPerformanceData() {
+  return {
+    scope: "seller",
+    sellerName: "Vendedor Teste",
+    pipelines: dashboardData().pipelines,
+    totalLeads: 12,
+    customFields: [
+      { name: "Cidade", filledPercentage: 91.7, emptyPercentage: 8.3, totalLeads: 12, filledCount: 11 },
+      { name: "Capacidade (litros)", filledPercentage: 58.3, emptyPercentage: 41.7, totalLeads: 12, filledCount: 7 },
+      { name: "Tipo de tanque", filledPercentage: 33.3, emptyPercentage: 66.7, totalLeads: 12, filledCount: 4 },
+    ],
+    overallFillRate: 61.1,
+    incompleteLeads: [
+      { id: "opp-1", name: "Fazenda Boa Vista", stage: "Proposta Enviada", status: "open", missing: ["Tipo de tanque", "Capacidade (litros)"], createdAt: now() },
+      { id: "opp-2", name: "Posto Rodovia 040", stage: "Contato Inicial", status: "open", missing: ["Tipo de tanque"], createdAt: now() },
+      { id: "opp-3", name: "Transportadora Silva", stage: "Contato Inicial", status: "open", missing: ["Cidade", "Tipo de tanque"], createdAt: now() },
+      { id: "opp-4", name: "Agro Martins", stage: "Venda Ganha", status: "won", missing: ["Capacidade (litros)"], createdAt: now() },
+    ],
+    incompleteLeadsTotal: 4,
+    responseTime: {
+      averageMinutes: 47,
+      responseCount: 63,
+      conversationsAnalyzed: 21,
+      conversationsWithInbound: 25,
+      businessHoursStart: "08:00",
+      businessHoursEnd: "18:00",
+      unanswered: [],
+    },
+    ghlLocationId: "loc-e2e",
+    cachedAt: now(),
+  };
+}
+
+export function edgeResult(fn: string, body?: Record<string, unknown> | null): unknown {
   switch (fn) {
     case "evolution-pairing-public":
       // 1x1 PNG transparente como QR de teste
@@ -307,7 +347,7 @@ export function edgeResult(fn: string): unknown {
         label: "WhatsApp Comercial",
       };
     case "ghl-dashboard":
-      return dashboardData();
+      return body?.view === "my_performance" ? myPerformanceData() : dashboardData();
     default:
       return { ok: true };
   }

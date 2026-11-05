@@ -115,7 +115,13 @@ export async function installSupabaseMocks(page: Page, opts: MockOptions) {
   await intercept(page, "**/functions/v1/**", (route) => {
     const url = new URL(route.request().url());
     const fn = (url.pathname.split("/functions/v1/")[1] ?? "").split("?")[0];
-    return json(route, edgeResult(fn));
+    let body: Record<string, unknown> | null = null;
+    try {
+      body = route.request().postDataJSON();
+    } catch {
+      // sem corpo JSON
+    }
+    return json(route, edgeResult(fn, body));
   });
 }
 

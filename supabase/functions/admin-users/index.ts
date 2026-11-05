@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
           admin.from("user_roles").select("user_id, role").in("user_id", ids),
           admin.from("profiles").select("user_id, full_name").in("user_id", ids),
           admin.from("workspace_members").select("user_id, workspace_id, role, workspaces(name)").in("user_id", ids),
-          admin.from("user_permissions").select("user_id, view_suggestions, view_integrations, view_settings, view_all_cooling_leads").in("user_id", ids),
+          admin.from("user_permissions").select("user_id, view_suggestions, view_integrations, view_settings, view_all_cooling_leads, view_my_performance").in("user_id", ids),
           admin.from("user_ghl_links").select("user_id, workspace_id, ghl_user_id").in("user_id", ids),
         ]);
         return json({
@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
                 view_integrations: !!p?.view_integrations,
                 view_settings: !!p?.view_settings,
                 view_all_cooling_leads: !!p?.view_all_cooling_leads,
+                view_my_performance: !!p?.view_my_performance,
               },
               ghl_links: (ghlLinks?.filter((g) => g.user_id === u.id) || []).map((g) => ({
                 workspace_id: g.workspace_id,
@@ -135,6 +136,8 @@ Deno.serve(async (req) => {
           // Vendedor nasce restrito ao próprio escopo; o admin libera depois
           // pelo diálogo de permissões, se quiser.
           view_all_cooling_leads: isVendor ? false : !!permissions?.view_all_cooling_leads,
+          // "Meu desempenho" vale para vendedor também: é a tela dele.
+          view_my_performance: !!permissions?.view_my_performance,
         });
         if (isVendor) {
           const { error: linkErr } = await admin.from("user_ghl_links").upsert(
@@ -172,6 +175,7 @@ Deno.serve(async (req) => {
           view_integrations: !!permissions.view_integrations,
           view_settings: !!permissions.view_settings,
           view_all_cooling_leads: !!permissions.view_all_cooling_leads,
+          view_my_performance: !!permissions.view_my_performance,
         });
         if (error) throw error;
         return json({ ok: true });

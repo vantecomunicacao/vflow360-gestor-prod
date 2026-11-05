@@ -1176,6 +1176,7 @@ export type Database = {
           view_integrations: boolean
           view_settings: boolean
           view_all_cooling_leads: boolean
+          view_my_performance: boolean
           view_suggestions: boolean
         }
         Insert: {
@@ -1185,6 +1186,7 @@ export type Database = {
           view_integrations?: boolean
           view_settings?: boolean
           view_all_cooling_leads?: boolean
+          view_my_performance?: boolean
           view_suggestions?: boolean
         }
         Update: {
@@ -1194,6 +1196,7 @@ export type Database = {
           view_integrations?: boolean
           view_settings?: boolean
           view_all_cooling_leads?: boolean
+          view_my_performance?: boolean
           view_suggestions?: boolean
         }
         Relationships: []
@@ -1300,6 +1303,7 @@ export type Database = {
           view_integrations: boolean
           view_settings: boolean
           view_all_cooling_leads: boolean
+          view_my_performance: boolean
           view_suggestions: boolean
         }[]
       }

@@ -19,6 +19,7 @@ interface UserPerms {
   view_integrations: boolean;
   view_settings: boolean;
   view_all_cooling_leads: boolean;
+  view_my_performance: boolean;
 }
 
 interface AdminUser {
@@ -30,6 +31,7 @@ interface AdminUser {
   roles: string[];
   workspaces: { workspace_id: string; role: string; name: string }[];
   permissions: UserPerms;
+  ghl_links?: { workspace_id: string; ghl_user_id: string }[];
 }
 
 interface Workspace { id: string; name: string; owner_id: string; }
@@ -54,6 +56,7 @@ export default function Admin() {
     view_integrations: false,
     view_settings: false,
     view_all_cooling_leads: false,
+    view_my_performance: false,
   });
   const [creating, setCreating] = useState(false);
   // vendedor (acesso só a Sugestões, vinculado a um GHL user)
@@ -77,6 +80,7 @@ export default function Admin() {
     view_integrations: false,
     view_settings: false,
     view_all_cooling_leads: false,
+    view_my_performance: false,
   });
 
   const callAdmin = async <T = Record<string, unknown>>(
@@ -186,7 +190,7 @@ export default function Admin() {
       toast.success(isVendor ? "Vendedor criado" : "Usuário criado");
       setCreateOpen(false);
       setNewEmail(""); setNewPassword(""); setNewName(""); setNewWorkspace(""); setNewRole("user");
-      setNewPerms({ view_suggestions: false, view_integrations: false, view_settings: false, view_all_cooling_leads: false });
+      setNewPerms({ view_suggestions: false, view_integrations: false, view_settings: false, view_all_cooling_leads: false, view_my_performance: false });
       setIsVendor(false); setNewGhlUser(""); setGhlUsers([]);
       refresh();
     } catch (e) {
@@ -343,6 +347,18 @@ export default function Admin() {
                   {newWorkspace && !loadingGhlUsers && ghlUsers.length === 0 && (
                     <p className="text-xs text-muted-foreground mt-1">Nenhum usuário do GHL sincronizado nesta conta.</p>
                   )}
+                  <div className="flex items-start justify-between gap-3 mt-3">
+                    <div>
+                      <Label className="font-normal">Ver Meu desempenho</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Qualidade de preenchimento e tempo de resposta só dos leads dele.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={newPerms.view_my_performance}
+                      onCheckedChange={(v) => setNewPerms((p) => ({ ...p, view_my_performance: v }))}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -547,6 +563,24 @@ export default function Admin() {
               <Switch
                 checked={permsDraft.view_all_cooling_leads}
                 onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_all_cooling_leads: v }))}
+              />
+            </div>
+            <div className="flex items-start justify-between gap-3 pt-2 border-t border-border">
+              <div>
+                <Label className="font-normal">Ver Meu desempenho</Label>
+                <p className="text-xs text-muted-foreground">
+                  Tela com a qualidade de preenchimento e o tempo de resposta só dos leads do vendedor
+                  vinculado a este usuário no GHL.
+                </p>
+                {permsDraft.view_my_performance && !(permsUser?.ghl_links?.length) && (
+                  <p className="text-xs text-warning-ink mt-1">
+                    Este usuário não está vinculado a um vendedor do GHL. A tela vai aparecer, mas sem dados.
+                  </p>
+                )}
+              </div>
+              <Switch
+                checked={permsDraft.view_my_performance}
+                onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_my_performance: v }))}
               />
             </div>
           </div>
