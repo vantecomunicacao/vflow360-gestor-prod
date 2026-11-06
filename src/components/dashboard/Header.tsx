@@ -223,7 +223,7 @@ export function Header({
 
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground px-0.5">
+      <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground/80 px-0.5">
         {label}
       </span>
       {children}

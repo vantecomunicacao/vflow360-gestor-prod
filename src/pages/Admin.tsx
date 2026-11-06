@@ -466,7 +466,7 @@ export default function Admin() {
                     {u.workspaces.map((w) => (
                       <Badge key={w.workspace_id} variant="secondary" className="gap-1">
                         {w.name}
-                        <button onClick={() => removeFromWorkspace(u, w.workspace_id)} className="hover:text-destructive-ink">×</button>
+                        <button onClick={() => removeFromWorkspace(u, w.workspace_id)} className="hover:text-destructive">×</button>
                       </Badge>
                     ))}
                     {u.workspaces.length === 0 && <span className="text-xs text-muted-foreground">Sem contas</span>}
@@ -488,7 +488,7 @@ export default function Admin() {
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button size="sm" variant="outline" disabled={u.id === user?.id}>
-                        <Trash2 className="w-3 h-3 text-destructive-ink" />
+                        <Trash2 className="w-3 h-3 text-destructive" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>

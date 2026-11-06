@@ -129,7 +129,7 @@ export default function MyPerformance() {
       {error && !data ? (
         <div className="dashboard-section flex flex-col items-center text-center gap-3 py-10">
           <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Link2Off className="w-6 h-6 text-destructive-ink" aria-hidden="true" />
+            <Link2Off className="w-6 h-6 text-destructive" aria-hidden="true" />
           </div>
           <p className="text-sm text-foreground max-w-md">{error.message}</p>
           <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">

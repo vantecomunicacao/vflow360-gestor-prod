@@ -126,7 +126,7 @@ export function IncompleteLeadsCard({ leads, total, ghlLocationId, showSeller = 
                     {lead.missing.map((f) => (
                       <span
                         key={f}
-                        className="text-[11px] px-2 py-0.5 rounded-full border bg-destructive/5 border-destructive/15 text-destructive-ink"
+                        className="text-[11px] px-2 py-0.5 rounded-full border bg-destructive/5 border-destructive/15 text-destructive"
                       >
                         {f}
                       </span>
