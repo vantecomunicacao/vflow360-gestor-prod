@@ -35,6 +35,10 @@ interface AdminUser {
 }
 
 interface Workspace { id: string; name: string; owner_id: string; }
+type GhlUserOption = { ghl_id: string; name: string | null; email: string | null };
+
+// Valor do Select para "sem vínculo" (o Radix não aceita value="").
+const NO_LINK = "__none__";
 
 export default function Admin() {
   const { user } = useAuth();
@@ -82,6 +86,9 @@ export default function Admin() {
     view_all_cooling_leads: false,
     view_my_performance: false,
   });
+  // Vínculo com o vendedor do GHL, por conta: workspace_id -> ghl_user_id | NO_LINK.
+  const [linkDraft, setLinkDraft] = useState<Record<string, string>>({});
+  const [linkOptions, setLinkOptions] = useState<Record<string, GhlUserOption[] | "loading" | "error">>({});
 
   const callAdmin = async <T = Record<string, unknown>>(
     action: string,
@@ -200,15 +207,36 @@ export default function Admin() {
     }
   };
 
+  const currentLink = (u: AdminUser, workspaceId: string) =>
+    u.ghl_links?.find((l) => l.workspace_id === workspaceId)?.ghl_user_id || NO_LINK;
+
   const openPermsDialog = (u: AdminUser) => {
     setPermsUser(u);
     setPermsDraft({ ...u.permissions });
+    setLinkDraft(Object.fromEntries(u.workspaces.map((w) => [w.workspace_id, currentLink(u, w.workspace_id)])));
+    setLinkOptions(Object.fromEntries(u.workspaces.map((w) => [w.workspace_id, "loading" as const])));
+    for (const w of u.workspaces) {
+      callAdmin<{ ghl_users?: GhlUserOption[] }>("list_ghl_users", { workspace_id: w.workspace_id })
+        .then((d) => setLinkOptions((o) => ({ ...o, [w.workspace_id]: d?.ghl_users || [] })))
+        .catch(() => setLinkOptions((o) => ({ ...o, [w.workspace_id]: "error" })));
+    }
   };
+
+  const draftHasLink = Object.values(linkDraft).some((v) => v && v !== NO_LINK);
 
   const savePermissions = async () => {
     if (!permsUser) return;
     try {
       await callAdmin("set_permissions", { user_id: permsUser.id, permissions: permsDraft });
+      for (const w of permsUser.workspaces) {
+        const next = linkDraft[w.workspace_id] ?? NO_LINK;
+        if (next === currentLink(permsUser, w.workspace_id)) continue;
+        await callAdmin("set_ghl_link", {
+          user_id: permsUser.id,
+          workspace_id: w.workspace_id,
+          ghl_user_id: next === NO_LINK ? null : next,
+        });
+      }
       toast.success("Permissões atualizadas");
       setPermsUser(null);
       refresh();
@@ -351,7 +379,7 @@ export default function Admin() {
                     <div>
                       <Label className="font-normal">Ver Meu desempenho</Label>
                       <p className="text-xs text-muted-foreground">
-                        Qualidade de preenchimento e tempo de resposta só dos leads dele.
+                        Qualidade de preenchimento e tempo de resposta dos leads dele. Sem vínculo, escolhe o vendedor na tela.
                       </p>
                     </div>
                     <Switch
@@ -438,7 +466,7 @@ export default function Admin() {
                     {u.workspaces.map((w) => (
                       <Badge key={w.workspace_id} variant="secondary" className="gap-1">
                         {w.name}
-                        <button onClick={() => removeFromWorkspace(u, w.workspace_id)} className="hover:text-destructive">×</button>
+                        <button onClick={() => removeFromWorkspace(u, w.workspace_id)} className="hover:text-destructive-ink">×</button>
                       </Badge>
                     ))}
                     {u.workspaces.length === 0 && <span className="text-xs text-muted-foreground">Sem contas</span>}
@@ -460,7 +488,7 @@ export default function Admin() {
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button size="sm" variant="outline" disabled={u.id === user?.id}>
-                        <Trash2 className="w-3 h-3 text-destructive" />
+                        <Trash2 className="w-3 h-3 text-destructive-ink" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -522,7 +550,7 @@ export default function Admin() {
 
       {/* Permissions dialog */}
       <Dialog open={!!permsUser} onOpenChange={(o) => !o && setPermsUser(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Permissões — {permsUser?.full_name || permsUser?.email}</DialogTitle>
           </DialogHeader>
@@ -552,6 +580,50 @@ export default function Admin() {
                 onCheckedChange={(v) => setPermsDraft((p) => ({ ...p, view_settings: v }))}
               />
             </div>
+            {(permsUser?.workspaces.length ?? 0) > 0 && (
+              <div className="pt-2 border-t border-border space-y-2">
+                <div>
+                  <Label className="font-normal">Vendedor do GHL</Label>
+                  <p className="text-xs text-muted-foreground">
+                    De qual vendedor são os leads deste usuário em Leads esfriando e Meu desempenho.
+                    Use “Nenhum” em um login compartilhado por vários vendedores.
+                  </p>
+                </div>
+                {permsUser?.workspaces.map((w) => {
+                  const opts = linkOptions[w.workspace_id];
+                  const value = linkDraft[w.workspace_id] ?? NO_LINK;
+                  const list = Array.isArray(opts) ? opts : [];
+                  // Vínculo atual que não está mais na lista sincronizada do GHL.
+                  const orphan = value !== NO_LINK && Array.isArray(opts) && !list.some((g) => g.ghl_id === value);
+                  return (
+                    <div key={w.workspace_id} className="space-y-1">
+                      {(permsUser?.workspaces.length ?? 0) > 1 && (
+                        <p className="text-xs font-medium text-foreground">{w.name}</p>
+                      )}
+                      <Select
+                        value={value}
+                        onValueChange={(v) => setLinkDraft((d) => ({ ...d, [w.workspace_id]: v }))}
+                        disabled={opts === "loading" || opts === "error"}
+                      >
+                        <SelectTrigger aria-label={`Vendedor do GHL em ${w.name}`}>
+                          <SelectValue placeholder={opts === "loading" ? "Carregando..." : "Selecione"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_LINK}>Nenhum (escolhe o vendedor na tela)</SelectItem>
+                          {orphan && <SelectItem value={value}>Vendedor removido do GHL</SelectItem>}
+                          {list.map((g) => (
+                            <SelectItem key={g.ghl_id} value={g.ghl_id}>{g.name || g.email || g.ghl_id}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {opts === "error" && (
+                        <p className="text-xs text-destructive">Não foi possível carregar os vendedores do GHL.</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="flex items-start justify-between gap-3 pt-2 border-t border-border">
               <div>
                 <Label className="font-normal">Ver leads esfriando de toda a conta</Label>
@@ -569,12 +641,13 @@ export default function Admin() {
               <div>
                 <Label className="font-normal">Ver Meu desempenho</Label>
                 <p className="text-xs text-muted-foreground">
-                  Tela com a qualidade de preenchimento e o tempo de resposta só dos leads do vendedor
-                  vinculado a este usuário no GHL.
+                  Tela com a qualidade de preenchimento e o tempo de resposta dos leads do vendedor
+                  vinculado a este usuário no GHL. Sem vínculo (login usado por vários vendedores),
+                  a pessoa escolhe o vendedor na própria tela.
                 </p>
-                {permsDraft.view_my_performance && !(permsUser?.ghl_links?.length) && (
+                {permsDraft.view_my_performance && !draftHasLink && (
                   <p className="text-xs text-warning-ink mt-1">
-                    Este usuário não está vinculado a um vendedor do GHL. A tela vai aparecer, mas sem dados.
+                    Sem vínculo com o GHL: na tela, este usuário poderá escolher qualquer vendedor da conta.
                   </p>
                 )}
               </div>

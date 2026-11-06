@@ -1,4 +1,4 @@
-import { CalendarDays, Filter, Users, GitBranch, ChevronDown, Layers, X, Megaphone, Target, Check } from "lucide-react";
+import { CalendarDays, Filter, Users, GitBranch, ChevronDown, Layers, X, Megaphone, Target, Check, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -30,6 +30,8 @@ interface HeaderProps {
   onPipelineChange: (id: string | null) => void;
   onStageIdsChange?: (ids: string[]) => void;
   onSellerIdsChange?: (ids: string[]) => void;
+  /** Vendedor fixo (sem escolha): mostra o nome no lugar do filtro. */
+  lockedSellerName?: string | null;
   onUtmMediumChange?: (v: string | null) => void;
   onUtmCampaignChange?: (v: string | null) => void;
   cachedAt?: string | null;
@@ -194,7 +196,7 @@ export function Header({
   selectedPipelineId, selectedStageIds = [], selectedSellerIds = [],
   utmMediumValues = [], utmCampaignValues = [],
   selectedUtmMedium = null, selectedUtmCampaign = null,
-  onPipelineChange, onStageIdsChange, onSellerIdsChange,
+  onPipelineChange, onStageIdsChange, onSellerIdsChange, lockedSellerName,
   onUtmMediumChange, onUtmCampaignChange,
   cachedAt,
   additionalDateRange, onAdditionalDateRangeChange, additionalDateLabel,
@@ -221,7 +223,7 @@ export function Header({
 
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground/80 px-0.5">
+      <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground px-0.5">
         {label}
       </span>
       {children}
@@ -269,6 +271,19 @@ export function Header({
             icon={Users}
             options={users.map((u) => ({ id: u.id, name: u.name }))}
           />
+        </Field>
+      )}
+
+      {!onSellerIdsChange && lockedSellerName && (
+        <Field label="Vendedor">
+          <div
+            className="h-8 text-xs font-medium rounded-md border border-primary/40 bg-primary/5 text-foreground gap-2 px-3 inline-flex items-center max-w-[220px]"
+            title="Você vê só os leads do vendedor vinculado ao seu usuário"
+          >
+            <Users className="w-3.5 h-3.5 shrink-0 text-primary-ink" aria-hidden="true" />
+            <span className="truncate">{lockedSellerName}</span>
+            <Lock className="w-3 h-3 shrink-0 opacity-50" aria-label="fixo" />
+          </div>
         </Field>
       )}
 

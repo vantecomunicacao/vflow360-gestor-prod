@@ -302,10 +302,26 @@ export function dashboardData() {
 
 // Payload do ghl-dashboard em modo view="my_performance" (tela do vendedor):
 // só qualidade de preenchimento, tempo de resposta e a lista de pendências.
-export function myPerformanceData() {
+// Padrão = usuário SEM vínculo com o GHL (login compartilhado): recebe todos
+// os vendedores para o filtro. `locked` = usuário vinculado, travado nele.
+const MY_PERF_SELLERS = [
+  { id: "ghlu-1", name: "Vendedor Teste" },
+  { id: "ghlu-2", name: "Bruno Lima" },
+  { id: "ghlu-3", name: "Carla Souza" },
+];
+export function myPerformanceData(
+  body?: Record<string, unknown> | null,
+  opts: { locked?: boolean } = {},
+) {
+  const requested = Array.isArray(body?.sellerIds) ? (body!.sellerIds as string[]) : [];
+  const sellerIds = opts.locked ? ["ghlu-1"] : requested;
   return {
     scope: "seller",
-    sellerName: "Vendedor Teste",
+    sellerLocked: !!opts.locked,
+    users: opts.locked ? MY_PERF_SELLERS.slice(0, 1) : MY_PERF_SELLERS,
+    sellerName: sellerIds.length === 1
+      ? (MY_PERF_SELLERS.find((u) => u.id === sellerIds[0])?.name ?? null)
+      : null,
     pipelines: dashboardData().pipelines,
     totalLeads: 12,
     customFields: [
@@ -315,10 +331,10 @@ export function myPerformanceData() {
     ],
     overallFillRate: 61.1,
     incompleteLeads: [
-      { id: "opp-1", name: "Fazenda Boa Vista", stage: "Proposta Enviada", status: "open", missing: ["Tipo de tanque", "Capacidade (litros)"], createdAt: now() },
-      { id: "opp-2", name: "Posto Rodovia 040", stage: "Contato Inicial", status: "open", missing: ["Tipo de tanque"], createdAt: now() },
-      { id: "opp-3", name: "Transportadora Silva", stage: "Contato Inicial", status: "open", missing: ["Cidade", "Tipo de tanque"], createdAt: now() },
-      { id: "opp-4", name: "Agro Martins", stage: "Venda Ganha", status: "won", missing: ["Capacidade (litros)"], createdAt: now() },
+      { id: "opp-1", name: "Fazenda Boa Vista", stage: "Proposta Enviada", seller: "Vendedor Teste", status: "open", missing: ["Tipo de tanque", "Capacidade (litros)"], createdAt: now() },
+      { id: "opp-2", name: "Posto Rodovia 040", stage: "Contato Inicial", seller: "Bruno Lima", status: "open", missing: ["Tipo de tanque"], createdAt: now() },
+      { id: "opp-3", name: "Transportadora Silva", stage: "Contato Inicial", seller: "Carla Souza", status: "open", missing: ["Cidade", "Tipo de tanque"], createdAt: now() },
+      { id: "opp-4", name: "Agro Martins", stage: "Venda Ganha", seller: "Vendedor Teste", status: "won", missing: ["Capacidade (litros)"], createdAt: now() },
     ],
     incompleteLeadsTotal: 4,
     responseTime: {
@@ -347,7 +363,7 @@ export function edgeResult(fn: string, body?: Record<string, unknown> | null): u
         label: "WhatsApp Comercial",
       };
     case "ghl-dashboard":
-      return body?.view === "my_performance" ? myPerformanceData() : dashboardData();
+      return body?.view === "my_performance" ? myPerformanceData(body) : dashboardData();
     default:
       return { ok: true };
   }

@@ -186,11 +186,13 @@ serve(async (req) => {
     if (!isMember) throw new Error("Forbidden");
 
     // ===== Modo "Meu desempenho" (tela do vendedor) =====
-    // Mesmo cálculo do dashboard, mas com o vendedor FORÇADO ao ghl_user_id do
-    // vínculo em user_ghl_links (ignora sellerIds do payload) e devolvendo só
-    // Qualidade de Preenchimento + Tempo de Resposta. Exige a permissão
-    // view_my_performance. Filtros de origem/UTM/datas adicionais não existem
-    // nessa tela e são ignorados.
+    // Mesmo cálculo do dashboard, devolvendo só Qualidade de Preenchimento +
+    // Tempo de Resposta. Exige a permissão view_my_performance. Usuário com
+    // vínculo em user_ghl_links fica TRAVADO no ghl_user_id dele (ignora
+    // sellerIds do payload); sem vínculo (ex.: login compartilhado por vários
+    // vendedores) escolhe o vendedor no filtro da tela, como nos Leads
+    // esfriando. Filtros de origem/UTM/datas adicionais não existem nessa tela
+    // e são ignorados.
     const myPerformance = payload.view === "my_performance";
     const [{ data: permRow, error: permErr }, { data: adminRow, error: adminErr }] = await Promise.all([
       supabase.from("user_permissions")
@@ -218,15 +220,11 @@ serve(async (req) => {
       if (!perm.view_my_performance) {
         throw new HttpError(403, "Você não tem acesso à tela Meu desempenho.");
       }
-      const { data: linkRow } = await supabase.from("user_ghl_links").select("ghl_user_id")
+      const { data: linkRow, error: linkErr } = await supabase.from("user_ghl_links").select("ghl_user_id")
         .eq("user_id", userId).eq("workspace_id", workspaceId).maybeSingle();
-      if (!linkRow?.ghl_user_id) {
-        throw new HttpError(
-          403,
-          "Seu usuário não está vinculado a um vendedor do GHL nesta conta. Peça ao administrador para fazer o vínculo.",
-        );
-      }
-      mySellerId = linkRow.ghl_user_id as string;
+      // Erro ao ler o vínculo não pode virar "escolhe qualquer vendedor".
+      if (linkErr) throw linkErr;
+      mySellerId = (linkRow?.ghl_user_id as string | undefined) || null;
     }
 
     const startDate: string | null = payload.startDate || null;
@@ -240,6 +238,11 @@ serve(async (req) => {
       : Array.isArray(payload.sellerIds)
         ? payload.sellerIds.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
         : (payload.sellerId ? [payload.sellerId] : []);
+    // Meu desempenho com vendedor(es) escolhido(s): o tempo de resposta conta só
+    // as respostas deles (mesmo critério do tempo por vendedor do gestor).
+    const scopeSellerSet: Set<string> | null = myPerformance && filterUserIds.length > 0
+      ? new Set(filterUserIds)
+      : null;
     const filterOrigin: string | null = myPerformance ? null : (payload.sourceOrigin || null);
     const filterUtmMedium: string | null = myPerformance ? null : (payload.utmMedium || null);
     const filterUtmCampaign: string | null = myPerformance ? null : (payload.utmCampaign || null);
@@ -843,12 +846,13 @@ serve(async (req) => {
     // Abertos primeiro, depois quem tem mais campos faltando.
     const INCOMPLETE_LIMIT = 300;
     type IncompleteLead = {
-      id: string; name: string; stage: string | null;
+      id: string; name: string; stage: string | null; seller: string | null;
       status: "open" | "won" | "lost"; missing: string[]; createdAt: string | null;
     };
     let incompleteLeads: IncompleteLead[] = [];
     let incompleteLeadsTotal = 0;
     if (myPerformance && visibleFieldKeys.length > 0) {
+      const sellerNameById = new Map(usersList.map((u) => [u.ghl_id, u.name] as const));
       const stageNameById = new Map<string, string>();
       for (const p of allPipelines) {
         for (const s of (Array.isArray(p.stages) ? p.stages : []) as Array<{ id: string; name: string }>) {
@@ -876,6 +880,7 @@ serve(async (req) => {
           id: o.ghl_id,
           name: o.name || `Oportunidade ${String(o.ghl_id).slice(0, 6)}`,
           stage: o.stage_id ? (stageNameById.get(o.stage_id) || null) : null,
+          seller: o.assigned_to ? (sellerNameById.get(o.assigned_to) || null) : null,
           status,
           missing,
           createdAt: o.ghl_created_at || null,
@@ -1171,10 +1176,10 @@ serve(async (req) => {
         // (atribuido na conversa ou dono da oportunidade). Conversa orfa nao
         // entra na media global, na contagem nem na taxa de resposta.
         if (!sid) continue;
-        // Meu desempenho: só as respostas do próprio vendedor. Conversa de um
-        // lead dele que esteja atribuída a outro vendedor não entra (é o mesmo
-        // critério do tempo por vendedor da tabela de desempenho do gestor).
-        if (mySellerId && sid !== mySellerId) continue;
+        // Meu desempenho: só as respostas do(s) vendedor(es) da tela. Conversa
+        // de um lead dele que esteja atribuída a outro vendedor não entra (é o
+        // mesmo critério do tempo por vendedor da tabela de desempenho do gestor).
+        if (scopeSellerSet && !scopeSellerSet.has(sid)) continue;
         const acc = sellerResponse.get(sid) || { totalMinutes: 0, count: 0 };
         for (const m of msgs) {
           if (m.dir === "inbound") {
@@ -1303,9 +1308,18 @@ serve(async (req) => {
       } catch (e) {
         console.error("[my-performance] locationId indisponível", e);
       }
+      // Opções do filtro de vendedor: travado = só ele; sem vínculo = todos.
+      const sellerOptions = (mySellerId ? usersList.filter((u) => u.ghl_id === mySellerId) : usersList)
+        .map((u) => ({ id: u.ghl_id, name: u.name }))
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
       return new Response(JSON.stringify({
         scope: "seller",
-        sellerName: usersList.find((u) => u.ghl_id === mySellerId)?.name || null,
+        sellerLocked: !!mySellerId,
+        users: sellerOptions,
+        // Nome só quando a tela é de UM vendedor; com vários/todos fica null.
+        sellerName: filterUserIds.length === 1
+          ? (usersList.find((u) => u.ghl_id === filterUserIds[0])?.name || null)
+          : null,
         pipelines,
         totalLeads,
         customFields,

@@ -12,9 +12,10 @@ import { DataQuality } from "@/components/dashboard/DataQuality";
 import { ResponseTimeCard } from "@/components/dashboard/ResponseTimeCard";
 import { IncompleteLeadsCard } from "@/components/dashboard/IncompleteLeadsCard";
 
-/** Tela do vendedor: Qualidade de Preenchimento e Tempo Médio de Resposta só
- *  dos próprios leads. O vendedor é decidido no servidor pelo vínculo do
- *  usuário com o GHL; aqui não existe filtro de vendedor. */
+/** Tela do vendedor: Qualidade de Preenchimento e Tempo Médio de Resposta.
+ *  Usuário vinculado a um vendedor do GHL fica travado nele (o servidor decide
+ *  e a tela só mostra o nome). Sem vínculo, como num login compartilhado por
+ *  vários vendedores, aparece o filtro de vendedor. */
 export default function MyPerformance() {
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id || null;
@@ -24,6 +25,7 @@ export default function MyPerformance() {
   });
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [stageIds, setStageIds] = useState<string[]>([]);
+  const [sellerIds, setSellerIds] = useState<string[]>([]);
   // Só busca depois de aplicar o funil padrão da conta (mesmo ponto de partida
   // do Dashboard), para não calcular duas vezes na abertura.
   const [readyWorkspaceId, setReadyWorkspaceId] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export default function MyPerformance() {
     let cancelled = false;
     setPipelineId(null);
     setStageIds([]);
+    setSellerIds([]);
     supabase
       .from("ghl_dashboard_settings")
       .select("default_pipeline_ids")
@@ -52,8 +55,8 @@ export default function MyPerformance() {
   const ready = !!workspaceId && readyWorkspaceId === workspaceId;
 
   const filters = useMemo(
-    () => ({ workspaceId, startDate, endDate, pipelineId, stageIds }),
-    [workspaceId, startDate, endDate, pipelineId, stageIds],
+    () => ({ workspaceId, startDate, endDate, pipelineId, stageIds, sellerIds }),
+    [workspaceId, startDate, endDate, pipelineId, stageIds, sellerIds],
   );
   const { data, isLoading, isFetching, error, refetch } = useMyPerformance(filters, { enabled: ready });
 
@@ -65,6 +68,16 @@ export default function MyPerformance() {
     endDate: endOfDay(subDays(startDate, 1)),
   }), [filters, startDate, periodDays]);
   const { data: prevData } = useMyPerformance(prevFilters, { enabled: ready && !!data });
+
+  const locked = !!data?.sellerLocked;
+  const subtitle = (() => {
+    if (!data) return "Qualidade de preenchimento e tempo de resposta dos seus leads";
+    const opps = `${data.totalLeads} oportunidade${data.totalLeads === 1 ? "" : "s"} no período`;
+    if (locked) return data.sellerName ? `Seus leads como ${data.sellerName} · ${opps}` : opps;
+    if (sellerIds.length === 0) return `Todos os vendedores · ${opps}`;
+    if (sellerIds.length === 1) return `Leads de ${data.sellerName || "1 vendedor"} · ${opps}`;
+    return `${sellerIds.length} vendedores · ${opps}`;
+  })();
 
   if (!activeWorkspace) {
     return (
@@ -82,11 +95,14 @@ export default function MyPerformance() {
         onRefresh={() => refetch()}
         isLoading={isLoading}
         pipelines={data?.pipelines || []}
-        users={[]}
+        users={locked ? [] : data?.users || []}
         selectedPipelineId={pipelineId}
         selectedStageIds={stageIds}
+        selectedSellerIds={locked ? [] : sellerIds}
         onPipelineChange={(id) => { setPipelineId(id); setStageIds([]); }}
         onStageIdsChange={setStageIds}
+        onSellerIdsChange={data && !locked ? setSellerIds : undefined}
+        lockedSellerName={locked ? data?.sellerName : null}
       />
 
       <div className="flex items-start justify-between gap-3">
@@ -95,11 +111,7 @@ export default function MyPerformance() {
             <TrendingUp className="w-6 h-6 text-primary-ink" />
             Meu desempenho
           </h1>
-          <p className="text-muted-foreground">
-            {data?.sellerName
-              ? `Seus leads como ${data.sellerName} · ${data.totalLeads} oportunidade${data.totalLeads === 1 ? "" : "s"} no período`
-              : "Qualidade de preenchimento e tempo de resposta dos seus leads"}
-          </p>
+          <p className="text-muted-foreground">{subtitle}</p>
         </div>
         <Button
           variant="outline"
@@ -117,7 +129,7 @@ export default function MyPerformance() {
       {error && !data ? (
         <div className="dashboard-section flex flex-col items-center text-center gap-3 py-10">
           <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Link2Off className="w-6 h-6 text-destructive" aria-hidden="true" />
+            <Link2Off className="w-6 h-6 text-destructive-ink" aria-hidden="true" />
           </div>
           <p className="text-sm text-foreground max-w-md">{error.message}</p>
           <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
@@ -142,6 +154,7 @@ export default function MyPerformance() {
             leads={data.incompleteLeads}
             total={data.incompleteLeadsTotal}
             ghlLocationId={data.ghlLocationId}
+            showSeller={!locked && sellerIds.length !== 1}
           />
         </div>
       )}

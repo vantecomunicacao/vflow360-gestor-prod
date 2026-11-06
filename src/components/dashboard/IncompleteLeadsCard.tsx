@@ -10,6 +10,8 @@ interface IncompleteLeadsCardProps {
   leads: IncompleteLead[];
   total: number;
   ghlLocationId: string | null;
+  /** Mostra o vendedor de cada lead (tela com mais de um vendedor). */
+  showSeller?: boolean;
 }
 
 const STATUS_LABEL: Record<IncompleteLead["status"], { text: string; cls: string }> = {
@@ -22,7 +24,7 @@ const ALL = "__all__";
 
 /** Lista de pendências da Qualidade de Preenchimento: quais oportunidades do
  *  período estão com quais campos em branco, com atalho para abrir no GHL. */
-export function IncompleteLeadsCard({ leads, total, ghlLocationId }: IncompleteLeadsCardProps) {
+export function IncompleteLeadsCard({ leads, total, ghlLocationId, showSeller = false }: IncompleteLeadsCardProps) {
   const hasOpen = leads.some((l) => l.status === "open");
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [field, setField] = useState<string>(ALL);
@@ -110,7 +112,11 @@ export function IncompleteLeadsCard({ leads, total, ghlLocationId }: IncompleteL
                       ) : (
                         <p className="text-sm font-medium text-foreground truncate">{lead.name}</p>
                       )}
-                      {lead.stage && <p className="text-xs text-muted-foreground truncate">{lead.stage}</p>}
+                      {(lead.stage || (showSeller && lead.seller)) && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {[lead.stage, showSeller ? lead.seller : null].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                     </div>
                     <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0", status.cls)}>
                       {status.text}
@@ -120,7 +126,7 @@ export function IncompleteLeadsCard({ leads, total, ghlLocationId }: IncompleteL
                     {lead.missing.map((f) => (
                       <span
                         key={f}
-                        className="text-[11px] px-2 py-0.5 rounded-full border bg-destructive/5 border-destructive/15 text-destructive"
+                        className="text-[11px] px-2 py-0.5 rounded-full border bg-destructive/5 border-destructive/15 text-destructive-ink"
                       >
                         {f}
                       </span>
