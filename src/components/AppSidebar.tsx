@@ -87,7 +87,7 @@ export function AppSidebar() {
                       to={item.url}
                       end={item.end !== false}
                       className="flex items-center gap-3 px-3 py-2 rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-                      activeClassName="gradient-primary text-white font-bold shadow-brand"
+                      activeClassName="gradient-primary text-primary-foreground font-bold shadow-brand"
                     >
                       <item.icon className="w-5 h-5 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
@@ -110,14 +110,14 @@ export function AppSidebar() {
           }
           title={collapsed ? displayName : undefined}
         >
-          <div className="w-8 h-8 rounded-full gradient-primary text-white flex items-center justify-center text-sm font-semibold shrink-0">
+          <div className="w-8 h-8 rounded-full gradient-primary text-primary-foreground flex items-center justify-center text-sm font-semibold shrink-0">
             {initial}
           </div>
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">{displayName}</p>
               {email && email !== displayName && (
-                <p className="text-xs text-sidebar-foreground/60 truncate">{email}</p>
+                <p className="text-xs text-sidebar-foreground/80 truncate">{email}</p>
               )}
             </div>
           )}

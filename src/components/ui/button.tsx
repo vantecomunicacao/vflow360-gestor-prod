@@ -9,10 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        /* .btn--primario do DS Vante — laranja sólido (selo de marca, não gradient) */
-        default: "bg-primary text-white font-bold shadow-[0_1px_2px_rgba(13,13,13,0.10)] hover:bg-primary/90 hover:shadow-brand",
+        /* .btn--primario do DS Vante — laranja sólido (selo de marca, não gradient).
+           Texto escuro (--primary-foreground): branco sobre este laranja dá só 2,4:1;
+           o preto da marca dá 8,2:1. Mesma regra de Badge/Checkbox/funil. */
+        default: "bg-primary text-primary-foreground font-bold shadow-[0_1px_2px_rgba(13,13,13,0.10)] hover:bg-primary/90 hover:shadow-brand",
         /* CTA de marca — gradient Vante. Use 1 por tela (regra do DS). */
-        brand: "gradient-primary text-white font-bold shadow-[0_1px_2px_rgba(13,13,13,0.10)] hover:shadow-brand",
+        brand: "gradient-primary text-primary-foreground font-bold shadow-[0_1px_2px_rgba(13,13,13,0.10)] hover:shadow-brand",
         destructive: "bg-destructive text-destructive-foreground font-bold hover:bg-destructive/90",
         /* .btn--secundario do DS — superfície + borda forte */
         outline: "border border-border bg-card text-foreground hover:bg-muted hover:border-muted-foreground/40",

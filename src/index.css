@@ -12,6 +12,10 @@
      Mapeados para os nomes que o shadcn/Tailwind esperam.
      ============================================================ */
   :root {
+    /* Controles nativos do navegador (relógio/calendário de input, scrollbar,
+       autofill) seguem o tema. Sem isso, no escuro eles saem com ícone preto. */
+    color-scheme: light;
+
     /* ===== Escala laranja Vante (HSL p/ Tailwind) ===== */
     --laranja-50:  14 100% 96%;
     --laranja-100: 14 100% 91%;
@@ -62,6 +66,8 @@
     --accent-foreground: var(--laranja-900);
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
+    /* Texto/ícone vermelho sobre fundo neutro (mesmo padrão de --primary-ink) */
+    --destructive-ink: 0 72% 51%;
     --border: var(--neutro-200);
     --input: var(--neutro-200);
     --ring: var(--laranja-700);
@@ -133,7 +139,9 @@
     /* ============================================================
        TEMA ESCURO (default do VFlow360)
        ============================================================ */
-    --background: 0 0% 4%;           /* #0A0A0A — --fundo */
+    color-scheme: dark;
+
+    --background: 0 0% 4%;          /* #0A0A0A — --fundo */
     --foreground: 0 0% 96%;          /* #F5F5F5 — --texto */
     --card: 0 0% 7%;                 /* #131313 — --superficie */
     --card-foreground: 0 0% 96%;
@@ -149,12 +157,18 @@
     --secondary: 0 0% 11%;           /* #1C1C1C — --superficie-2 */
     --secondary-foreground: 0 0% 96%;
     --muted: 0 0% 11%;
-    --muted-foreground: 0 0% 54%;    /* #8A8A8A — --texto-3 */
+    /* #A1A1A1 — entre --texto-2 e --texto-3 do DS. O #8A8A8A (--texto-3) ficava
+       abaixo de 4,5:1 quando combinado com opacidade (ex.: /70) ou em fundo
+       --muted; 63% dá 7,2:1 no card e mantém a hierarquia vs. --foreground. */
+    --muted-foreground: 0 0% 63%;
     --accent: 18 55% 14%;            /* tint quente escuro */
     --accent-foreground: 0 0% 96%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 16%;              /* #2A2A2A — --borda */
+    /* Vermelho clareado p/ texto no dark: 5,4:1 no card (o --destructive dá 3,9:1).
+       O fundo do botão vermelho continua em --destructive. */
+    --destructive-ink: 0 80% 63%;
+    --border: 0 0% 16%;             /* #2A2A2A — --borda */
     --input: 0 0% 16%;
     --ring: var(--laranja-700);
 

@@ -285,7 +285,7 @@ const Workspaces = () => {
                             : "Excluir"
                         }
                       >
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <Trash2 className="w-4 h-4 text-destructive-ink" />
                       </Button>
                     </>
                   )}
@@ -343,7 +343,7 @@ const Workspaces = () => {
             return (
               <div
                 key={ws.id}
-                className="glass-card p-4 flex items-center gap-3 opacity-80"
+                className="glass-card p-4 flex items-center gap-3"
               >
                 <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
                   <Building2 className="w-5 h-5" />
@@ -371,7 +371,7 @@ const Workspaces = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-destructive hover:text-destructive"
+                  className="text-destructive-ink hover:text-destructive-ink"
                   onClick={() => { setPurgeTarget(ws); setPurgeConfirmText(""); }}
                   disabled={!isOwner}
                   title={isOwner ? "Excluir definitivamente" : "Apenas o proprietário pode excluir"}
@@ -452,7 +452,7 @@ const Workspaces = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive">
+            <AlertDialogTitle className="text-destructive-ink">
               Excluir "{purgeTarget?.name}" definitivamente?
             </AlertDialogTitle>
             <AlertDialogDescription>

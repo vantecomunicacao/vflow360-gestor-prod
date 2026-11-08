@@ -171,7 +171,7 @@ export function ContactGroupCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 px-3 text-muted-foreground hover:text-destructive"
+                  className="h-8 px-3 text-muted-foreground hover:text-destructive-ink"
                   disabled={rejectingThisGroup || approvingThisGroup}
                   onClick={(e) => {
                     e.stopPropagation();

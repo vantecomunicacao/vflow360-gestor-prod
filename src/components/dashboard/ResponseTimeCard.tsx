@@ -53,7 +53,7 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
     responseRate === null ? "text-muted-foreground"
     : responseRate >= 70 ? "text-success"
     : responseRate >= 40 ? "text-warning-ink"
-    : "text-destructive";
+    : "text-destructive-ink";
   const rateBarColor =
     responseRate === null ? "bg-muted"
     : responseRate >= 70 ? "bg-success"
@@ -99,7 +99,7 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
                     <div
                       className={cn(
                         "mt-3 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full cursor-help",
-                        trend.faster ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
+                        trend.faster ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive-ink",
                       )}
                     >
                       {trend.faster ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
@@ -139,7 +139,7 @@ export function ResponseTimeCard({ responseTime, prevResponseTime }: ResponseTim
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <MessageCircleReply className="w-4 h-4 text-destructive" />
+              <MessageCircleReply className="w-4 h-4 text-destructive-ink" />
               Clientes sem resposta
             </DialogTitle>
             <DialogDescription>

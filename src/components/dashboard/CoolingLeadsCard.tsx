@@ -54,8 +54,8 @@ export function CoolingLeadsCard({ data }: CoolingLeadsCardProps) {
       count: data?.critical ?? 0,
       label: `${t.critical}+ dias parado`,
       sub: "Crítico",
-      cls: "bg-destructive/10 text-destructive border-destructive/30",
-      iconCls: "bg-destructive/15 text-destructive",
+      cls: "bg-destructive/10 text-destructive-ink border-destructive/30",
+      iconCls: "bg-destructive/15 text-destructive-ink",
     },
   ];
 

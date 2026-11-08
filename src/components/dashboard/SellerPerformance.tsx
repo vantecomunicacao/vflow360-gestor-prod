@@ -188,7 +188,7 @@ export function SellerPerformance({ sellers, selectedSellerIds = [], onSellerTog
                   <StageCell tone="funnel-4" passage={s.fechamento} current={s.atualFechamento} />
                   <StageCell tone="funnel-5" passage={s.vendaGanha} current={s.atualVendaGanha} />
                   <td className="text-center">
-                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-destructive/10 text-destructive rounded-lg font-bold text-sm">{s.perdidas ?? 0}</span>
+                    <span className="inline-flex items-center justify-center min-w-10 h-7 px-2 bg-destructive/10 text-destructive-ink rounded-lg font-bold text-sm">{s.perdidas ?? 0}</span>
                   </td>
                   <td className="text-center"><span className="font-bold text-primary-ink">{rate}%</span></td>
                   <td className="text-center">

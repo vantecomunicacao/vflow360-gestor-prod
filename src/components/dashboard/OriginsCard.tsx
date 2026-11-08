@@ -6,6 +6,7 @@ import { SectionTooltip } from "./SectionTooltip";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { groupTopN } from "@/lib/group-top-n";
 import { getPieColor } from "@/lib/pie-palette";
+import { chartTooltipProps } from "@/lib/chart-tooltip";
 
 type Mode = "leads" | "wins";
 
@@ -140,13 +141,7 @@ export function OriginsCard({ mode, distribution, fillRate, configured, colorMap
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--raio-md)",
-                    boxShadow: "var(--shadow-2)",
-                    fontSize: 13,
-                  }}
+                  {...chartTooltipProps}
                   formatter={(v: number, name: string) => [`${v} ${copy.unitLabel}`, name]}
                 />
               </PieChart>

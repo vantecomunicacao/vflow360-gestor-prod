@@ -44,9 +44,9 @@ export function DataQuality({ customFields, overallFillRate = 0 }: DataQualityPr
       <div className="space-y-3">
         {sortedFields.map((f) => {
           const Icon = f.filledPercentage >= 50 ? CheckCircle2 : AlertCircle;
-          const iconColor = f.filledPercentage >= 50 ? "text-success" : "text-destructive";
+          const iconColor = f.filledPercentage >= 50 ? "text-success" : "text-destructive-ink";
           const bgColor = f.filledPercentage >= 50 ? "bg-success/5 border-success/10" : "bg-destructive/5 border-destructive/10";
-          const textColor = f.filledPercentage >= 50 ? "text-success" : "text-destructive";
+          const textColor = f.filledPercentage >= 50 ? "text-success" : "text-destructive-ink";
 
           return (
             <div key={f.name} className={cn("p-3 border rounded-2xl", bgColor)}>

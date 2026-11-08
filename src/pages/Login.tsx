@@ -71,9 +71,9 @@ const Login = () => {
             src="/vflow360-logo-escuro.png"
             alt="VFlow360"
             className="h-12 w-auto mx-auto mb-8"
-            style={{ filter: "brightness(0) invert(1)" }}
+            style={{ filter: "brightness(0)" }}
           />
-          <p className="text-white text-lg max-w-md leading-relaxed">
+          <p className="text-primary-foreground text-lg max-w-md leading-relaxed">
             Seu assistente inteligente para vendas. Analise conversas, receba sugestões e atualize seu CRM automaticamente.
           </p>
         </motion.div>

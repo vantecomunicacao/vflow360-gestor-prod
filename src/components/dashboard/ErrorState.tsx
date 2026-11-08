@@ -11,7 +11,7 @@ export function ErrorState({ error, onRetry }: ErrorStateProps) {
     <div className="min-h-[400px] flex items-center justify-center">
       <div className="text-center space-y-6 max-w-md mx-auto p-6">
         <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
-          <AlertTriangle className="w-8 h-8 text-destructive" />
+          <AlertTriangle className="w-8 h-8 text-destructive-ink" />
         </div>
         <div>
           <h2 className="text-xl font-semibold text-foreground mb-2">Erro ao carregar dashboard</h2>

@@ -118,7 +118,7 @@ export function WorkspaceMembers({ workspaceId, canManage }: { workspaceId: stri
                 >
                   {removingId === m.user_id
                     ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Trash2 className="w-4 h-4 text-destructive" />}
+                    : <Trash2 className="w-4 h-4 text-destructive-ink" />}
                 </Button>
               )}
             </div>

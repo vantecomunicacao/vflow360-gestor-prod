@@ -42,7 +42,7 @@ export function MetricCard({
                 <div
                   className={cn(
                     "flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full cursor-help shrink-0 self-center",
-                    trend.isPositive ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
+                    trend.isPositive ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive-ink",
                   )}
                 >
                   {trend.isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}

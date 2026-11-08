@@ -148,7 +148,7 @@ export const GhlSection = ({
         </div>
         <Badge
           variant="outline"
-          className={ghlConnected ? "text-success border-success/30" : "text-destructive border-destructive/30"}
+          className={ghlConnected ? "text-success border-success/30" : "text-destructive-ink border-destructive/30"}
         >
           {ghlConnected ? (
             <>

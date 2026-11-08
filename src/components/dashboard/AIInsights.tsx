@@ -97,7 +97,7 @@ export function AIInsights() {
                           {ins.refs?.pipeline_name || "Visão geral"}
                         </Badge>
                         {ins.period_label && (
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                             {ins.period_label}
                           </span>
                         )}

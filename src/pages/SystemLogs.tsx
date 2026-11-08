@@ -151,7 +151,7 @@ export default function SystemLogs() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">Erros</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-destructive">{counts.errors}</CardContent>
+          <CardContent className="text-2xl font-bold text-destructive-ink">{counts.errors}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">

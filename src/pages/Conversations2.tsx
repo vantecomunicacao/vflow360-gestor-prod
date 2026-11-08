@@ -784,7 +784,7 @@ export default function Conversations2() {
                                   <button
                                     type="button"
                                     onClick={() => toggleDescription(msg.id)}
-                                    className={`flex items-center gap-1 text-[11px] opacity-70 hover:opacity-100 transition-opacity ${
+                                    className={`flex items-center gap-1 text-[11px] hover:underline underline-offset-2 ${
                                       isOutbound ? "text-primary-foreground" : "text-foreground"
                                     }`}
                                   >
@@ -813,7 +813,7 @@ export default function Conversations2() {
                           ) : null}
                           <p
                             className={`text-xs mt-1 ${
-                              isOutbound ? "text-primary-foreground/60" : "text-muted-foreground"
+                              isOutbound ? "text-primary-foreground/75" : "text-muted-foreground"
                             }`}
                           >
                             {new Date(msg.date_added).toLocaleTimeString("pt-BR", {

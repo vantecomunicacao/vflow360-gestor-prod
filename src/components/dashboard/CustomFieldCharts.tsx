@@ -2,22 +2,22 @@ import { PieChart as PieIcon } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { CustomFieldDistribution } from "@/hooks/useGhlData";
 import { SectionTooltip } from "./SectionTooltip";
+import { getPieColor, OUTRAS_COLOR } from "@/lib/pie-palette";
+import { chartTooltipProps } from "@/lib/chart-tooltip";
 
 interface CustomFieldChartsProps {
   fields: CustomFieldDistribution[];
 }
 
-const PIE_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent))",
-  "hsl(var(--success))",
-  "hsl(var(--warning))",
-  "hsl(var(--destructive))",
-  "hsl(var(--muted-foreground))",
-  "hsl(var(--secondary-foreground))",
-];
-
 const MAX_SLICES = 6;
+const OUTROS_LABEL = "Outros";
+
+// Mesma paleta das demais pizzas do dashboard. A paleta antiga usava tokens de
+// interface (--accent, --secondary-foreground) como cor de dado: no tema escuro
+// uma fatia saía marrom quase preta, e no claro outra saía preta.
+function sliceColor(name: string, index: number): string {
+  return name === OUTROS_LABEL ? OUTRAS_COLOR : getPieColor(name, index);
+}
 
 function compactDistribution(dist: CustomFieldDistribution["distribution"]) {
   if (dist.length <= MAX_SLICES) return dist;
@@ -25,7 +25,7 @@ function compactDistribution(dist: CustomFieldDistribution["distribution"]) {
   const tail = dist.slice(MAX_SLICES - 1);
   const otherCount = tail.reduce((a, b) => a + b.count, 0);
   const otherPct = tail.reduce((a, b) => a + b.percentage, 0);
-  return [...head, { name: "Outros", count: otherCount, percentage: otherPct }];
+  return [...head, { name: OUTROS_LABEL, count: otherCount, percentage: otherPct }];
 }
 
 export function CustomFieldCharts({ fields }: CustomFieldChartsProps) {
@@ -72,18 +72,13 @@ export function CustomFieldCharts({ fields }: CustomFieldChartsProps) {
                           stroke="hsl(var(--background))"
                           strokeWidth={1}
                         >
-                          {data.map((_, i) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          {data.map((d, i) => (
+                            <Cell key={i} fill={sliceColor(d.name, i)} />
                           ))}
                         </Pie>
                         <Tooltip
-                          contentStyle={{
-                            background: "hsl(var(--popover))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "0.5rem",
-                            fontSize: "11px",
-                            padding: "4px 8px",
-                          }}
+                          {...chartTooltipProps}
+                          contentStyle={{ ...chartTooltipProps.contentStyle, fontSize: 11, padding: "4px 8px" }}
                           formatter={(value: number, name: string) => [`${value}`, name]}
                         />
                       </PieChart>
@@ -95,7 +90,7 @@ export function CustomFieldCharts({ fields }: CustomFieldChartsProps) {
                       <li key={d.name} className="flex items-center gap-1.5 text-[11px] leading-tight">
                         <span
                           className="w-2 h-2 rounded-full shrink-0"
-                          style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                          style={{ background: sliceColor(d.name, i) }}
                         />
                         <span className="truncate flex-1" title={d.name}>{d.name}</span>
                         <span className="text-muted-foreground tabular-nums">

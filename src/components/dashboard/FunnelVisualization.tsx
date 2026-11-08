@@ -114,20 +114,20 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
                 >
                   <div className="relative px-4 py-3.5 flex justify-between items-center gap-3">
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[9px] font-semibold uppercase tracking-wider text-white/75 leading-tight">
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-primary-foreground/85 leading-tight">
                         {isLast ? "Final" : `Etapa ${stageNumber}`}
                       </span>
-                      <h3 className="text-[13px] font-bold text-white leading-snug truncate">
+                      <h3 className="text-[13px] font-bold text-primary-foreground leading-snug truncate">
                         {stage.name}
                       </h3>
                     </div>
                     <div className="flex items-baseline gap-2.5 shrink-0">
                       {typeof stage.currentCount === "number" && (
-                        <span className="text-[10px] font-semibold text-white/85 tabular-nums whitespace-nowrap">
-                          <span className="font-normal text-white/60">atual</span> {stage.currentCount}
+                        <span className="text-[10px] font-semibold text-primary-foreground/85 tabular-nums whitespace-nowrap">
+                          <span className="font-normal">atual</span> {stage.currentCount}
                         </span>
                       )}
-                      <span className="text-xl font-extrabold leading-none text-white tabular-nums">
+                      <span className="text-xl font-extrabold leading-none text-primary-foreground tabular-nums">
                         {stage.count}
                       </span>
                     </div>
@@ -170,7 +170,7 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
             <div className="relative">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-                  <XCircle className="w-5 h-5 text-destructive" />
+                  <XCircle className="w-5 h-5 text-destructive-ink" />
                 </div>
                 <h3 className="font-bold text-foreground">Oportunidades Perdidas</h3>
                 <SectionTooltip text="Refere-se a leads que saíram do funil antes de atingir a etapa de Venda Ganha." />
@@ -179,7 +179,7 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
               <div className="space-y-4">
                 <div>
                   <div className="text-xs text-muted-foreground mb-0.5">Total acumulado</div>
-                  <div className="text-3xl font-black text-destructive tabular-nums leading-none">{lostLeads}</div>
+                  <div className="text-3xl font-black text-destructive-ink tabular-nums leading-none">{lostLeads}</div>
                 </div>
 
                 <div className="pt-4 border-t border-border">

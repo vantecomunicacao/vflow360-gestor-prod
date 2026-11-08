@@ -2,6 +2,7 @@ import { DailyLead } from "@/hooks/useGhlData";
 import { BarChart3, TrendingUp, Calendar, ArrowUp } from "lucide-react";
 import { SectionTooltip } from "./SectionTooltip";
 import { ComposedChart, Bar, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts";
+import { chartTooltipProps, chartCursorStyle } from "@/lib/chart-tooltip";
 
 interface DailyLeadsProps { dailyLeads: DailyLead[]; }
 
@@ -61,7 +62,8 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
               <XAxis dataKey="dayName" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12, fontWeight: 500 }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} allowDecimals={false} />
               <Tooltip<number, string>
-                contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "16px", boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}
+                {...chartTooltipProps}
+                cursor={chartCursorStyle}
                 formatter={(v, n) => [`${v} opps`, n === "count" ? "Entrada" : "Tendência"]}
                 labelFormatter={(label, payload) => {
                   const p = payload?.[0]?.payload as { date?: string } | undefined;
@@ -113,7 +115,7 @@ export function DailyLeads({ dailyLeads }: DailyLeadsProps) {
             <div className="flex items-center gap-2">
               <p className="text-lg font-extrabold text-foreground">{today.count} opps</p>
               {yesterday && todayVsYesterday !== 0 && (
-                <span className={`text-xs font-bold ${todayVsYesterday > 0 ? "text-success" : "text-destructive"}`}>
+                <span className={`text-xs font-bold ${todayVsYesterday > 0 ? "text-success" : "text-destructive-ink"}`}>
                   {todayVsYesterday > 0 ? "+" : ""}{todayVsYesterday.toFixed(0)}%
                 </span>
               )}

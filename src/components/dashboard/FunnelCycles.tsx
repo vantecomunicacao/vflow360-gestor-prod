@@ -38,10 +38,10 @@ export function FunnelCycles({
 
         <div className="pt-4 border-t border-border">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-            <XCircle className="w-3.5 h-3.5 text-destructive" />
+            <XCircle className="w-3.5 h-3.5 text-destructive-ink" />
             Ciclo até a perda
           </div>
-          <div className="text-2xl font-bold text-destructive tabular-nums">
+          <div className="text-2xl font-bold text-destructive-ink tabular-nums">
             {formatDays(cycleToLostDays)}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">

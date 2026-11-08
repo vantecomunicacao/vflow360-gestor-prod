@@ -5,6 +5,7 @@ import { XCircle, CheckCircle2, AlertCircle } from "lucide-react";
 import { SectionTooltip } from "./SectionTooltip";
 import { groupTopN, NAO_INFORMADO_LABEL } from "@/lib/group-top-n";
 import { getPieColor } from "@/lib/pie-palette";
+import { chartTooltipProps } from "@/lib/chart-tooltip";
 
 interface LossReasonsProps { lossReasons: LossReason[]; totalLost: number; }
 
@@ -42,7 +43,7 @@ export function LossReasons({ lossReasons, totalLost }: LossReasonsProps) {
     <div className="dashboard-section animate-slide-up h-full">
       <div className="flex items-center justify-between mb-4">
         <h2 className="section-title mb-0">
-          <XCircle className="w-5 h-5 text-destructive" />
+          <XCircle className="w-5 h-5 text-destructive-ink" />
           Motivos de Perda
           <SectionTooltip text="Distribuição dos motivos para oportunidades marcadas como Perdidas. Mostra os 6 principais motivos; o restante é agrupado em 'Outras'. Perdas sem motivo registrado aparecem como 'Não informado'." />
         </h2>
@@ -90,13 +91,7 @@ export function LossReasons({ lossReasons, totalLost }: LossReasonsProps) {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--raio-md)",
-                    boxShadow: "var(--shadow-2)",
-                    fontSize: 13,
-                  }}
+                  {...chartTooltipProps}
                   formatter={(v: number, name: string) => [`${v} opps`, name]}
                 />
               </PieChart>

@@ -77,7 +77,7 @@ export function SuggestionCard({
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">
                 {suggestion.ai_provider.startsWith("openai") ? "🤖 OpenAI" : "✨ IA (legado)"}
                 {suggestion.ai_provider.includes("/") && (
-                  <span className="ml-1 opacity-60">{suggestion.ai_provider.split("/").pop()}</span>
+                  <span className="ml-1 text-muted-foreground">{suggestion.ai_provider.split("/").pop()}</span>
                 )}
               </Badge>
             )}
@@ -90,7 +90,7 @@ export function SuggestionCard({
               </Badge>
             )}
             {suggestion.status === "pending" && ad?.auto_approve_error && (
-              <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+              <Badge variant="outline" className="bg-destructive/10 text-destructive-ink border-destructive/20">
                 <AlertTriangle className="w-3 h-3 mr-1" /> Auto-aprovação falhou
               </Badge>
             )}
@@ -163,10 +163,10 @@ export function SuggestionCard({
           {ad?.auto_approve_error && suggestion.status === "pending" && (
             <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 mb-2">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                <AlertTriangle className="w-4 h-4 text-destructive-ink mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs font-semibold text-destructive mb-0.5">Erro na auto-aprovação</p>
-                  <p className="text-xs text-destructive/80">{ad.auto_approve_error}</p>
+                  <p className="text-xs font-semibold text-destructive-ink mb-0.5">Erro na auto-aprovação</p>
+                  <p className="text-xs text-destructive-ink/80">{ad.auto_approve_error}</p>
                   {ad.auto_approve_failed_at && (
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {new Date(ad.auto_approve_failed_at).toLocaleString("pt-BR")}
@@ -263,7 +263,7 @@ export function SuggestionCard({
 
           {suggestion.status === "pending" && isLost && lostReasons.length > 0 && (
             <div className="mb-3 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
-              <label className="text-xs font-semibold text-destructive mb-1.5 block">
+              <label className="text-xs font-semibold text-destructive-ink mb-1.5 block">
                 Motivo de perda {(ad as any)?.lostReasonId ? "(sugerido pela IA ✨)" : "(obrigatório)"}
               </label>
               <Select
