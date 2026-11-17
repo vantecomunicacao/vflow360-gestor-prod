@@ -13,6 +13,8 @@ interface FunnelVisualizationProps {
   lostLeadsDetail?: StageLead[];
   /** Conteúdo renderizado abaixo do card "Oportunidades Perdidas" na coluna direita. */
   belowLostCard?: React.ReactNode;
+  /** Observação por etapa (bucket key -> texto). Só vem preenchida com um funil selecionado. */
+  stageNotes?: Record<string, string>;
 }
 
 const formatPercentage = (v: number) => `${v.toFixed(1)}%`;
@@ -60,7 +62,7 @@ const stageAccents = [
   { bg: "bg-funnel-5", border: "border-funnel-5/40", icon: "text-funnel-5-ink" },
 ];
 
-export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [], belowLostCard }: FunnelVisualizationProps) {
+export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, lostLeadsDetail = [], belowLostCard, stageNotes }: FunnelVisualizationProps) {
   const [selectedStage, setSelectedStage] = useState<{ title: string; leads: StageLead[] } | null>(null);
 
   // Derivado do próprio funil de passagem: a taxa entre duas etapas é a razão
@@ -104,6 +106,7 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
             const accent = stageAccents[index] || stageAccents[stageAccents.length - 1];
             const widthClass = stageWidths[index] || stageWidths[stageWidths.length - 1];
             const stageNumber = String(index + 1).padStart(2, "0");
+            const note = stageNotes?.[stage.id];
 
             return (
               <div key={stage.id} className={`${widthClass} flex flex-col items-center`}>
@@ -120,6 +123,11 @@ export function FunnelVisualization({ funnelStages, conversionRates, lostLeads, 
                       <h3 className="text-[13px] font-bold text-primary-foreground leading-snug truncate">
                         {stage.name}
                       </h3>
+                      {note && (
+                        <p className="text-[10px] text-primary-foreground/85 leading-snug truncate" title={note}>
+                          {note}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-baseline gap-2.5 shrink-0">
                       {typeof stage.currentCount === "number" && (

@@ -32,6 +32,7 @@ import { AnimatedSection } from "@/components/dashboard/AnimatedSection";
 import { AIUsageCard } from "@/components/dashboard/AIUsageCard";
 import { useToast } from "@/hooks/use-toast";
 import { loadDashboardFilters, saveDashboardFilters, clearDashboardFilters } from "@/lib/dashboard-filters-storage";
+import type { FunnelStageNotes } from "@/lib/dashboard-funnel";
 
 export default function Dashboard() {
   const { activeWorkspace } = useWorkspace();
@@ -137,6 +138,24 @@ export default function Dashboard() {
     selectedPipelineId, selectedStageIds, selectedSellerIds, selectedUtmMedium, selectedUtmCampaign,
   ]);
 
+  // Observações por etapa, configuradas por funil em Configurações → Dashboard.
+  const [stageNotesByPipeline, setStageNotesByPipeline] = useState<FunnelStageNotes>({});
+  useEffect(() => {
+    if (!activeWorkspace?.id) return;
+    let cancelled = false;
+    setStageNotesByPipeline({});
+    (async () => {
+      const { data } = await supabase
+        .from("ghl_dashboard_settings")
+        .select("funnel_stage_notes")
+        .eq("workspace_id", activeWorkspace.id)
+        .maybeSingle();
+      if (!cancelled) setStageNotesByPipeline((data?.funnel_stage_notes as unknown as FunnelStageNotes) || {});
+    })();
+    return () => { cancelled = true; };
+  }, [activeWorkspace?.id]);
+  // Só com UM funil selecionado; em "Todos" nenhuma observação aparece.
+  const stageNotes = selectedPipelineId ? stageNotesByPipeline[selectedPipelineId] : undefined;
 
   const startDate = useMemo(() => startOfDay(dateRange?.from || subDays(new Date(), 6)), [dateRange?.from]);
   const endDate = useMemo(() => endOfDay(dateRange?.to || dateRange?.from || new Date()), [dateRange?.to, dateRange?.from]);
@@ -355,6 +374,7 @@ export default function Dashboard() {
             conversionRates={data.conversionRates}
             lostLeads={data.lostLeads || 0}
             lostLeadsDetail={data.lostLeadsDetail || []}
+            stageNotes={stageNotes}
             belowLostCard={
               <FunnelCycles
                 cycleToWonDays={data.cycleToWonDays ?? 0}

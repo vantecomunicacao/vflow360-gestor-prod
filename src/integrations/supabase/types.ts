@@ -544,6 +544,7 @@ export type Database = {
           created_at: string
           default_pipeline_ids: string[] | null
           funnel_stage_mapping: Json | null
+          funnel_stage_notes: Json
           origin_field_name: string | null
           updated_at: string
           utm_campaign_field_id: string | null
@@ -566,6 +567,7 @@ export type Database = {
           created_at?: string
           default_pipeline_ids?: string[] | null
           funnel_stage_mapping?: Json | null
+          funnel_stage_notes?: Json
           origin_field_name?: string | null
           updated_at?: string
           utm_campaign_field_id?: string | null
@@ -588,6 +590,7 @@ export type Database = {
           created_at?: string
           default_pipeline_ids?: string[] | null
           funnel_stage_mapping?: Json | null
+          funnel_stage_notes?: Json
           origin_field_name?: string | null
           updated_at?: string
           utm_campaign_field_id?: string | null

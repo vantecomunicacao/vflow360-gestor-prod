@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Button } from "@/components/ui/button";
-
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Loader2, Save, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { FUNNEL_BUCKETS, DATE_TYPES } from "@/lib/dashboard-funnel";
+import { FUNNEL_BUCKETS, DATE_TYPES, cleanStageNotes, type FunnelStageNotes } from "@/lib/dashboard-funnel";
 
 interface Stage { id: string; name: string; }
 interface Pipeline { id: string; ghl_id: string; name: string; stages: Stage[]; }
@@ -40,6 +40,9 @@ export default function DashboardSettings() {
   const [businessStart, setBusinessStart] = useState<string>("09:00");
   const [businessEnd, setBusinessEnd] = useState<string>("18:00");
   const [wonStageKeys, setWonStageKeys] = useState<string[]>(["venda_ganha"]);
+  // pipeline ghl_id -> bucket key -> observação exibida no funil do dashboard
+  const [stageNotes, setStageNotes] = useState<FunnelStageNotes>({});
+  const [notesPipelineId, setNotesPipelineId] = useState<string>("");
 
   useEffect(() => {
     if (!activeWorkspace?.id) return;
@@ -79,7 +82,11 @@ export default function DashboardSettings() {
         setBusinessStart((settings as any).business_hours_start || "09:00");
         setBusinessEnd((settings as any).business_hours_end || "18:00");
         setWonStageKeys(settings.won_stage_keys || ["venda_ganha"]);
+        setStageNotes((settings.funnel_stage_notes as unknown as FunnelStageNotes) || {});
       }
+      // Abre o editor de observações no funil padrão (ou no primeiro funil).
+      const firstPipe = (settings?.default_pipeline_ids || [])[0] || ps[0]?.ghl_id || "";
+      setNotesPipelineId(firstPipe);
     } catch (e) {
       toast.error("Erro ao carregar", { description: (e as Error).message });
     } finally {
@@ -107,6 +114,7 @@ export default function DashboardSettings() {
         business_hours_start: businessStart || "09:00",
         business_hours_end: businessEnd || "18:00",
         won_stage_keys: wonStageKeys,
+        funnel_stage_notes: cleanStageNotes(stageNotes),
       };
       const { error } = await supabase
         .from("ghl_dashboard_settings")
@@ -291,6 +299,54 @@ export default function DashboardSettings() {
             </div>
           ))}
           {allStages.length === 0 && <p className="text-sm text-muted-foreground">Sincronize pipelines primeiro.</p>}
+        </CardContent>
+      </Card>
+
+      {/* Observações do funil */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Observações do funil</CardTitle>
+          <CardDescription>
+            Escreva uma observação para cada fase. Ela aparece no dashboard quando apenas esse funil estiver selecionado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {pipelines.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sincronize pipelines primeiro.</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                <Label className="text-sm">Funil</Label>
+                <Select value={notesPipelineId} onValueChange={setNotesPipelineId}>
+                  <SelectTrigger className="md:col-span-2"><SelectValue placeholder="Selecione um funil" /></SelectTrigger>
+                  <SelectContent>
+                    {pipelines.map((p) => (
+                      <SelectItem key={p.ghl_id} value={p.ghl_id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {notesPipelineId && FUNNEL_BUCKETS.map((b) => (
+                <div key={b.key} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                  <Label htmlFor={`note-${b.key}`} className="text-sm font-normal">{b.label}</Label>
+                  <Input
+                    id={`note-${b.key}`}
+                    className="md:col-span-2"
+                    maxLength={120}
+                    placeholder="Sem observação"
+                    value={stageNotes[notesPipelineId]?.[b.key] || ""}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      setStageNotes((prev) => ({
+                        ...prev,
+                        [notesPipelineId]: { ...(prev[notesPipelineId] || {}), [b.key]: text },
+                      }));
+                    }}
+                  />
+                </div>
+              ))}
+            </>
+          )}
         </CardContent>
       </Card>
 
