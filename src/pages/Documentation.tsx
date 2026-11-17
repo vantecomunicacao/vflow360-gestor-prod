@@ -228,7 +228,7 @@ const Documentation = () => {
           </p>
           <div className="space-y-2">
             {[
-              { icon: "🎤", text: "Áudios: transcritos automaticamente com IA (OpenAI Whisper) e analisados como texto" },
+              { icon: "🎤", text: "Áudios: não são transcritos pelo sistema (a transcrição fica no próprio GHL); a análise só registra que houve um áudio" },
               { icon: "🖼️", text: "Imagens: descritas pela IA e o conteúdo é usado como contexto da conversa" },
               { icon: "📝", text: "Texto: analisado diretamente como parte da conversa" },
             ].map((item, i) => (

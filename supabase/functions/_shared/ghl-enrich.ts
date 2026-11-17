@@ -5,7 +5,7 @@
 //
 // Pega ghl_messages com attachments mas sem enriched_body, baixa as URLs e:
 //   - imagem -> OpenAI vision -> descricao
-//   - audio  -> Whisper -> transcricao
+//   - audio  -> marcador "[Áudio]" (transcricao via Whisper so com GHL_ENRICH_AUDIO=on)
 //   - PDF    -> pdf-extract edge function -> texto
 // Grava em ghl_messages.enriched_body para o ai-analyze-v2 ler.
 
@@ -21,6 +21,12 @@ const MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024; // 25 MB (limite do Whisper)
 // GHL_ENRICH_IMAGE_MODEL nas edge functions.
 const ENRICH_AUDIO_MODEL = Deno.env.get("GHL_ENRICH_AUDIO_MODEL") || "gpt-4o-mini-transcribe";
 const ENRICH_IMAGE_MODEL = Deno.env.get("GHL_ENRICH_IMAGE_MODEL") || "gpt-4o-mini";
+
+// Transcricao de audio DESLIGADA por padrao (2026-11-17): a equipe nao usa e o
+// GHL ja transcreve na propria interface (a API dele nao expoe esse texto para
+// mensagens de WhatsApp). O audio vira so um marcador "[Áudio]" para a analise
+// saber que houve audio. Para religar, setar o secret GHL_ENRICH_AUDIO=on.
+const ENRICH_AUDIO_ENABLED = (Deno.env.get("GHL_ENRICH_AUDIO") || "off").toLowerCase() === "on";
 
 // ============================================================
 // Helpers de download/conversao
@@ -223,8 +229,12 @@ export async function enrichPending(
           // modelo de analise do usuario.
           parts.push(await describeImage(base64, mimetype, aiKey));
         } else if (kind === "audio") {
-          const { base64, mimetype } = await downloadAsBase64(url);
-          parts.push(await transcribeAudio(base64, mimetype, aiKey));
+          if (ENRICH_AUDIO_ENABLED) {
+            const { base64, mimetype } = await downloadAsBase64(url);
+            parts.push(await transcribeAudio(base64, mimetype, aiKey));
+          } else {
+            parts.push("🎵 [Áudio] (não transcrito)");
+          }
         } else if (kind === "pdf") {
           const { base64 } = await downloadAsBase64(url);
           parts.push(await extractPdf(base64, fileNameFromUrl(url), supabaseUrl, serviceKey, ownerId));

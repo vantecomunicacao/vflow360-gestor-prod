@@ -78,6 +78,13 @@ function isGenericMediaPlaceholder(body: string | null | undefined): boolean {
   return /^arquivo de \w+$/i.test(trimmed) || /^\[(image|audio|video|document|sticker|file)\]$/i.test(trimmed);
 }
 
+// Audio sem transcricao vira so o marcador abaixo (ver ghl-enrich.ts). Sem outro
+// conteudo, nao ha "descricao IA" para mostrar.
+const UNTRANSCRIBED_AUDIO = "🎵 [Áudio] (não transcrito)";
+function hasAiDescription(enriched: string | null | undefined): boolean {
+  return !!enriched && enriched.split(UNTRANSCRIBED_AUDIO).join("").trim().length > 0;
+}
+
 const ALL_VENDORS = "__all__";
 const UNASSIGNED = "__unassigned__";
 const LIST_PAGE_SIZE = 50;
@@ -776,7 +783,7 @@ export default function Conversations2() {
                                 {msg.body}
                               </p>
                             )}
-                          {msg.enriched_body && msg.attachments_json?.length ? (
+                          {hasAiDescription(msg.enriched_body) && msg.attachments_json?.length ? (
                             (() => {
                               const expanded = expandedDescriptions.has(msg.id);
                               return (
